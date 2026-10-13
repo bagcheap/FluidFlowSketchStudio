@@ -6,7 +6,6 @@
   "description": "FlowSketch Studio — animated hand-drawn flow diagram editor",
   "scripts": {
     "build:player": "vite build --config vite.player.config.ts && node -e \"require('fs').copyFileSync('src/player/dist/player.bundle.js','src/player/player.bundle.js')\"",
-    "predev": "npm run build:player",
     "dev": "vite",
     "prebuild": "npm run build:player",
     "build": "tsc --noEmit -p . && vite build",
