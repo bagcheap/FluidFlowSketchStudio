@@ -1,0 +1,39 @@
+{
+  "name": "flowsketch-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FlowSketch Studio — animated hand-drawn flow diagram editor",
+  "scripts": {
+    "build:player": "vite build --config vite.player.config.ts && node -e \"require('fs').copyFileSync('src/player/dist/player.bundle.js','src/player/player.bundle.js')\"",
+    "predev": "npm run build:player",
+    "dev": "vite",
+    "prebuild": "npm run build:player",
+    "build": "tsc --noEmit -p . && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "python3 e2e/run_e2e.py",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/kalam": "^5.3.0",
+    "gifenc": "^1.0.3",
+    "idb-keyval": "^6.3.0",
+    "lucide-react": "^1.55.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "roughjs": "^4.6.6",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
+  }
+}
