@@ -17,6 +17,7 @@ import { GifDialog } from './ui/dialogs/GifDialog';
 import { ImageDialog, SvgDialog, VideoDialog } from './ui/dialogs/ExportDialogs';
 import { AboutDialog, AnimationDialog, DocPropsDialog, HelpDialog, PrefsDialog, RecentDialog, ShapesDialog, ShortcutsDialog, TemplatesDialog } from './ui/dialogs/MiscDialogs';
 import { SAMPLES, STARTER_ID } from './templates/samples';
+import { Modal } from './ui/dialogs/Modal';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -95,6 +96,19 @@ function Welcome() {
   );
 }
 
+function ConfirmDialog() {
+  const req = useUI((s) => s.confirmReq);
+  if (!req) return null;
+  return (
+    <Modal title="Are you sure?" onClose={() => req.resolve(false)} footer={<>
+      <button className="btn ghost" onClick={() => req.resolve(false)}>Cancel</button>
+      <button className="btn primary" data-testid="confirm-ok" onClick={() => req.resolve(true)}>{req.ok}</button>
+    </>}>
+      <p className="note">{req.message}</p>
+    </Modal>
+  );
+}
+
 function Dialogs() {
   const d = useUI((s) => s.dialog);
   switch (d) {
@@ -132,9 +146,10 @@ export function App() {
       if (u.prefs.autoplay && !u.reducedMotionOS) u.setPlaying(true);
     }).catch(() => undefined);
     document.fonts?.ready.then(() => { resetTextMetrics(); useDoc.setState((s) => ({ revision: s.revision + 1 })); });
-    const onOpen = (e: Event) => {
+    const onOpen = async (e: Event) => {
       const f = (e as CustomEvent<File>).detail;
-      if (!cmd.confirmDiscard()) return;
+      const ok = await cmd.confirmDiscard();
+      if (!ok) return;
       openDroppedFile(f).then((r) => { cmd.loadDocument(r.doc, r.name); if (r.warnings.length) useUI.getState().toast(`Opened with repairs: ${r.warnings[0]}`); })
         .catch((err) => useUI.getState().toast(err instanceof DocumentError ? err.message : 'Could not open that file.', 'error'));
     };
@@ -174,6 +189,7 @@ export function App() {
         {!presentation && showTimeline && <Timeline />}
         <Toasts />
         <Dialogs />
+        <ConfirmDialog />
       </div>
     </ErrorBoundary>
   );

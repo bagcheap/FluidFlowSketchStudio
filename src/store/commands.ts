@@ -370,13 +370,13 @@ export const restart = () => { U().setTime(0); U().setPlaying(true); };
 export const stop = () => { U().setPlaying(false); U().setTime(0); };
 
 // ---- documents ----------------------------------------------------------------------
-export function confirmDiscard(): boolean {
+export async function confirmDiscard(): Promise<boolean> {
   if (!D().dirty || !D().doc.elements.length) return true;
-  return window.confirm('You have unsaved changes (they are autosaved in this browser, but not saved to a file). Continue?');
+  return U().ask('This diagram has changes that are not saved to a file (it is autosaved in this browser and stays in Recent documents). Replace it?', 'Replace');
 }
 
-export function newDiagram() {
-  if (!confirmDiscard()) return;
+export async function newDiagram() {
+  if (!(await confirmDiscard())) return;
   resetFileHandle();
   D().load(newDocument());
   U().select([]);
@@ -392,7 +392,7 @@ export function loadDocument(doc: FlowDocument, fileName: string | null = null, 
 }
 
 export async function openFile() {
-  if (!confirmDiscard()) return;
+  if (!(await confirmDiscard())) return;
   try {
     const r = await openDocumentFile();
     if (!r) return;
@@ -412,7 +412,8 @@ export async function save(saveAs = false) {
 }
 
 export function renameDocument(title?: string) {
-  const t = title ?? window.prompt('Document title', D().doc.title);
+  if (title === undefined) { (document.querySelector('.doc-title') as HTMLInputElement | null)?.select(); return; }
+  const t = title;
   if (t && t.trim()) D().commit((d) => ({ ...d, title: t.trim().slice(0, 200) }), 'title');
 }
 

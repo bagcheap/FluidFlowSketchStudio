@@ -70,6 +70,7 @@ interface UIState {
   hint: string | null;
   menuOpen: string | null;
   reducedMotionOS: boolean;
+  confirmReq: { message: string; ok: string; resolve: (v: boolean) => void } | null;
 }
 
 interface UIActions {
@@ -90,6 +91,8 @@ interface UIActions {
   dismissToast(id: number): void;
   setHint(h: string | null): void;
   setMenuOpen(m: string | null): void;
+  /** In-app confirmation (native confirm() is unavailable in sandboxed hosts). */
+  ask(message: string, ok?: string): Promise<boolean>;
 }
 
 let toastId = 0;
@@ -109,6 +112,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   toasts: [],
   hint: null,
   menuOpen: null,
+  confirmReq: null,
   reducedMotionOS: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
 
   setTool(tool, shape) { set((s) => ({ tool, shapeKind: shape ?? s.shapeKind, selection: tool === 'select' ? s.selection : [], editingId: null })); },
@@ -151,6 +155,10 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   dismissToast(id) { set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })); },
   setHint(h) { set({ hint: h }); },
   setMenuOpen(m) { set({ menuOpen: m }); },
+  ask(message, ok = 'Continue') {
+    get().confirmReq?.resolve(false);
+    return new Promise<boolean>((resolve) => set({ confirmReq: { message, ok, resolve: (v) => { set({ confirmReq: null }); resolve(v); } }, menuOpen: null }));
+  },
 }));
 
 export const currentStyleKey = () => { const s = useUI.getState(); return styleKey(s.tool, s.shapeKind); };

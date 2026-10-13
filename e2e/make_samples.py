@@ -16,7 +16,9 @@ with sync_playwright() as pw:
     for i, tid in enumerate(ids):
         if i:
             pg.get_by_role('menuitem', name='File').click(); pg.get_by_role('menuitem', name='New from template…').click()
-        pg.locator(f'[data-template={tid}]').click(); pg.wait_for_timeout(600)
+        pg.locator(f'[data-template={tid}]').click()
+        if pg.get_by_test_id('confirm-ok').count(): pg.get_by_test_id('confirm-ok').click()
+        pg.wait_for_timeout(600)
         pg.evaluate('() => document.activeElement && document.activeElement.blur()')
         with pg.expect_download() as dl:
             pg.keyboard.press('Control+s')

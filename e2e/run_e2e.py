@@ -419,6 +419,7 @@ def main():
             for i, tid in enumerate(ids):
                 if i: page4.get_by_role('menuitem', name='File').click(); page4.get_by_role('menuitem', name='New from template…').click()
                 page4.locator(f'[data-template={tid}]').click()
+                if page4.get_by_test_id('confirm-ok').count(): page4.get_by_test_id('confirm-ok').click()
                 page4.wait_for_timeout(700)
                 page4.screenshot(path=f'{OUT}/sample-{tid}.png')
                 assert len(app4.els()) > 4

@@ -153,19 +153,19 @@ export function RecentDialog() {
   const refresh = () => { void listRecents().then(setList); void loadAutosave().then(setAuto); };
   useEffect(refresh, []);
   const open = async (id: string) => {
-    if (!cmd.confirmDiscard()) return;
+    if (!(await cmd.confirmDiscard())) return;
     try { const d = await loadRecent(id); if (d) { cmd.loadDocument(d); close(); } else useUI.getState().toast('That document is no longer stored', 'error'); }
     catch (e) { useUI.getState().toast(`Could not open: ${(e as Error).message}`, 'error'); }
   };
   return (
     <Modal title="Recent documents" footer={<><button className="btn" onClick={() => { close(); void cmd.openFile(); }}><FolderOpen size={14} /> Open file…</button><button className="btn primary" onClick={close}>Close</button></>}>
-      {auto && <div className="recover"><b>Autosave:</b> “{auto.title}” · {auto.elements.length} objects · <button className="link" onClick={() => { if (cmd.confirmDiscard()) { cmd.loadDocument(auto, null, true); close(); } }}>Restore</button></div>}
+      {auto && <div className="recover"><b>Autosave:</b> “{auto.title}” · {auto.elements.length} objects · <button className="link" onClick={async () => { if (await cmd.confirmDiscard()) { cmd.loadDocument(auto, null, true); close(); } }}>Restore</button></div>}
       {list === null ? <p>Loading…</p> : list.length === 0 ? <p className="note">Nothing yet — documents appear here as soon as they autosave.</p> : (
         <ul className="recent-list">
           {list.map((r) => (
             <li key={r.id}>
               <button className="recent-open" onClick={() => void open(r.id)}><b>{r.title}</b><span className="dim">{new Date(r.updatedAt).toLocaleString()} · {r.elements} objects</span></button>
-              <button className="icon-btn sm" aria-label={`Remove ${r.title} from recents`} onClick={() => { if (confirm(`Remove “${r.title}” from browser storage?`)) void removeRecent(r.id).then(refresh); }}><Trash2 size={14} /></button>
+              <button className="icon-btn sm" aria-label={`Remove ${r.title} from recents`} onClick={async () => { if (await useUI.getState().ask(`Remove “${r.title}” from this browser’s storage?`, 'Remove')) void removeRecent(r.id).then(refresh); }}><Trash2 size={14} /></button>
             </li>
           ))}
         </ul>
@@ -189,8 +189,8 @@ export function TemplatesDialog() {
   const [custom, setCustom] = useState<CustomTemplate[]>([]);
   useEffect(() => { void listCustomTemplates().then(setCustom); }, []);
   const built = useMemo(() => SAMPLES.map((s) => ({ ...s, doc: s.build() })), []);
-  const use = (d: FlowDocument) => {
-    if (!cmd.confirmDiscard()) return;
+  const use = async (d: FlowDocument) => {
+    if (!(await cmd.confirmDiscard())) return;
     cmd.loadDocument({ ...structuredClone(d), id: uid('doc'), createdAt: new Date().toISOString() }, null, true);
     useUI.getState().setPlaying(true);
     close();
