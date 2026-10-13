@@ -200,6 +200,13 @@ export function defaultToolStyle(key: string): ToolStyle {
   return s;
 }
 
-export const PALETTE_STROKE = ['#1e1e2e', '#4b5563', '#e03131', '#2f9e44', '#1971c2', '#7048e8', '#f08c00', '#c2255c'];
-export const PALETTE_FILL = ['transparent', '#ffffff', '#e7e3ff', '#d9ecff', '#d6f5df', '#fff4c2', '#ffe3e3', '#eef0f3', '#fde68a', '#c3fae8'];
+// Colour grids: 10 hues (red → pink) in rows of increasing strength, plus neutrals.
+const HUES = {
+  tint: ['#ffe3e3', '#ffe8cc', '#fff3bf', '#d3f9d8', '#c3fae8', '#c5f6fa', '#d0ebff', '#dbe4ff', '#e5dbff', '#ffdeeb'],
+  light: ['#ffa8a8', '#ffc078', '#ffe066', '#8ce99a', '#63e6be', '#66d9e8', '#74c0fc', '#91a7ff', '#b197fc', '#faa2c1'],
+  bold: ['#fa5252', '#fd7e14', '#fab005', '#40c057', '#12b886', '#15aabf', '#228be6', '#4c6ef5', '#7950f2', '#e64980'],
+  deep: ['#c92a2a', '#d9480f', '#e67700', '#2b8a3e', '#087f5b', '#0b7285', '#1864ab', '#364fc7', '#5f3dc4', '#a61e4d'],
+};
+export const PALETTE_STROKE = ['#1e1e2e', '#343a40', '#495057', '#868e96', '#adb5bd', '#dee2e6', '#ffffff', '#4b5563', '#7048e8', '#c2255c', ...HUES.deep, ...HUES.bold, ...HUES.light];
+export const PALETTE_FILL = ['transparent', '#ffffff', '#f8f9fa', '#e9ecef', '#ced4da', '#868e96', '#495057', '#1e1e2e', '#e7e3ff', '#fde68a', ...HUES.tint, ...HUES.light, ...HUES.bold, ...HUES.deep];
 export const HIGHLIGHT_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];

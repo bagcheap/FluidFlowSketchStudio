@@ -42,11 +42,11 @@ export function Inspector() {
 
   const setStyle = (p: Partial<Style>) => {
     const key = 'style:' + Object.keys(p).join();
-    if (onSelection) useDoc.getState().commit((d) => mapElements(d, ids, (e) => ({ ...e, style: { ...e.style, ...p } })), key + ids.join());
+    if (onSelection) { useDoc.getState().commit((d) => mapElements(d, ids, (e) => ({ ...e, style: { ...e.style, ...p } })), key + ids.join()); cmd.rememberSelectionStyle(ids); }
     else ui.setToolStyle(toolKey!, { ...ts!, style: { ...ts!.style, ...p } });
   };
   const setText = (p: Partial<TextStyle>) => {
-    if (onSelection) useDoc.getState().commit((d) => mapElements(d, ids, (e) => cmd.fitShapeToText({ ...e, textStyle: { ...e.textStyle, ...p } } as DiagramElement)), 'text:' + Object.keys(p).join() + ids.join());
+    if (onSelection) { useDoc.getState().commit((d) => mapElements(d, ids, (e) => cmd.fitShapeToText({ ...e, textStyle: { ...e.textStyle, ...p } } as DiagramElement)), 'text:' + Object.keys(p).join() + ids.join()); cmd.rememberSelectionStyle(ids); }
     else ui.setToolStyle(toolKey!, { ...ts!, textStyle: { ...ts!.textStyle, ...p } });
   };
   const setConn = (p: Partial<ConnectorElement>) => {

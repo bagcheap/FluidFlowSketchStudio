@@ -28,7 +28,11 @@ const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isCon
 export function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (editable(e.target)) return;
+      if (editable(e.target)) {
+        // Esc leaves an inspector field (not the text editor, which handles Esc itself) and continues below
+        if (e.key !== 'Escape' || (e.target as HTMLElement).classList.contains('text-editor')) return;
+        (e.target as HTMLElement).blur();
+      }
       const u = useUI.getState();
       const D = useDoc.getState();
       const mod = e.metaKey || e.ctrlKey;

@@ -22,6 +22,7 @@ export interface Prefs {
   recentColors: string[];
   suspendWhileDragging: boolean;
   autoplay: boolean;
+  selectionUpdatesDefaults: boolean;
 }
 
 const PREFS_KEY = 'flowsketch.prefs.v1';
@@ -39,6 +40,7 @@ const DEFAULT_PREFS: Prefs = {
   recentColors: [],
   suspendWhileDragging: true,
   autoplay: true,
+  selectionUpdatesDefaults: true,
 };
 
 function loadPrefs(): Prefs {
@@ -71,6 +73,7 @@ interface UIState {
   menuOpen: string | null;
   reducedMotionOS: boolean;
   confirmReq: { message: string; ok: string; resolve: (v: boolean) => void } | null;
+  welcomeDismissed: boolean;
 }
 
 interface UIActions {
@@ -113,9 +116,10 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   hint: null,
   menuOpen: null,
   confirmReq: null,
+  welcomeDismissed: false,
   reducedMotionOS: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
 
-  setTool(tool, shape) { set((s) => ({ tool, shapeKind: shape ?? s.shapeKind, selection: tool === 'select' ? s.selection : [], editingId: null })); },
+  setTool(tool, shape) { set((s) => ({ tool, shapeKind: shape ?? s.shapeKind, selection: tool === 'select' ? s.selection : [], editingId: null, welcomeDismissed: s.welcomeDismissed || (tool !== 'select' && tool !== 'hand') })); },
   select(ids) { set({ selection: [...new Set(ids)] }); },
   setView(v) { set((s) => ({ view: { ...s.view, ...v, zoom: Math.min(8, Math.max(0.1, v.zoom ?? s.view.zoom)) } })); },
   setEditing(id) { set({ editingId: id }); },

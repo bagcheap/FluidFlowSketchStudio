@@ -170,10 +170,30 @@ export function pasteStyle() {
 }
 
 /** Make the selected object's look the default for its tool. */
+/** The remembered-style key of the tool that draws this kind of element. */
+export function toolKeyFor(e: DiagramElement): string | null {
+  return e.type === 'shape' ? styleKey('shape', e.shape) : e.type === 'connector' ? (e.endHead === 'none' && e.startHead === 'none' ? 'line' : 'arrow') : e.type === 'freehand' ? (e.highlighter ? 'highlighter' : 'freehand') : e.type === 'text' ? 'text' : null;
+}
+
+/** Copy style changes made on selected objects into their tools' defaults (Excalidraw-like "current item style"). */
+export function rememberSelectionStyle(ids: string[]) {
+  if (!U().prefs.selectionUpdatesDefaults) return;
+  const doc = D().doc;
+  const done = new Set<string>();
+  for (const id of ids) {
+    const e = getElement(doc, id);
+    const key = e && toolKeyFor(e);
+    if (!e || !key || done.has(key)) continue;
+    done.add(key);
+    const cur = U().toolStyle(key);
+    U().setToolStyle(key, { ...cur, style: { ...e.style }, textStyle: { ...e.textStyle, ...(e.type === 'connector' ? {} : { padding: cur.textStyle.padding }) } });
+  }
+}
+
 export function applySelectionStyleToDefaults() {
   const e = getElement(D().doc, U().selection[0]);
   if (!e) return;
-  const key = e.type === 'shape' ? styleKey('shape', e.shape) : e.type === 'connector' ? (e.endHead === 'none' && e.startHead === 'none' ? 'line' : 'arrow') : e.type === 'freehand' ? (e.highlighter ? 'highlighter' : 'freehand') : e.type === 'text' ? 'text' : null;
+  const key = toolKeyFor(e);
   if (!key) return;
   U().setToolStyle(key, styleOf(e));
   U().toast(`Saved as the default style for new ${key.replace('shape:', '')} drawings`, 'success');
@@ -379,6 +399,7 @@ export async function newDiagram() {
   if (!(await confirmDiscard())) return;
   resetFileHandle();
   D().load(newDocument());
+  useUI.setState({ welcomeDismissed: true }); // the user asked for a blank canvas
   U().select([]);
   U().setTime(0);
   fitRect(null);

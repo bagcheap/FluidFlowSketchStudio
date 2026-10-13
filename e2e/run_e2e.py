@@ -120,8 +120,8 @@ def main():
         def t1():
             app.reset_view()
             app.key('r')
-            page.get_by_label('Stroke colour #1971c2').click()
-            page.get_by_label('Fill colour #fff4c2').click()
+            page.get_by_label('Stroke colour #1864ab').click()
+            page.get_by_label('Fill colour #fff3bf').click()
             page.get_by_label('Width value').fill('3')
             for i in range(3):
                 app.drag((100 + i * 220, 150), (280 + i * 220, 250))
@@ -129,7 +129,7 @@ def main():
             assert len(rects) == 3, f'expected 3 shapes, got {len(rects)}'
             for r in rects:
                 assert r['shape'] == 'rectangle'
-                assert r['style']['stroke'] == '#1971c2' and r['style']['fill'] == '#fff4c2' and r['style']['strokeWidth'] == 3, r['style']
+                assert r['style']['stroke'] == '#1864ab' and r['style']['fill'] == '#fff3bf' and r['style']['strokeWidth'] == 3, r['style']
             u = app.ui()
             assert u['tool'] == 'shape' and u['shapeKind'] == 'rectangle', u
         t1()
@@ -137,19 +137,19 @@ def main():
         @test('2 · Remembered per-tool defaults (red diamond survives switching tools)')
         def t2():
             app.key('d')
-            page.get_by_label('Stroke colour #e03131').click()
+            page.get_by_label('Stroke colour #c92a2a').click()
             app.key('r')
             app.drag((100, 330), (260, 420))
             app.drag((320, 330), (480, 420))
             last2 = app.els('shape')[-2:]
-            assert all(e['style']['stroke'] == '#1971c2' for e in last2), [e['style']['stroke'] for e in last2]
+            assert all(e['style']['stroke'] == '#1864ab' for e in last2), [e['style']['stroke'] for e in last2]
             app.key('d')
-            assert app.js("() => window.__flowsketch.toolStyle('shape:diamond').style.stroke") == '#e03131'
+            assert app.js("() => window.__flowsketch.toolStyle('shape:diamond').style.stroke") == '#c92a2a'
             app.drag((560, 320), (720, 440))
             d = app.els('shape')[-1]
-            assert d['shape'] == 'diamond' and d['style']['stroke'] == '#e03131'
+            assert d['shape'] == 'diamond' and d['style']['stroke'] == '#c92a2a'
             # existing objects untouched by default edits
-            assert app.els('shape')[0]['style']['stroke'] == '#1971c2'
+            assert app.els('shape')[0]['style']['stroke'] == '#1864ab'
         t2()
 
         @test('9 · Undo / redo (create, resize, recolour)')
