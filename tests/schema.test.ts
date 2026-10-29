@@ -3,7 +3,8 @@ import { DocumentError, parseDocument, serializeDocument } from '../src/model/sc
 import { SAMPLES } from '../src/templates/samples';
 import { renderDocumentAtTime } from '../src/engine/render';
 import { frameToSvg } from '../src/engine/svgExport';
-import { colorLabel, HIGHLIGHT_COLORS, PALETTE_FILL, PALETTE_STROKE } from '../src/model/defaults';
+import { HIGHLIGHT_COLORS, PALETTE_FILL, PALETTE_STROKE } from '../src/model/defaults';
+import { colorLabel } from '../src/ui/colorNames';
 
 describe('native .flowsketch format', () => {
   it('round-trips every sample losslessly (same diagram, same animation)', () => {

@@ -2,7 +2,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { ChevronDown, RotateCcw } from 'lucide-react';
 import { useUI } from '../store/uiStore';
-import { colorLabel } from '../model/defaults';
+import { colorLabel } from './colorNames';
 
 export function Section({ title, children, defaultOpen = true, right }: { title: string; children: ReactNode; defaultOpen?: boolean; right?: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
