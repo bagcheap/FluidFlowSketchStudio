@@ -7,7 +7,7 @@ import { defaultToolStyle, styleKey, type ToolId } from '../model/defaults';
 export type Theme = 'light' | 'dark' | 'system';
 export type DialogId =
   | null | 'gif' | 'image' | 'svg' | 'video' | 'animation' | 'shortcuts' | 'help' | 'templates'
-  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes';
+  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes' | 'whatsnew';
 
 export interface Prefs {
   toolStyles: Record<string, ToolStyle>;

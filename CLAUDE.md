@@ -71,6 +71,13 @@ src/templates/   samples.ts (7 built-in sample diagrams, generated in code)
 - Live view culls off-screen elements, and the grid is a cached canvas pattern.
 - Theme toggle: the top-bar sun/moon button cycles Light → Dark → System. It is also in View ▸ Theme and Edit ▸ Preferences.
 
+## Versions and the changelog
+
+- `CHANGELOG.md` (Keep a Changelog format) is the single source of release notes. The app shows it in Help ▸ What's new (`ui/changelog.ts` parses it; keep to `## [x.y.z] - YYYY-MM-DD`, `### Added|Changed|Fixed`, `- ` bullets, `**bold**`).
+- Every user-visible change adds a line under `## [Unreleased]` at the top (create the section when it is missing; never leave it empty), written for users, not developers (developer-only changes such as tests or tooling are left out).
+- A version bump (`npm version x.y.z --no-git-tag-version`) renames `[Unreleased]` to `[x.y.z] - <date>`. `tests/changelog.test.ts` fails if the `package.json` version has no dated entry.
+- The About dialog reads the version from `package.json`; never hard-code it.
+
 ## Testing conventions
 
 - Unit tests are in `tests/` (Vitest + jsdom): engine determinism and continuity, connectors, schema round-trip and sanitising, history, tool styles.

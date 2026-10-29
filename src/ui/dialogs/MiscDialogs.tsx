@@ -17,6 +17,7 @@ import { SHAPE_KINDS } from '../../model/schema';
 import { ShapeIcon } from '../ShapeIcon';
 import { uid } from '../../model/defaults';
 import { version } from '../../../package.json';
+import { boldRuns, RELEASES } from '../changelog';
 
 const close = () => useUI.getState().openDialog(null);
 
@@ -102,10 +103,35 @@ export function HelpDialog() {
   );
 }
 
+const fmtDate = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const Rich = ({ text }: { text: string }) => <>{boldRuns(text).map((r, i) => (r.bold ? <b key={i}>{r.text}</b> : <span key={i}>{r.text}</span>))}</>;
+
+/** Help ▸ What's new: the release notes from CHANGELOG.md. */
+export function WhatsNewDialog() {
+  return (
+    <Modal title="What's new" wide>
+      <div className="help whats-new">
+        {RELEASES.map((r) => (
+          <section key={r.version} aria-label={`Version ${r.version}`}>
+            <h3>{r.version === 'Unreleased' ? 'Coming in the next version' : `Version ${r.version}`}{r.date && <span className="dim"> · {fmtDate(r.date)}</span>}</h3>
+            {r.notes.map((n, i) => <p key={i}><Rich text={n} /></p>)}
+            {r.groups.map((g) => (
+              <div key={g.title}>
+                <h4>{g.title}</h4>
+                <ul>{g.items.map((it, i) => <li key={i}><Rich text={it} /></li>)}</ul>
+              </div>
+            ))}
+          </section>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
 export function AboutDialog() {
   return (
     <Modal title="About FlowSketch Studio">
-      <p><b>FlowSketch Studio</b> {version} — an editor for gently animated, hand-drawn flow diagrams.</p>
+      <p><b>FlowSketch Studio</b> {version} — an editor for gently animated, hand-drawn flow diagrams. <button className="link" onClick={() => useUI.getState().openDialog('whatsnew')}>What's new</button></p>
       <p className="note">Everything runs locally in your browser; documents are never uploaded. Built with React, Rough.js (MIT), gifenc (MIT), Zustand (MIT), idb-keyval (Apache-2.0), Lucide icons (ISC) and the Kalam & Inter fonts (OFL).</p>
     </Modal>
   );

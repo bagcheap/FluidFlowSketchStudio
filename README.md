@@ -4,6 +4,8 @@ A browser-based editor for **hand-drawn flow diagrams that gently come alive**. 
 
 ![Sample](samples/agent.gif)
 
+**What's changed:** see [CHANGELOG.md](CHANGELOG.md), also shown in the app under Help ▸ What's new.
+
 ## Quick start
 
 ```bash
@@ -11,7 +13,7 @@ npm install
 npm run dev        # http://localhost:5173  (also builds the HTML-player bundle first)
 npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ on http://localhost:4173
-npm test           # unit tests (Vitest, 27 tests)
+npm test           # unit tests (Vitest, 30 tests)
 npm run test:e2e   # end-to-end acceptance tests (needs `npm run preview` running; see below)
 ```
 
