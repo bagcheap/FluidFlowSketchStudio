@@ -8,10 +8,10 @@ import { useUI } from '../store/uiStore';
 import { renderDocumentAtTime, makeLookup, boxCorners } from '../engine/render';
 import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
-import { connectorPath } from '../engine/connectors';
+import { connectorPath, pairGap } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
-import { boxAt, hitTest, portAnchors, portPositions } from './hitTest';
+import { boxAt, connectorPartAt, hitTest, portAnchors, portPositions } from './hitTest';
 import { applyStyle, cloneElements, expandGroups, fitShapeToText, insertImage, stage, styleOf, zoomAt } from '../store/commands';
 import { TextEditor } from './TextEditor';
 
@@ -49,6 +49,7 @@ export function Canvas() {
   const selection = useUI((s) => s.selection);
   const view = useUI((s) => s.view);
   const editingId = useUI((s) => s.editingId);
+  const editingPart = useUI((s) => s.editingPart);
   const presentation = useUI((s) => s.presentation);
   const [size, setSize] = useState({ w: 1200, h: 800 });
   const [overlay, setOverlay] = useState<Overlay>({});
@@ -96,7 +97,7 @@ export function Canvas() {
       const it = inter.current;
       const susp = u.prefs.suspendWhileDragging && it && (it.k === 'move' || it.k === 'resize' || it.k === 'rotate' || it.k === 'resizeMulti')
         ? new Set(it.k === 'move' || it.k === 'resizeMulti' ? it.ids : [it.id]) : undefined;
-      const key = `${d.revision}|${u.time.toFixed(4)}|${u.view.x},${u.view.y},${u.view.zoom}|${stage.w}x${stage.h}|${u.editingId}|${susp ? [...susp].join() : ''}`;
+      const key = `${d.revision}|${u.time.toFixed(4)}|${u.view.x},${u.view.y},${u.view.zoom}|${stage.w}x${stage.h}|${u.editingId}#${u.editingPart}|${susp ? [...susp].join() : ''}`;
       if (key === lastKey && !redraw.current) return;
       lastKey = key; redraw.current = false;
       const c = canvasRef.current;
@@ -111,7 +112,7 @@ export function Canvas() {
       if (!u.presentation) drawGrid(ctx, d.doc, u.view, dpr);
       const frame = renderDocumentAtTime(d.doc, u.time, {
         flags: { suspended: susp },
-        hide: u.editingId ? new Set([u.editingId]) : undefined,
+        hide: u.editingId ? new Set([u.editingPart === 'response' ? u.editingId + '#response' : u.editingId]) : undefined,
         cull: { x: u.view.x, y: u.view.y, w: stage.w / u.view.zoom, h: stage.h / u.view.zoom },
       });
       drawFrame(ctx, frame, { images: imageMap(d.doc.assets), originX: u.view.x, originY: u.view.y, scale: u.view.zoom * dpr });
@@ -247,6 +248,7 @@ export function Canvas() {
         return;
       }
       case 'arrow':
+      case 'pair':
       case 'line': {
         const ts = u.toolStyle(u.tool);
         const target = boxAt(d, p, u.view.zoom);
@@ -324,12 +326,13 @@ export function Canvas() {
     u.setEditing(el.id);
   }
 
-  function startTextEdit(id: string) {
+  /** Edit an element's text; `at` picks which label of a request ⇄ response pair (the one nearest the point). */
+  function startTextEdit(id: string, at?: Point) {
     const d = useDoc.getState().doc;
     const el = getElement(d, id);
     if (!el || el.locked || el.type === 'image' || el.type === 'freehand') return;
     useUI.getState().select([id]);
-    useUI.getState().setEditing(id);
+    useUI.getState().setEditing(id, el.type === 'connector' && at ? connectorPartAt(d, el, at) : 'main');
   }
 
   // Pointer events always report detail=0, so double-clicks are handled here.
@@ -340,7 +343,7 @@ export function Canvas() {
     const p = toWorldPt(e);
     const d = useDoc.getState().doc;
     const hit = hitTest(d, p, u.view.zoom);
-    if (hit) startTextEdit(hit.id);
+    if (hit) startTextEdit(hit.id, p);
     else if (u.tool === 'select') createTextAt(p);
   };
 
@@ -365,7 +368,7 @@ export function Canvas() {
     const D = useDoc.getState();
     if (!it) {
       // hover feedback for connector tools
-      if (u.tool === 'arrow' || u.tool === 'line') {
+      if (u.tool === 'arrow' || u.tool === 'pair' || u.tool === 'line') {
         const t = boxAt(D.doc, p, u.view.zoom);
         if ((t?.id ?? null) !== (overlay.target ?? null)) setOverlay((o) => ({ ...o, target: t?.id ?? null }));
       } else if (overlay.target) setOverlay((o) => ({ ...o, target: null }));
@@ -673,7 +676,9 @@ export function Canvas() {
     for (const el of selEls) {
       if (el.type !== 'connector') continue;
       const path = connectorPath(el, makeLookup(doc, null));
-      overlayEls.push(<polyline key={'csel' + el.id} points={path.pts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={accent} strokeOpacity={0.35} strokeWidth={(el.style.strokeWidth + 6) / z} strokeLinecap="round" />);
+      // a pair is highlighted as one band covering both arrows
+      const bandW = el.style.strokeWidth + 6 / z + (el.pair ? pairGap(el) : 0);
+      overlayEls.push(<polyline key={'csel' + el.id} points={path.pts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={accent} strokeOpacity={el.pair ? 0.2 : 0.35} strokeWidth={el.pair ? bandW : (el.style.strokeWidth + 6) / z} strokeLinecap="round" strokeLinejoin="round" />);
     }
     if (singleBox && !singleBox.locked && !editingId) {
       const rp = toWorld(singleBox, STILL, { x: singleBox.w / 2, y: -26 / z });
@@ -738,10 +743,14 @@ export function Canvas() {
       <svg className="stage-overlay" width={size.w} height={size.h} aria-hidden>
         <g transform={`scale(${z}) translate(${-view.x} ${-view.y})`}>{overlayEls}</g>
       </svg>
-      {editingId && <TextEditor key={editingId} id={editingId} toScreen={toScreen} onDone={(id, text) => {
+      {editingId && <TextEditor key={editingId + '#' + editingPart} id={editingId} toScreen={toScreen} onDone={(id, text, part) => {
         const D = useDoc.getState();
         const el = getElement(D.doc, id);
         useUI.getState().setEditing(null);
+        if (el?.type === 'connector' && el.pair && part === 'response') {
+          if (text !== el.pair.text) D.commit((d) => mapElements(d, [id], (x) => (x.type === 'connector' && x.pair ? { ...x, pair: { ...x.pair, text } } : x)));
+          return;
+        }
         const fresh = newText.current?.id === id ? newText.current : null;
         newText.current = null;
         if (!el) return;

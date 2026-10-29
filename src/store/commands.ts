@@ -1,5 +1,6 @@
 // Editor commands shared by menus, keyboard shortcuts, toolbar and inspector.
 import type { BoxElement, ConnectorAnim, DiagramElement, FlowDocument, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
+import { SCHEMA_VERSION } from '../model/types';
 import { DEFAULT_ANIMATION, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { useUI } from './uiStore';
@@ -120,7 +121,7 @@ export async function paste(text?: string) {
   try { data = JSON.parse(raw); } catch { return pastePlainText(raw); }
   if (data.type !== CLIP_MIME || !Array.isArray(data.elements)) return pastePlainText(raw);
   // run through the same sanitiser as files
-  const { doc: parsed } = parseDocument({ format: 'flowsketch', schemaVersion: 1, elements: data.elements, assets: data.assets ?? {} });
+  const { doc: parsed } = parseDocument({ format: 'flowsketch', schemaVersion: SCHEMA_VERSION, elements: data.elements, assets: data.assets ?? {} });
   const doc = D().doc;
   const clones = cloneElements(doc, parsed.elements, 24, 24);
   D().commit((d) => ({ ...d, assets: { ...d.assets, ...parsed.assets }, elements: [...d.elements, ...clones] }));
@@ -177,7 +178,7 @@ export function pasteStyle() {
 /** Make the selected object's look the default for its tool. */
 /** The remembered-style key of the tool that draws this kind of element. */
 export function toolKeyFor(e: DiagramElement): string | null {
-  return e.type === 'shape' ? styleKey('shape', e.shape) : e.type === 'connector' ? (e.endHead === 'none' && e.startHead === 'none' ? 'line' : 'arrow') : e.type === 'freehand' ? (e.highlighter ? 'highlighter' : 'freehand') : e.type === 'text' ? 'text' : null;
+  return e.type === 'shape' ? styleKey('shape', e.shape) : e.type === 'connector' ? (e.pair ? 'pair' : e.endHead === 'none' && e.startHead === 'none' ? 'line' : 'arrow') : e.type === 'freehand' ? (e.highlighter ? 'highlighter' : 'freehand') : e.type === 'text' ? 'text' : null;
 }
 
 /** Copy style changes made on selected objects into their tools' defaults (Excalidraw-like "current item style"). */
@@ -292,6 +293,27 @@ export function nudge(dx: number, dy: number) {
     }
     return { ...e, x: e.x + dx, y: e.y + dy };
   }), 'nudge');
+}
+
+// ---- connectors -------------------------------------------------------------------
+/** Reverse arrows: start and end trade places (heads stay at the ends, so each arrow now points the other way). */
+export function swapDirection(ids: string[] = U().selection) {
+  D().commit((d) => mapElements(d, ids, (e) => (e.type !== 'connector' || e.locked ? e : {
+    // `|| 0` keeps a flipped 0 from becoming -0
+    ...e, start: e.end, end: e.start, bends: [...e.bends].reverse(), curvature: -e.curvature || 0, labelPos: 1 - e.labelPos,
+    labelOffset: e.pair ? e.labelOffset : -e.labelOffset || 0, // a pair's labels stay outside their arrows
+  })));
+}
+
+/** Turn arrows into request ⇄ response pairs, or back into single arrows (dropping the response label). */
+export function setConnectorPair(ids: string[], on: boolean) {
+  const strokeStyle = U().toolStyle('pair').pair?.strokeStyle ?? 'dashed';
+  D().commit((d) => mapElements(d, ids, (e) => {
+    if (e.type !== 'connector' || e.locked || !!e.pair === on) return e;
+    if (on) return { ...e, pair: { text: '', strokeStyle } };
+    const { pair: _p, ...rest } = e;
+    return rest as DiagramElement;
+  }));
 }
 
 // ---- insertion ------------------------------------------------------------------

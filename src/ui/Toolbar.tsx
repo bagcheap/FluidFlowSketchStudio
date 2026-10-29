@@ -1,6 +1,6 @@
 // Floating drawing toolbar. Tools stay active after drawing (continuous mode, lock icon).
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Circle, Diamond, Eraser, Hand, Highlighter, ImagePlus, Lock, LockOpen, Minus, MousePointer2, Paintbrush, Pencil, Shapes, Square, RectangleHorizontal, Type } from 'lucide-react';
+import { ArrowRightLeft, ArrowUpRight, Circle, Diamond, Eraser, Hand, Highlighter, ImagePlus, Lock, LockOpen, Minus, MousePointer2, Paintbrush, Pencil, Shapes, Square, RectangleHorizontal, Type } from 'lucide-react';
 import type { ShapeKind } from '../model/types';
 import type { ToolId } from '../model/defaults';
 import { useUI } from '../store/uiStore';
@@ -22,6 +22,7 @@ const TOOLS: (T | 'sep')[] = [
 ];
 const TOOLS2: (T | 'sep')[] = [
   { id: 'arrow', icon: <ArrowUpRight size={18} />, label: 'Arrow / connector', key: 'A', tip: 'Drag from one shape to another to connect them. The arrow follows the shapes when they move' },
+  { id: 'pair', icon: <ArrowRightLeft size={18} />, label: 'Request ⇄ response', key: 'Q', tip: 'Drag from the sender to the receiver: draws a request arrow and a dashed response arrow back, each with its own label' },
   { id: 'line', icon: <Minus size={18} />, label: 'Line', key: 'L', tip: 'Drag to draw a line without arrowheads. Can also connect shapes' },
   { id: 'freehand', icon: <Pencil size={18} />, label: 'Freehand pen', key: 'P', tip: 'Draw freely by dragging' },
   { id: 'highlighter', icon: <Highlighter size={18} />, label: 'Highlighter', key: 'M', tip: 'Draw a wide translucent stroke to mark things up' },

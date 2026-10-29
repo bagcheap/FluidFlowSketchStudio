@@ -1,7 +1,7 @@
 // Connector geometry: endpoint resolution against (animated) targets, routing, and
 // arc-length parametrised polylines used by flow/draw-on animation and hit testing.
 import type { BoxElement, ConnectorElement, DiagramElement, Point } from '../model/types';
-import { geometryFor, rayPolygon } from './shapes';
+import { geometryFor, pointInPolygon, rayPolygon } from './shapes';
 import type { Motion } from './animation';
 import { STILL } from './animation';
 
@@ -140,26 +140,88 @@ export function connectorPath(c: ConnectorElement, lookup: Lookup): ConnectorPat
   const s = resolveEnd(c.start, aimS, lookup, elbow);
   const e = resolveEnd(c.end, aimE, lookup, elbow);
   let control: Point[];
-  let pts: Point[];
-  if (elbow) {
-    control = elbowRoute(s, e, c.bends);
-    pts = densify(control);
-  } else if (c.routing === 'curved' && (c.bends.length || Math.abs(c.curvature) > 0.001)) {
-    if (c.bends.length) control = [s.p, ...c.bends, e.p];
-    else {
-      const mx = (s.p.x + e.p.x) / 2, my = (s.p.y + e.p.y) / 2;
-      const dx = e.p.x - s.p.x, dy = e.p.y - s.p.y;
-      const k = c.curvature * 0.5;
-      control = [s.p, { x: mx - dy * k, y: my + dx * k }, e.p];
-    }
-    pts = catmull(control);
-  } else {
-    control = [s.p, ...c.bends, e.p];
-    pts = densify(control);
-  }
+  if (elbow) control = elbowRoute(s, e, c.bends);
+  else if (isSmooth(c) && !c.bends.length) {
+    const mx = (s.p.x + e.p.x) / 2, my = (s.p.y + e.p.y) / 2;
+    const dx = e.p.x - s.p.x, dy = e.p.y - s.p.y;
+    const k = c.curvature * 0.5;
+    control = [s.p, { x: mx - dy * k, y: my + dx * k }, e.p];
+  } else control = [s.p, ...c.bends, e.p];
+  return buildPath(control, isSmooth(c));
+}
+
+const isSmooth = (c: ConnectorElement) => c.routing === 'curved' && (c.bends.length > 0 || Math.abs(c.curvature) > 0.001);
+
+function buildPath(control: Point[], smooth: boolean): ConnectorPath {
+  const pts = smooth ? catmull(control) : densify(control);
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
   return { pts, cum, length: cum[cum.length - 1], control };
+}
+
+// ---- request ⇄ response pairs ---------------------------------------------------
+
+/** Distance between the two arrows of a pair (centre to centre). */
+export const pairGap = (c: ConnectorElement) => 12 + c.style.strokeWidth * 3;
+
+/** Offset a polyline sideways by d (positive = left of travel, i.e. (dy, -dx) on screen); corners are mitred. */
+function offsetPolyline(pts: Point[], d: number): Point[] {
+  const segN: Point[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const v = norm({ x: pts[i + 1].x - pts[i].x, y: pts[i + 1].y - pts[i].y });
+    segN.push({ x: v.y, y: -v.x });
+  }
+  if (!segN.length) return pts.map((p) => ({ ...p }));
+  return pts.map((p, i) => {
+    const a = segN[Math.max(0, i - 1)], b = segN[Math.min(segN.length - 1, i)];
+    let n = norm({ x: a.x + b.x, y: a.y + b.y });
+    if (Math.hypot(a.x + b.x, a.y + b.y) < 1e-6) n = b; // reversal: no sensible miter
+    const k = Math.min(4, 1 / Math.max(0.25, n.x * b.x + n.y * b.y)); // miter length, clamped for sharp turns
+    return { x: p.x + n.x * d * k, y: p.y + n.y * d * k };
+  });
+}
+
+/**
+ * Slide an offset end point along its own line so it sits on the attached shape's outline (+ GAP).
+ * `away` points from the shape out along the path. Port-anchored and free ends are left as they are.
+ */
+function reattach(end: ConnectorElement['start'], q: Point, away: Point, lookup: Lookup): Point {
+  const pl = end.elementId && !end.anchor ? lookup(end.elementId) : null;
+  if (!pl) return q;
+  const { el, m } = pl;
+  const c = centerOf(el, m);
+  const along = (c.x - q.x) * away.x + (c.y - q.y) * away.y;
+  const foot = { x: q.x + away.x * along, y: q.y + away.y * along }; // closest point to the centre on this line
+  const lo = toLocal(el, m, foot);
+  const poly = localOutline(el);
+  if (!pointInPolygon(lo, poly)) return q; // shape too thin for this offset: keep the plain offset
+  const a = -rad(el.rotation + m.rot);
+  const ld = { x: away.x * Math.cos(a) - away.y * Math.sin(a), y: away.x * Math.sin(a) + away.y * Math.cos(a) };
+  const t = rayPolygon(lo, ld, poly);
+  if (t === null) return q;
+  return toWorld(el, m, { x: lo.x + ld.x * (t + GAP), y: lo.y + ld.y * (t + GAP) });
+}
+
+/**
+ * The two arrows of a request ⇄ response pair: `req` runs start→end on the left of travel,
+ * `res` runs end→start on the other side. Both follow the connector's route and attach to the shapes.
+ */
+export function pairPaths(c: ConnectorElement, lookup: Lookup): { req: ConnectorPath; res: ConnectorPath } {
+  const center = connectorPath(c, lookup);
+  const smooth = isSmooth(c);
+  const side = (d: number) => {
+    const ctrl = offsetPolyline(center.control, d);
+    const n = ctrl.length;
+    if (n >= 2) {
+      const dir0 = norm({ x: ctrl[1].x - ctrl[0].x, y: ctrl[1].y - ctrl[0].y });
+      const dirN = norm({ x: ctrl[n - 2].x - ctrl[n - 1].x, y: ctrl[n - 2].y - ctrl[n - 1].y });
+      ctrl[0] = reattach(c.start, ctrl[0], dir0, lookup);
+      ctrl[n - 1] = reattach(c.end, ctrl[n - 1], dirN, lookup);
+    }
+    return ctrl;
+  };
+  const half = pairGap(c) / 2;
+  return { req: buildPath(side(half), smooth), res: buildPath(side(-half).reverse(), smooth) };
 }
 
 /** Index i such that cum[i] <= s < cum[i+1] */

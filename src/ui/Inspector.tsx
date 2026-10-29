@@ -2,8 +2,8 @@
 // With a selection it edits those objects; with a drawing tool active it edits that tool's
 // remembered defaults (existing objects are never touched by default changes).
 import type { ReactNode } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, ArrowDownToLine, ArrowUpToLine, Bold, ClipboardPaste, Copy, CopyPlus, Italic, Lock, Paintbrush, RotateCcw, Trash2, Unlock, FoldVertical, BringToFront, SendToBack, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal } from 'lucide-react';
-import type { ConnectorAnim, ConnectorElement, DiagramElement, FillStyle, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle } from '../model/types';
+import { AlignCenter, ArrowRightLeft, AlignLeft, AlignRight, ArrowDownToLine, ArrowUpToLine, Bold, ClipboardPaste, Copy, CopyPlus, Italic, Lock, Paintbrush, RotateCcw, Trash2, Unlock, FoldVertical, BringToFront, SendToBack, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal } from 'lucide-react';
+import type { ConnectorAnim, ConnectorElement, DiagramElement, FillStyle, ShapeAnim, ShapeKind, StrokeStyle, Style, TextStyle, ToolStyle } from '../model/types';
 import { HIGHLIGHT_COLORS, PALETTE_FILL, PALETTE_STROKE, styleKey } from '../model/defaults';
 import { getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
@@ -28,12 +28,12 @@ export function Inspector() {
   const els = selection.map((id) => getElement(doc, id)).filter(Boolean) as DiagramElement[];
 
   // ---- target abstraction ---------------------------------------------------------------
-  const toolKey = tool === 'shape' || tool === 'arrow' || tool === 'line' || tool === 'freehand' || tool === 'highlighter' || tool === 'text' ? styleKey(tool, shapeKind) : null;
+  const toolKey = tool === 'shape' || tool === 'arrow' || tool === 'pair' || tool === 'line' || tool === 'freehand' || tool === 'highlighter' || tool === 'text' ? styleKey(tool, shapeKind) : null;
   const onSelection = els.length > 0;
   if (!onSelection && !toolKey) return <CanvasPanel />;
   const ts: ToolStyle | null = toolKey ? ui.toolStyle(toolKey) : null;
   const first = els[0];
-  const kinds = new Set<Kind>(onSelection ? els.map((e) => e.type) : [toolKey === 'arrow' || toolKey === 'line' ? 'connector' : toolKey === 'text' ? 'text' : toolKey === 'freehand' || toolKey === 'highlighter' ? 'freehand' : 'shape']);
+  const kinds = new Set<Kind>(onSelection ? els.map((e) => e.type) : [toolKey === 'arrow' || toolKey === 'pair' || toolKey === 'line' ? 'connector' : toolKey === 'text' ? 'text' : toolKey === 'freehand' || toolKey === 'highlighter' ? 'freehand' : 'shape']);
   const style: Style = onSelection ? first.style : ts!.style;
   const text: TextStyle = onSelection ? first.textStyle : ts!.textStyle;
   const anyLocked = els.some((e) => e.locked);
@@ -80,6 +80,15 @@ export function Inspector() {
   const routing = conn?.routing ?? ts?.routing ?? 'curved';
   const startHead = conn?.startHead ?? ts?.startHead ?? 'none';
   const endHead = conn?.endHead ?? ts?.endHead ?? 'arrow';
+  const conns = els.filter((e): e is ConnectorElement => e.type === 'connector');
+  // request ⇄ response: response line pattern of the selection, or the pair tool's default
+  const pairStyle = onSelection ? conns.find((c) => c.pair)?.pair?.strokeStyle : toolKey === 'pair' ? ts!.pair?.strokeStyle ?? 'dashed' : undefined;
+  const setPairStroke = (v: StrokeStyle) => {
+    if (onSelection) useDoc.getState().commit((d) => mapElements(d, ids, (e) => (e.type === 'connector' && e.pair ? { ...e, pair: { ...e.pair, strokeStyle: v } } : e)));
+    else ui.setToolStyle(toolKey!, { ...ts!, pair: { text: '', strokeStyle: v } });
+  };
+  const setPairText = (text: string) => useDoc.getState().commit((d) => mapElements(d, [conn!.id], (e) => (e.type === 'connector' && e.pair ? { ...e, pair: { ...e.pair, text } } : e)), 'pairtext' + conn!.id);
+  const setMainText = (text: string) => useDoc.getState().commit((d) => mapElements(d, [conn!.id], (e) => ({ ...e, text })), 'conntext' + conn!.id);
   const hasBox = kinds.has('shape') || kinds.has('text') || kinds.has('image') || kinds.has('freehand');
   const hasFillable = kinds.has('shape');
   const hasText = kinds.has('shape') || kinds.has('text') || kinds.has('connector');
@@ -87,8 +96,8 @@ export function Inspector() {
   const singleBox = els.length === 1 && first.type !== 'connector' ? first : null;
 
   const heading = onSelection
-    ? els.length === 1 ? `${first.type === 'shape' ? SHAPE_LABELS[first.shape] : first.type === 'connector' ? (first.endHead === 'none' && first.startHead === 'none' ? 'Line' : 'Arrow') : first.type[0].toUpperCase() + first.type.slice(1)}` : `${els.length} objects`
-    : `New ${toolKey!.startsWith('shape:') ? SHAPE_LABELS[toolKey!.slice(6) as ShapeKind].toLowerCase() : toolKey}`;
+    ? els.length === 1 ? `${first.type === 'shape' ? SHAPE_LABELS[first.shape] : first.type === 'connector' ? (first.pair ? 'Request ⇄ response' : first.endHead === 'none' && first.startHead === 'none' ? 'Line' : 'Arrow') : first.type[0].toUpperCase() + first.type.slice(1)}` : `${els.length} objects`
+    : `New ${toolKey!.startsWith('shape:') ? SHAPE_LABELS[toolKey!.slice(6) as ShapeKind].toLowerCase() : toolKey === 'pair' ? 'request ⇄ response arrows' : toolKey}`;
 
   return (
     <aside className="inspector no-canvas" aria-label="Properties">
@@ -141,6 +150,21 @@ export function Inspector() {
 
           {kinds.has('connector') && (
             <Section title="Connector">
+              {onSelection && (
+                <Row label="Type">
+                  <Segmented label="Arrow type" value={conns.some((c) => c.pair) ? 'pair' : 'single'} onChange={(v) => cmd.setConnectorPair(conns.map((c) => c.id), v === 'pair')} options={[{ v: 'single', label: 'Single →', title: 'One arrow' }, { v: 'pair', label: 'Pair ⇄', title: 'Request ⇄ response: a request arrow and a response arrow back, side by side, each with its own label' }]} />
+                </Row>
+              )}
+              {pairStyle && (
+                <Row label="Response">
+                  <Segmented label="Response line" value={pairStyle} onChange={setPairStroke} options={[{ v: 'solid', label: 'Solid' }, { v: 'dashed', label: 'Dashed' }, { v: 'dotted', label: 'Dotted' }]} />
+                </Row>
+              )}
+              {conn?.pair && conns.length === 1 && <>
+                <label className="field"><span>Request label</span><input value={conn.text} placeholder="e.g. GET /orders" onChange={(e) => setMainText(e.target.value.slice(0, 5000))} /></label>
+                <label className="field"><span>Response label</span><input value={conn.pair.text} placeholder="e.g. 200 OK" onChange={(e) => setPairText(e.target.value.slice(0, 5000))} /></label>
+              </>}
+              {onSelection && <button className="btn small" title="Start and end trade places, so the arrow (or the request) points the other way" onClick={() => cmd.swapDirection(conns.map((c) => c.id))}><ArrowRightLeft size={13} /> Swap direction</button>}
               <Row label="Routing">
                 <Segmented label="Routing" value={routing} onChange={(v) => setConn({ routing: v })} options={[{ v: 'straight', label: 'Straight' }, { v: 'curved', label: 'Curved' }, { v: 'elbow', label: 'Elbow' }]} />
               </Row>

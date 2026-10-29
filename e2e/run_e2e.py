@@ -255,6 +255,39 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tesc()
 
+        @test('Request ⇄ response: Q draws an attached pair; both labels edit; swap direction')
+        def tpair():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.key('u'); app.drag((5100, 5200), (5260, 5280)); app.drag((5500, 5200), (5660, 5280))
+            ids = [e['id'] for e in app.els('shape')[-2:]]
+            app.key('q'); app.drag((5180, 5240), (5580, 5240))
+            c = app.els('connector')[-1]
+            assert c.get('pair') == {'text': '', 'strokeStyle': 'dashed'}, c.get('pair')
+            assert c['start']['elementId'] == ids[0] and c['end']['elementId'] == ids[1], (c['start'], c['end'])
+            app.key('Escape')
+            # request runs above the centre line (left of travel), response below it
+            app.click((5380, 5240 + 8), count=2); page.wait_for_selector('.text-editor')
+            page.keyboard.type('200 OK'); page.keyboard.press('Escape'); page.wait_for_timeout(80)
+            app.click((5380, 5240 - 8), count=2); page.wait_for_selector('.text-editor')
+            page.keyboard.type('GET /orders'); page.keyboard.press('Escape'); page.wait_for_timeout(80)
+            c = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert c['text'] == 'GET /orders' and c['pair']['text'] == '200 OK', (c['text'], c['pair'])
+            app.click((5380, 5240))
+            page.get_by_role('button', name='Swap direction').click(); page.wait_for_timeout(80)
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert s['start']['elementId'] == ids[1] and s['end']['elementId'] == ids[0]
+            assert s['text'] == 'GET /orders' and s['pair']['text'] == '200 OK'
+            assert s['curvature'] == 0 and str(s['curvature']) != '-0.0', s['curvature']
+            # remove the test objects so later tests that use "the last arrow" are unaffected
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            assert not [e for e in app.els() if e['id'] in ids + [c['id']]], 'test objects left behind'
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tpair()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]
@@ -338,7 +371,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 1
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 2
             assert len(data['elements']) == len(app.els())
         t7()
 

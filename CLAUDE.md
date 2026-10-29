@@ -65,13 +65,14 @@ src/templates/   samples.ts (7 built-in sample diagrams, generated in code)
 - **Dark theme does NOT invert the canvas.** The diagram always shows its true colours (what you see is what you export). Dark theme only restyles the app's interface. Users who want a dark canvas pick a dark canvas background.
 - **Palettes** (`model/defaults.ts`): a 10-column grid of neutrals plus 10 hues, in tint, light, bold and deep strengths, plus recent colours and hex/native picker. The e2e tests click swatches by aria-label, for example `Stroke colour #1864ab`. Update the tests if you change palette values.
 - **Welcome card** shows only on a fresh empty canvas. It can be dismissed (✕ / "Start with a blank canvas" / picking any drawing tool). File ▸ New diagram always gives a blank canvas with no card.
+- **Request ⇄ response pairs** (tool `pair`, key Q): one connector with `pair: { text, strokeStyle }`. The request (connector `text`) runs start→end on the left of travel; the response (`pair.text`, dashed by default) runs end→start alongside it. Geometry is `pairPaths()` in `engine/connectors.ts` (offset route, ends re-attached to the outlines); labels sit outside their own arrow (`connectorLabelRect` in `engine/render.ts`). Flow animation ping-pongs (request in the first half of each round trip, response in the second). Inspector: Type Single → / Pair ⇄, response line pattern, both labels, Swap direction (`cmd.swapDirection`, also for single arrows). The text editor's `editingPart` says which label is being edited. Schema v2 added `pair`.
 - Default arrow animation is the travelling highlight. Glow is drawn as translucent wide strokes, not blur filters, for speed.
 - Live view culls off-screen elements, and the grid is a cached canvas pattern.
 - Theme toggle: the top-bar sun/moon button cycles Light → Dark → System. It is also in View ▸ Theme and Edit ▸ Preferences.
 
 ## Testing conventions
 
-- Unit tests are in `tests/` (Vitest + jsdom): engine determinism and continuity, connectors, schema round-trip and sanitising, history, tool styles.
+- Unit tests are in `tests/` (Vitest + jsdom): engine determinism and continuity, connectors, request ⇄ response pairs (`tests/pair.test.ts`), schema round-trip and sanitising, history, tool styles.
 - `src/main.tsx` exposes a **read-only** `window.__flowsketch` hook (`doc`, `ui`, `toolStyle`, `frame(t)`, `connectorEnds`, `pause`, `setView`, `benchRender`, `measureFps`, `history`) used by the e2e tests. Keep it working and read-only.
 - Stable test selectors: `data-testid` = `stage`, `play`, `open-sample`, `start-blank`, `gif-export`, `confirm-ok`. Templates use `data-template=<id>`.
 - E2E opens files with `delete window.showOpenFilePicker` so the `<input type=file>` fallback (attached to the DOM in `pickFile`) is exercised.

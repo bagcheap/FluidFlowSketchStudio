@@ -170,6 +170,10 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
         labelPos: num(v.labelPos, 0.5, 0, 1),
         labelOffset: num(v.labelOffset, 0, -500, 500),
         ...(isObj(v.anim) ? { anim: sanitizeConnectorAnim(v.anim, true) } : {}),
+        ...(isObj(v.pair) ? { pair: {
+          text: str(v.pair.text, '', MAX_TEXT),
+          strokeStyle: oneOf(v.pair.strokeStyle, ['solid', 'dashed', 'dotted'] as const, 'dashed'),
+        } } : {}),
       };
     }
   }
@@ -202,6 +206,10 @@ export function migrate(raw: Obj): Obj {
       raw.elements = [...((raw.shapes as unknown[]) ?? []), ...((raw.connectors as unknown[]) ?? [])];
     }
     version = 1;
+  }
+  if (version === 1) {
+    // v1 -> v2: adds the optional ConnectorElement.pair (request ⇄ response); nothing to convert
+    version = 2;
   }
   raw.schemaVersion = version;
   return raw;

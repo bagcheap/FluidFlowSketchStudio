@@ -1,10 +1,9 @@
 // Hit testing on STATIC geometry: animation never affects what the pointer grabs.
 import type { BoxElement, ConnectorElement, DiagramElement, FlowDocument, Point } from '../model/types';
 import { STILL } from '../engine/animation';
-import { connectorPath, pointAt, toLocal, toWorld } from '../engine/connectors';
-import { makeLookup } from '../engine/render';
+import { connectorPath, pairGap, pairPaths, toLocal, toWorld } from '../engine/connectors';
+import { connectorLabelRect, makeLookup, type LabelPart, type Rect } from '../engine/render';
 import { distToPolyline, geometryFor, pointInPolygon } from '../engine/shapes';
-import { layoutText } from '../engine/text';
 
 export function hitBox(el: BoxElement, p: Point, tol: number): boolean {
   const l = toLocal(el, STILL, p);
@@ -19,21 +18,35 @@ export function hitBox(el: BoxElement, p: Point, tol: number): boolean {
   return l.x >= -tol && l.y >= -tol && l.x <= el.w + tol && l.y <= el.h + tol;
 }
 
-export function connectorLabelBox(doc: FlowDocument, c: ConnectorElement) {
-  if (!c.text) return null;
-  const path = connectorPath(c, makeLookup(doc, null));
-  const { pt: a, tan } = pointAt(path, c.labelPos * path.length);
-  const lay = layoutText(c.text, c.textStyle, null);
-  const w = lay.width + c.textStyle.padding * 2 + 4, h = lay.height + c.textStyle.padding * 2;
-  const cx = a.x - tan.y * c.labelOffset, cy = a.y + tan.x * c.labelOffset;
-  return { x: cx - w / 2, y: cy - h / 2, w, h };
+/** Label boxes of a connector that has label text (a pair can have two). */
+export function connectorLabelBoxes(doc: FlowDocument, c: ConnectorElement): { part: LabelPart; box: Rect }[] {
+  const lookup = makeLookup(doc, null);
+  const out: { part: LabelPart; box: Rect }[] = [];
+  if (c.text) out.push({ part: 'main', box: connectorLabelRect(c, 'main', lookup) });
+  if (c.pair?.text) out.push({ part: 'response', box: connectorLabelRect(c, 'response', lookup) });
+  return out;
 }
 
+const inRect = (p: Point, r: Rect) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+
 export function hitConnector(doc: FlowDocument, c: ConnectorElement, p: Point, tol: number): boolean {
-  const path = connectorPath(c, makeLookup(doc, null));
-  if (distToPolyline(p, path.pts) < tol + c.style.strokeWidth / 2 + 2) return true;
-  const lb = connectorLabelBox(doc, c);
-  return !!lb && p.x >= lb.x && p.x <= lb.x + lb.w && p.y >= lb.y && p.y <= lb.y + lb.h;
+  const lookup = makeLookup(doc, null);
+  const near = tol + c.style.strokeWidth / 2 + 2;
+  if (c.pair) {
+    // anywhere on either arrow or in the gap between them
+    const center = connectorPath(c, lookup);
+    if (distToPolyline(p, center.pts) < near + pairGap(c) / 2) return true;
+  } else if (distToPolyline(p, connectorPath(c, lookup).pts) < near) return true;
+  return connectorLabelBoxes(doc, c).some((l) => inRect(p, l.box));
+}
+
+/** Which label of a connector a point refers to: a label box under it, else the nearer arrow of a pair. */
+export function connectorPartAt(doc: FlowDocument, c: ConnectorElement, p: Point): LabelPart {
+  if (!c.pair) return 'main';
+  const hit = connectorLabelBoxes(doc, c).find((l) => inRect(p, l.box));
+  if (hit) return hit.part;
+  const pp = pairPaths(c, makeLookup(doc, null));
+  return distToPolyline(p, pp.res.pts) < distToPolyline(p, pp.req.pts) ? 'response' : 'main';
 }
 
 export function hitTest(doc: FlowDocument, p: Point, zoom: number, filter?: (e: DiagramElement) => boolean): DiagramElement | null {

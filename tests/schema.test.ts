@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DocumentError, parseDocument, serializeDocument } from '../src/model/schema';
+import { SCHEMA_VERSION } from '../src/model/types';
 import { SAMPLES } from '../src/templates/samples';
 import { renderDocumentAtTime } from '../src/engine/render';
 import { frameToSvg } from '../src/engine/svgExport';
@@ -56,7 +57,7 @@ describe('native .flowsketch format', () => {
   it('migrates v0 documents', () => {
     const { doc } = parseDocument({ format: 'flowsketch', shapes: [{ id: 's', type: 'shape', shape: 'diamond', x: 1, y: 2, w: 3, h: 4 }], connectors: [] });
     expect(doc.elements).toHaveLength(1);
-    expect(doc.schemaVersion).toBe(1);
+    expect(doc.schemaVersion).toBe(SCHEMA_VERSION);
   });
 });
 

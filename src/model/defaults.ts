@@ -153,6 +153,7 @@ export function makeConnector(start: Endpoint, end: Endpoint, tool: ToolStyle): 
     labelPos: 0.5, labelOffset: 0,
     textStyle: { ...tool.textStyle, fontSize: Math.max(12, tool.textStyle.fontSize - 4), padding: 4 },
     ...(tool.connectorAnim && Object.keys(tool.connectorAnim).length ? { anim: { ...tool.connectorAnim } } : {}),
+    ...(tool.pair ? { pair: { ...tool.pair, text: '' } } : {}),
   };
 }
 
@@ -161,7 +162,7 @@ export const isConnector = (e: DiagramElement): e is ConnectorElement => e.type 
 // ---- Tool defaults ---------------------------------------------------------
 
 export type ToolId =
-  | 'select' | 'hand' | 'shape' | 'arrow' | 'line' | 'freehand' | 'highlighter'
+  | 'select' | 'hand' | 'shape' | 'arrow' | 'pair' | 'line' | 'freehand' | 'highlighter'
   | 'text' | 'image' | 'eraser' | 'painter';
 
 /** Key under which a tool's style is remembered (shape tools remember per shape kind). */
@@ -174,6 +175,10 @@ export function defaultToolStyle(key: string): ToolStyle {
   if (key === 'arrow') {
     s.style = { ...s.style, fill: 'transparent', fillStyle: 'none', stroke: '#4b5563' };
     s.routing = 'curved'; s.endHead = 'arrow'; s.startHead = 'none';
+  } else if (key === 'pair') {
+    s.style = { ...s.style, fill: 'transparent', fillStyle: 'none', stroke: '#4b5563' };
+    s.routing = 'straight'; s.endHead = 'arrow'; s.startHead = 'none';
+    s.pair = { text: '', strokeStyle: 'dashed' };
   } else if (key === 'line') {
     s.style = { ...s.style, fill: 'transparent', fillStyle: 'none' };
     s.routing = 'straight'; s.endHead = 'none'; s.startHead = 'none';

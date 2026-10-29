@@ -26,6 +26,7 @@ export function TopBar() {
   useEffect(() => setTitle(doc.title), [doc.title]);
   const a = doc.animation;
   const hasSel = sel.length > 0;
+  const selConnector = doc.elements.some((e) => e.type === 'connector' && sel.includes(e.id));
   const toggle = (k: keyof typeof prefs) => () => ui.updatePrefs({ [k]: !prefs[k] } as never);
 
   const anim = (patch: Partial<typeof a>) => () => cmd.setAnimation(patch, 'menu');
@@ -74,6 +75,7 @@ export function TopBar() {
       { label: 'Flowchart symbol', sub: SHAPE_KINDS.filter((k) => !['rectangle', 'roundRect', 'ellipse', 'triangle', 'star'].includes(k)).map((k) => ({ label: SHAPE_LABELS[k], run: () => cmd.insertShapeAtCenter(k) })) },
       { label: 'Shape library…', shortcut: 'S', run: () => ui.openDialog('shapes') },
       { label: 'Arrow / connector', shortcut: 'A', run: () => ui.setTool('arrow') },
+      { label: 'Request ⇄ response arrows', shortcut: 'Q', run: () => ui.setTool('pair') },
       { label: 'Line', shortcut: 'L', run: () => ui.setTool('line') },
       { label: 'Text', shortcut: 'T', run: () => ui.setTool('text') },
       { label: 'Image…', shortcut: 'I', run: () => void cmd.insertImage() },
@@ -97,6 +99,7 @@ export function TopBar() {
       { sep: true },
       { label: 'Flip horizontal', run: () => cmd.flip('h'), disabled: !hasSel },
       { label: 'Flip vertical', run: () => cmd.flip('v'), disabled: !hasSel },
+      { label: 'Swap arrow direction', run: () => cmd.swapDirection(), disabled: !selConnector },
       { sep: true },
       { label: 'Lock / unlock', shortcut: `${MOD}${SHIFT}L`, run: cmd.toggleLock, disabled: !hasSel },
       { label: 'Unlock all', run: cmd.unlockAll },

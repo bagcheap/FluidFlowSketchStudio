@@ -141,6 +141,12 @@ export interface ImageElement extends ElementBase {
   anim?: Partial<ShapeAnim>;
 }
 
+/** Request ⇄ response: a second arrow running back from end to start, parallel to the first. */
+export interface ConnectorPair {
+  text: string; // response label (the request label is the connector's own text)
+  strokeStyle: StrokeStyle; // response line pattern (dashed by default, the UML reply convention)
+}
+
 export interface ConnectorElement extends ElementBase {
   type: 'connector';
   start: Endpoint;
@@ -153,6 +159,7 @@ export interface ConnectorElement extends ElementBase {
   labelPos: number; // 0..1 along path
   labelOffset: number; // px perpendicular
   anim?: Partial<ConnectorAnim>;
+  pair?: ConnectorPair; // present = request ⇄ response pair (start→end request, end→start response)
 }
 
 export type BoxElement = ShapeElement | TextElement | FreehandElement | ImageElement;
@@ -178,7 +185,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2; // v2: ConnectorElement.pair
 
 export interface FlowDocument {
   format: 'flowsketch';
@@ -204,4 +211,5 @@ export interface ToolStyle {
   routing?: Routing;
   startHead?: HeadKind;
   endHead?: HeadKind;
+  pair?: ConnectorPair; // pair tool: response line defaults (text unused)
 }

@@ -5,14 +5,14 @@ import { useDoc, getElement } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import { geometryFor } from '../engine/shapes';
 import { cssFont } from '../engine/text';
-import { connectorPath, pointAt } from '../engine/connectors';
-import { makeLookup } from '../engine/render';
+import { connectorLabelRect, makeLookup, type LabelPart } from '../engine/render';
 
-export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p: Point) => Point; onDone: (id: string, text: string) => void }) {
+export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p: Point) => Point; onDone: (id: string, text: string, part: LabelPart) => void }) {
   const doc = useDoc((s) => s.doc);
   const view = useUI((s) => s.view);
   const el = getElement(doc, id);
-  const [text, setText] = useState(el?.text ?? '');
+  const [part] = useState(() => useUI.getState().editingPart); // a pair's request ('main') or response label
+  const [text, setText] = useState((part === 'response' && el?.type === 'connector' ? el.pair?.text : el?.text) ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
   const done = useRef(false);
   const [lines, setLines] = useState(1);
@@ -21,7 +21,7 @@ export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p:
   useLayoutEffect(() => { setLines(Math.max(1, text.split('\n').length)); }, [text]);
 
   if (!el) return null;
-  const finish = () => { if (done.current) return; done.current = true; onDone(id, text); };
+  const finish = () => { if (done.current) return; done.current = true; onDone(id, text, part); };
   const z = view.zoom;
   const ts = el.textStyle;
   const lh = ts.fontSize * ts.lineHeight;
@@ -35,9 +35,8 @@ export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p:
   let outer: React.CSSProperties;
   let inner: React.CSSProperties;
   if (el.type === 'connector') {
-    const path = connectorPath(el, makeLookup(doc, null));
-    const { pt, tan } = pointAt(path, el.labelPos * path.length);
-    const c = toScreen({ x: pt.x - tan.y * el.labelOffset, y: pt.y + tan.x * el.labelOffset });
+    const r = connectorLabelRect(el, part, makeLookup(doc, null), text);
+    const c = toScreen({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
     const w = Math.max(120, (text.length + 2) * ts.fontSize * 0.6) * z;
     outer = { left: c.x - w / 2, top: c.y - (lines * lh * z) / 2, width: w, height: lines * lh * z };
     inner = { ...common, left: 0, top: 0, width: '100%', height: '100%', textAlign: 'center', background: 'var(--canvas-chip)' };

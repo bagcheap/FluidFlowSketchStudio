@@ -2,10 +2,10 @@
 // The single source of truth for what a diagram looks like at time t. Pure with respect to the
 // document: it never mutates it. The live canvas, PNG/GIF/video export and SVG export all consume
 // the returned Frame, so preview and exports match exactly.
-import type { BoxElement, ConnectorElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, Point, ShapeElement, TextElement } from '../model/types';
+import type { AnimationSettings, BoxElement, ConnectorAnim, ConnectorElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, Point, ShapeElement, StrokeStyle, TextElement } from '../model/types';
 import type { Motion, PreviewFlags } from './animation';
 import { STILL, resolveConnectorAnim, shapeMotion } from './animation';
-import { connectorPath, endTangent, pointAt, slice, type ConnectorPath, type Lookup } from './connectors';
+import { connectorPath, endTangent, pairGap, pairPaths, pointAt, slice, type ConnectorPath, type Lookup } from './connectors';
 import { displace, easeInOut, fract, hash01, snapFreq, type DeformField } from './noise';
 import { roughSets, type OpSet } from './rough';
 import { geometryFor } from './shapes';
@@ -23,7 +23,7 @@ export interface Frame { items: Item[]; time: number; background: string }
 
 export interface RenderOptions {
   flags?: PreviewFlags;
-  hide?: Set<string>; // e.g. element being text-edited (label hidden)
+  hide?: Set<string>; // label being text-edited: element id, or `<id>#response` for a pair's response label
   only?: Set<string>; // export selection only
   cull?: Rect; // live view: skip elements entirely outside this world rect
 }
@@ -159,22 +159,29 @@ function headParts(kind: HeadKind, tip: Point, dir: Point, color: string, sw: nu
   return [{ k: 'line', pts: [tip.x + n.x, tip.y + n.y, tip.x - n.x, tip.y - n.y], color, width: sw, alpha: 1, cap: 'round', dash: null }];
 }
 
-function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, lookup: Lookup, flags: PreviewFlags | undefined, background: string, hideLabel: boolean, cull?: Rect): Item[] {
-  const path = connectorPath(c, lookup);
-  if (path.length < 1) return [];
-  if (cull) {
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const q of path.control) { x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y); x1 = Math.max(x1, q.x); y1 = Math.max(y1, q.y); }
-    const m = 60;
-    if (x1 + m < cull.x || x0 - m > cull.x + cull.w || y1 + m < cull.y || y0 - m > cull.y + cull.h) return [];
-  }
+/** What one arrow's flow animation shows right now (all fractions of the arrow's own length). */
+interface FlowState {
+  span: [number, number] | null; // draw-on: visible part, null = whole arrow
+  travel: number | null; // travelling highlight phase 0..1, null = no highlight now
+  pulse: number | null; // pulse strength 0..1, null = no pulse now
+}
+
+/** Draw-on visibility: draws during [start, start+dur) of the cycle, holds, then vanishes or erases in the pause. */
+function drawSpan(u: number, start: number, dur: number, a: ConnectorAnim): [number, number] {
+  const pf = a.pauseFraction;
+  if (u < start) return [0, 0];
+  if (u < start + dur) return [0, easeInOut((u - start) / dur)];
+  if (u < 1 - pf) return [0, 1];
+  if (a.erase) return [easeInOut((u - (1 - pf)) / Math.max(1e-6, pf)), 1];
+  return [0, 0];
+}
+
+/** Line, flow animation and heads for one arrow along `path`. */
+function arrowParts(c: ConnectorElement, path: ConnectorPath, strokeStyle: StrokeStyle, seed: number, anim: ConnectorAnim, settings: AnimationSettings, t: number, fs: FlowState): Part[] {
   const st = c.style;
   const sw = st.strokeWidth;
-  const anim = flags?.still ? { ...resolveConnectorAnim(doc.animation, c), mode: 'none' as const } : resolveConnectorAnim(doc.animation, c);
-  const settings = doc.animation;
   const L = settings.seamless && settings.loop ? settings.duration : null;
   const tt = t; // connectors share the document clock so flow reads consistently
-  const active = t >= anim.delay;
   const speed = anim.speed * settings.arrowSpeedScale;
   const trip = (hz: number) => (L ? snapFreq(hz, L) : hz);
   const parts: Part[] = [];
@@ -182,25 +189,16 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
   const range = (a: number, b: number) => (anim.direction === 'reverse' ? [len - b, len - a] : [a, b]);
   const shorten = (k: HeadKind) => (k === 'triangle' || k === 'dot' ? Math.min(34, 9 + sw * 3) * 0.55 : 0);
   let visible: [number, number] = [0, len];
-  let pulse = 1;
-
-  if (anim.mode === 'drawOn' && speed > 0) {
-    const u = active ? fract((tt - anim.delay) * trip(speed)) : 0;
-    const df = anim.drawFraction, pf = anim.pauseFraction;
-    let a = 0, b = 0;
-    if (u < df) b = easeInOut(u / df) * len;
-    else if (u < 1 - pf) b = len;
-    else if (anim.erase) { a = easeInOut((u - (1 - pf)) / Math.max(1e-6, pf)) * len; b = len; }
-    else { a = 0; b = 0; }
-    const r = range(a, b);
+  if (anim.mode === 'drawOn' && speed > 0 && fs.span) {
+    const r = range(fs.span[0] * len, fs.span[1] * len);
     visible = [r[0], r[1]];
   }
   const [va, vb] = visible;
   const startCut = va <= 0.001 ? shorten(c.startHead) : 0;
   const endCut = vb >= len - 0.001 ? shorten(c.endHead) : 0;
-  const base = wiggled(path, va + startCut, vb - endCut, st.roughness, c.seed);
+  const base = wiggled(path, va + startCut, vb - endCut, st.roughness, seed);
 
-  const dash = dashFor(st.strokeStyle, sw);
+  const dash = dashFor(strokeStyle, sw);
   if (anim.mode === 'dash' && speed > 0) {
     const pat = dash ?? [sw * 4 + 6, sw * 3 + 6];
     const period = pat[0] + pat[1];
@@ -209,30 +207,25 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
     if (base.length) parts.push({ k: 'line', pts: base, color: st.stroke, width: sw, alpha: 1, cap: 'round', dash: pat, dashOffset: off });
   } else if (base.length) {
     parts.push({ k: 'line', pts: base, color: st.stroke, width: sw, alpha: 1, cap: 'round', dash });
-    if (st.roughness >= 2) parts.push({ k: 'line', pts: wiggled(path, va + startCut, vb - endCut, st.roughness * 0.6, c.seed + 99), color: st.stroke, width: Math.max(0.6, sw * 0.55), alpha: 0.7, cap: 'round', dash });
+    if (st.roughness >= 2) parts.push({ k: 'line', pts: wiggled(path, va + startCut, vb - endCut, st.roughness * 0.6, seed + 99), color: st.stroke, width: Math.max(0.6, sw * 0.55), alpha: 0.7, cap: 'round', dash });
   }
 
-  if (anim.mode === 'travel' && speed > 0 && active) {
+  if (anim.mode === 'travel' && speed > 0 && fs.travel !== null) {
     const hl = Math.min(anim.highlightLength, len);
     const n = Math.max(1, anim.segments);
-    const u = fract((tt - anim.delay) * trip(speed));
     for (let i = 0; i < n; i++) {
-      const head = fract(u + i / n) * (len + hl);
+      const head = fract(fs.travel + i / n) * (len + hl);
       const [a, b] = range(head - hl, head);
-      const pts = wiggled(path, Math.max(0, a), Math.min(len - endCut * 0.6, b), st.roughness, c.seed);
+      const pts = wiggled(path, Math.max(0, a), Math.min(len - endCut * 0.6, b), st.roughness, seed);
       if (pts.length >= 4) {
         if (anim.glow) parts.push(...halo(pts, anim.highlightColor, sw, anim.highlightOpacity));
         parts.push({ k: 'line', pts, color: anim.highlightColor, width: sw + 1.5, alpha: anim.highlightOpacity, cap: anim.roundCaps ? 'round' : 'butt', dash: null });
       }
     }
   }
-  if (anim.mode === 'pulse' && speed > 0) {
-    const k = trip(speed);
-    pulse = 0.5 + 0.5 * Math.sin(2 * Math.PI * k * tt);
-    if (base.length) {
-      if (anim.glow) parts.push(...halo(base, anim.highlightColor, sw, anim.highlightOpacity * pulse));
-      parts.push({ k: 'line', pts: base, color: anim.highlightColor, width: sw + 1.5, alpha: anim.highlightOpacity * pulse, cap: 'round', dash: null });
-    }
+  if (anim.mode === 'pulse' && speed > 0 && fs.pulse !== null && base.length) {
+    if (anim.glow) parts.push(...halo(base, anim.highlightColor, sw, anim.highlightOpacity * fs.pulse));
+    parts.push({ k: 'line', pts: base, color: anim.highlightColor, width: sw + 1.5, alpha: anim.highlightOpacity * fs.pulse, cap: 'round', dash: null });
   }
   const headScale = anim.arrowPulse && anim.mode !== 'none' ? 1 + 0.18 * Math.sin(2 * Math.PI * trip(speed || 0.5) * tt) : 1;
   // heads: during draw-on the end head rides the leading edge
@@ -252,21 +245,95 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
       parts.push(...headParts(c.startHead, path.pts[0], endTangent(path, true), st.stroke, sw, headScale));
     }
   }
-  const items: Item[] = [{ id: c.id, opacity: st.opacity, tf: null, parts }];
-  if (c.text && !hideLabel) {
-    const { pt, tan } = pointAt(path, c.labelPos * len);
-    const center = { x: pt.x - tan.y * c.labelOffset, y: pt.y + tan.x * c.labelOffset };
-    const ts = c.textStyle;
-    const lay = layoutText(c.text, ts, null);
-    const w = lay.width + ts.padding * 2 + 4, h = lay.height + ts.padding * 2;
-    const box = { x: center.x - w / 2, y: center.y - h / 2, w, h };
-    const r = 6;
-    const bg: Part = {
-      k: 'line', color: background, width: 1, alpha: 0.92, cap: 'round', dash: null, closed: true, fill: background,
-      pts: [box.x + r, box.y, box.x + w - r, box.y, box.x + w, box.y + r, box.x + w, box.y + h - r, box.x + w - r, box.y + h, box.x + r, box.y + h, box.x, box.y + h - r, box.x, box.y + r],
-    };
-    items.push({ id: c.id + ':label', opacity: st.opacity, tf: null, parts: [bg, ...labelParts(c, box, false)] });
+  return parts;
+}
+
+export type LabelPart = 'main' | 'response';
+
+/**
+ * Where a connector label sits. A single arrow's label is a chip on the line (moved sideways by labelOffset);
+ * each label of a request ⇄ response pair sits just outside its own arrow.
+ * `text` overrides the measured text (the text editor passes what is being typed).
+ */
+export function connectorLabelRect(c: ConnectorElement, part: LabelPart, lookup: Lookup, text?: string, paths?: { req: ConnectorPath; res: ConnectorPath } | ConnectorPath): Rect {
+  const ts = c.textStyle;
+  const lay = layoutText((text ?? (part === 'response' ? c.pair?.text : c.text)) || ' ', ts, null);
+  const w = lay.width + ts.padding * 2 + 4, h = lay.height + ts.padding * 2;
+  let cx: number, cy: number;
+  if (c.pair) {
+    const pp = paths && 'req' in paths ? paths : pairPaths(c, lookup);
+    const path = part === 'response' ? pp.res : pp.req;
+    const { pt, tan } = pointAt(path, (part === 'response' ? 1 - c.labelPos : c.labelPos) * path.length);
+    const n = { x: tan.y, y: -tan.x }; // left of travel = the outer side of this arrow
+    const r = Math.abs(n.x) * (w / 2) + Math.abs(n.y) * (h / 2) + 4 + c.labelOffset;
+    cx = pt.x + n.x * r; cy = pt.y + n.y * r;
+  } else {
+    const path = paths && !('req' in paths) ? paths : connectorPath(c, lookup);
+    const { pt, tan } = pointAt(path, c.labelPos * path.length);
+    cx = pt.x - tan.y * c.labelOffset; cy = pt.y + tan.x * c.labelOffset;
   }
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
+function labelItem(c: ConnectorElement, id: string, box: Rect, text: string, background: string): Item {
+  const { x, y, w, h } = box;
+  const r = 6;
+  const bg: Part = {
+    k: 'line', color: background, width: 1, alpha: 0.92, cap: 'round', dash: null, closed: true, fill: background,
+    pts: [x + r, y, x + w - r, y, x + w, y + r, x + w, y + h - r, x + w - r, y + h, x + r, y + h, x, y + h - r, x, y + r],
+  };
+  return { id, opacity: c.style.opacity, tf: null, parts: [bg, ...labelParts({ ...c, text }, box, false)] };
+}
+
+function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, lookup: Lookup, flags: PreviewFlags | undefined, background: string, hide: Set<string> | undefined, cull?: Rect): Item[] {
+  const center = connectorPath(c, lookup);
+  if (center.length < 1) return [];
+  if (cull) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const q of center.control) { x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y); x1 = Math.max(x1, q.x); y1 = Math.max(y1, q.y); }
+    const m = 60;
+    if (x1 + m < cull.x || x0 - m > cull.x + cull.w || y1 + m < cull.y || y0 - m > cull.y + cull.h) return [];
+  }
+  const anim = flags?.still ? { ...resolveConnectorAnim(doc.animation, c), mode: 'none' as const } : resolveConnectorAnim(doc.animation, c);
+  const settings = doc.animation;
+  const L = settings.seamless && settings.loop ? settings.duration : null;
+  const speed = anim.speed * settings.arrowSpeedScale;
+  const trip = (hz: number) => (L ? snapFreq(hz, L) : hz);
+  const active = t >= anim.delay;
+  const items: Item[] = [];
+  if (!c.pair) {
+    const u = fract((t - anim.delay) * trip(speed));
+    const fs: FlowState = {
+      span: drawSpan(active ? u : 0, 0, anim.drawFraction, anim),
+      travel: active ? u : null,
+      pulse: 0.5 + 0.5 * Math.sin(2 * Math.PI * trip(speed) * t),
+    };
+    items.push({ id: c.id, opacity: c.style.opacity, tf: null, parts: arrowParts(c, center, c.style.strokeStyle, c.seed, anim, settings, t, fs) });
+    if (c.text && !hide?.has(c.id)) items.push(labelItem(c, c.id + ':label', connectorLabelRect(c, 'main', lookup, undefined, center), c.text, background));
+    return items;
+  }
+  // Request ⇄ response, ping-pong: one round trip per cycle, the request in the first half, the response in the second.
+  const pp = pairPaths(c, lookup);
+  const u = active ? fract((t - anim.delay) * trip(speed / 2)) : 0;
+  const first = u < 0.5;
+  const local = first ? u * 2 : (u - 0.5) * 2;
+  const df = anim.drawFraction / 2;
+  const req: FlowState = {
+    span: drawSpan(u, 0, df, anim),
+    travel: active && first ? local : null,
+    pulse: active && first ? Math.sin(Math.PI * local) : null,
+  };
+  const res: FlowState = {
+    span: drawSpan(u, 0.5, Math.min(df, Math.max(0.02, 0.5 - anim.pauseFraction)), anim),
+    travel: active && !first ? local : null,
+    pulse: active && !first ? Math.sin(Math.PI * local) : null,
+  };
+  items.push({
+    id: c.id, opacity: c.style.opacity, tf: null,
+    parts: [...arrowParts(c, pp.req, c.style.strokeStyle, c.seed, anim, settings, t, req), ...arrowParts(c, pp.res, c.pair.strokeStyle, c.seed + 7, anim, settings, t, res)],
+  });
+  if (c.text && !hide?.has(c.id)) items.push(labelItem(c, c.id + ':label', connectorLabelRect(c, 'main', lookup, undefined, pp), c.text, background));
+  if (c.pair.text && !hide?.has(c.id + '#response')) items.push(labelItem(c, c.id + ':label2', connectorLabelRect(c, 'response', lookup, undefined, pp), c.pair.text, background));
   return items;
 }
 
@@ -306,7 +373,7 @@ export function renderDocumentAtTime(doc: FlowDocument, t: number, opts: RenderO
       case 'image':
         items.push({ id: el.id, opacity: el.style.opacity, tf: { x: el.x + m.tx, y: el.y + m.ty, w: el.w, h: el.h, rot: el.rotation + m.rot }, parts: [{ k: 'image', assetId: el.assetId, x: 0, y: 0, w: el.w, h: el.h }] });
         break;
-      case 'connector': items.push(...connectorItems(doc, el, t, lookup, opts.flags, doc.canvas.background, hide, opts.cull)); break;
+      case 'connector': items.push(...connectorItems(doc, el, t, lookup, opts.flags, doc.canvas.background, opts.hide, opts.cull)); break;
     }
   }
   return { items, time: t, background: doc.canvas.background };
@@ -329,7 +396,7 @@ export function elementBounds(doc: FlowDocument, el: DiagramElement): Rect {
   if (el.type === 'connector') {
     const p = connectorPath(el, makeLookup(doc, null));
     pts = p.pts.length ? p.pts : [{ x: el.start.x, y: el.start.y }];
-    const pad = Math.min(34, 9 + el.style.strokeWidth * 3);
+    const pad = Math.min(34, 9 + el.style.strokeWidth * 3) + (el.pair ? pairGap(el) / 2 : 0);
     const xs = pts.map((q) => q.x), ys = pts.map((q) => q.y);
     return { x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 };
   }
