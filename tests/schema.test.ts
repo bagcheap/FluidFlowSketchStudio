@@ -3,6 +3,7 @@ import { DocumentError, parseDocument, serializeDocument } from '../src/model/sc
 import { SAMPLES } from '../src/templates/samples';
 import { renderDocumentAtTime } from '../src/engine/render';
 import { frameToSvg } from '../src/engine/svgExport';
+import { colorLabel, HIGHLIGHT_COLORS, PALETTE_FILL, PALETTE_STROKE } from '../src/model/defaults';
 
 describe('native .flowsketch format', () => {
   it('round-trips every sample losslessly (same diagram, same animation)', () => {
@@ -66,5 +67,13 @@ describe('SVG export', () => {
     expect(svg).toContain('a &lt; b &amp; &quot;c&quot;');
     expect(svg).not.toContain('<script');
     expect((svg.match(/<path /g) ?? []).length).toBeGreaterThan(20);
+  });
+});
+
+describe('palette colour names', () => {
+  it('names every swatch (tooltips never fall back to a bare hex code)', () => {
+    for (const c of [...PALETTE_STROKE, ...PALETTE_FILL, ...HIGHLIGHT_COLORS]) expect(colorLabel(c)).not.toBe(c);
+    expect(colorLabel('#1864ab')).toBe('Dark blue · #1864ab');
+    expect(colorLabel('#123456')).toBe('#123456');
   });
 });

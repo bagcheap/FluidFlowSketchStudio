@@ -9,26 +9,26 @@ import { ShapeIcon } from './ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { SHAPE_KINDS } from '../model/schema';
 
-interface T { id: ToolId; shape?: ShapeKind; icon: ReactNode; label: string; key: string }
+interface T { id: ToolId; shape?: ShapeKind; icon: ReactNode; label: string; key: string; tip: string }
 
 const TOOLS: (T | 'sep')[] = [
-  { id: 'hand', icon: <Hand size={18} />, label: 'Hand (pan)', key: 'H' },
-  { id: 'select', icon: <MousePointer2 size={18} />, label: 'Select', key: 'V' },
+  { id: 'hand', icon: <Hand size={18} />, label: 'Hand (pan)', key: 'H', tip: 'Drag to move around the canvas. Hold Space with any tool to pan temporarily' },
+  { id: 'select', icon: <MousePointer2 size={18} />, label: 'Select', key: 'V', tip: 'Click to select, drag to move, drag on empty canvas to box-select. Shift-click adds to the selection' },
   'sep',
-  { id: 'shape', shape: 'rectangle', icon: <Square size={18} />, label: 'Rectangle', key: 'R' },
-  { id: 'shape', shape: 'roundRect', icon: <RectangleHorizontal size={18} />, label: 'Rounded rectangle', key: 'U' },
-  { id: 'shape', shape: 'ellipse', icon: <Circle size={18} />, label: 'Ellipse', key: 'O' },
-  { id: 'shape', shape: 'diamond', icon: <Diamond size={18} />, label: 'Diamond', key: 'D' },
+  { id: 'shape', shape: 'rectangle', icon: <Square size={18} />, label: 'Rectangle', key: 'R', tip: 'Click to place, or drag to size. Shift keeps it square' },
+  { id: 'shape', shape: 'roundRect', icon: <RectangleHorizontal size={18} />, label: 'Rounded rectangle', key: 'U', tip: 'Click to place, or drag to size. Shift keeps it square' },
+  { id: 'shape', shape: 'ellipse', icon: <Circle size={18} />, label: 'Ellipse', key: 'O', tip: 'Click to place, or drag to size. Shift draws a circle' },
+  { id: 'shape', shape: 'diamond', icon: <Diamond size={18} />, label: 'Diamond', key: 'D', tip: 'Decision shape. Click to place, or drag to size' },
 ];
 const TOOLS2: (T | 'sep')[] = [
-  { id: 'arrow', icon: <ArrowUpRight size={18} />, label: 'Arrow / connector', key: 'A' },
-  { id: 'line', icon: <Minus size={18} />, label: 'Line', key: 'L' },
-  { id: 'freehand', icon: <Pencil size={18} />, label: 'Freehand pen', key: 'P' },
-  { id: 'highlighter', icon: <Highlighter size={18} />, label: 'Highlighter', key: 'M' },
-  { id: 'text', icon: <Type size={18} />, label: 'Text', key: 'T' },
-  { id: 'image', icon: <ImagePlus size={18} />, label: 'Image', key: 'I' },
-  { id: 'eraser', icon: <Eraser size={18} />, label: 'Eraser', key: 'E' },
-  { id: 'painter', icon: <Paintbrush size={18} />, label: 'Format painter', key: 'F' },
+  { id: 'arrow', icon: <ArrowUpRight size={18} />, label: 'Arrow / connector', key: 'A', tip: 'Drag from one shape to another to connect them. The arrow follows the shapes when they move' },
+  { id: 'line', icon: <Minus size={18} />, label: 'Line', key: 'L', tip: 'Drag to draw a line without arrowheads. Can also connect shapes' },
+  { id: 'freehand', icon: <Pencil size={18} />, label: 'Freehand pen', key: 'P', tip: 'Draw freely by dragging' },
+  { id: 'highlighter', icon: <Highlighter size={18} />, label: 'Highlighter', key: 'M', tip: 'Draw a wide translucent stroke to mark things up' },
+  { id: 'text', icon: <Type size={18} />, label: 'Text', key: 'T', tip: 'Click to add text. Click a shape to edit its label. Esc finishes' },
+  { id: 'image', icon: <ImagePlus size={18} />, label: 'Image', key: 'I', tip: 'Insert a PNG, JPEG, GIF or WebP picture' },
+  { id: 'eraser', icon: <Eraser size={18} />, label: 'Eraser', key: 'E', tip: 'Click or drag over objects to delete them' },
+  { id: 'painter', icon: <Paintbrush size={18} />, label: 'Format painter', key: 'F', tip: 'Click an object to pick up its style, then click others to apply it. Alt-click picks again' },
 ];
 const BASIC = new Set<ShapeKind>(['rectangle', 'roundRect', 'ellipse', 'diamond']);
 
@@ -47,7 +47,7 @@ export function Toolbar() {
         className={`tb-btn ${active ? 'active' : ''}`}
         aria-pressed={active}
         aria-label={`${t.label} (${t.key})`}
-        title={`${t.label} — ${t.key}`}
+        title={`${t.label} (${t.key})\n${t.tip}`}
         data-tool={t.shape ?? t.id}
         onClick={() => (t.id === 'image' ? void insertImage() : ui.setTool(t.id, t.shape))}
       >
@@ -64,7 +64,7 @@ export function Toolbar() {
       <span className="tb-sep" aria-hidden />
       {TOOLS.map(btn)}
       <div className="tb-more-wrap">
-        <button className={`tb-btn ${extraActive ? 'active' : ''}`} aria-haspopup="true" aria-expanded={more} aria-label="More shapes (S)" title="More shapes — S" data-tool="more" onClick={() => setMore(!more)}>
+        <button className={`tb-btn ${extraActive ? 'active' : ''}`} aria-haspopup="true" aria-expanded={more} aria-label="More shapes (S)" title={"More shapes (S)\nParallelogram, hexagon, cylinder, cloud, star and more"} data-tool="more" onClick={() => setMore(!more)}>
           {extraActive ? <ShapeIcon kind={shapeKind} size={18} /> : <Shapes size={18} />}<span className="tb-key">S</span>
         </button>
         {more && (

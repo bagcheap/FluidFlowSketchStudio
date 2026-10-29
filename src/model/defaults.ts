@@ -210,3 +210,23 @@ const HUES = {
 export const PALETTE_STROKE = ['#1e1e2e', '#343a40', '#495057', '#868e96', '#adb5bd', '#dee2e6', '#ffffff', '#4b5563', '#7048e8', '#c2255c', ...HUES.deep, ...HUES.bold, ...HUES.light];
 export const PALETTE_FILL = ['transparent', '#ffffff', '#f8f9fa', '#e9ecef', '#ced4da', '#868e96', '#495057', '#1e1e2e', '#e7e3ff', '#fde68a', ...HUES.tint, ...HUES.light, ...HUES.bold, ...HUES.deep];
 export const HIGHLIGHT_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
+
+// Human-readable names for palette colours (swatch tooltips).
+const HUE_NAMES = ['red', 'orange', 'yellow', 'green', 'teal', 'cyan', 'blue', 'indigo', 'violet', 'pink'];
+const STRENGTH_NAMES: Record<keyof typeof HUES, string> = { tint: 'Pale ', light: 'Light ', bold: '', deep: 'Dark ' };
+const COLOR_NAMES = new Map<string, string>([
+  ['#1e1e2e', 'Ink'], ['#343a40', 'Charcoal'], ['#495057', 'Dark grey'], ['#4b5563', 'Slate'], ['#868e96', 'Grey'],
+  ['#adb5bd', 'Silver'], ['#ced4da', 'Light grey'], ['#dee2e6', 'Pale grey'], ['#e9ecef', 'Mist'], ['#f8f9fa', 'Off-white'], ['#ffffff', 'White'],
+  ['#7048e8', 'Purple'], ['#c2255c', 'Raspberry'], ['#e7e3ff', 'Lavender'], ['#fde68a', 'Butter'],
+  ['#3b82f6', 'Blue'], ['#22c55e', 'Green'], ['#f59e0b', 'Amber'], ['#ec4899', 'Pink'], ['#8b5cf6', 'Violet'], ['#ef4444', 'Red'], ['#06b6d4', 'Cyan'],
+]);
+for (const [strength, colors] of Object.entries(HUES) as [keyof typeof HUES, string[]][]) {
+  colors.forEach((c, i) => { const n = STRENGTH_NAMES[strength] + HUE_NAMES[i]; COLOR_NAMES.set(c, n[0].toUpperCase() + n.slice(1)); });
+}
+
+/** Tooltip text for a colour: "Dark blue · #1864ab", or just the code for custom colours. */
+export function colorLabel(c: string): string {
+  if (c === 'transparent') return 'No fill (transparent)';
+  const name = COLOR_NAMES.get(c.toLowerCase());
+  return name ? `${name} · ${c}` : c;
+}
