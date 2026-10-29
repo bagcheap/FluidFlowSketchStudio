@@ -54,7 +54,9 @@ export function GifDialog() {
     return () => { alive = false; clearTimeout(timer); };
   }, [plan, s.background]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => { abort.current?.abort(); if (result) URL.revokeObjectURL(result.url); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => abort.current?.abort(), []);
+  // free the previous result's preview URL when it is replaced or the dialog closes
+  useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
 
   const run = async () => {
     setError(null); setResult(null);
