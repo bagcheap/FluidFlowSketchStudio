@@ -27,8 +27,10 @@ export function planGif(doc: FlowDocument, s: GifSettings): GifPlan {
   const n = Math.max(1, Math.round(s.duration * s.fps));
   // seamless: n frames spaced so frame n would equal frame 0 (we never render it twice)
   const times = Array.from({ length: n }, (_, i) => (s.seamless ? (i * s.duration) / n : Math.min(s.duration, i / s.fps)));
-  // GIF delays are in centiseconds; distribute rounding so total time stays exact
-  const delaysCs = times.map((_, i) => Math.round(((i + 1) * 100) / s.fps) - Math.round((i * 100) / s.fps));
+  // GIF delays are in centiseconds; distribute rounding so total time stays exact.
+  // Delays follow the actual frame spacing, so a seamless loop plays in exactly s.duration.
+  const step = s.seamless ? s.duration / n : 1 / s.fps;
+  const delaysCs = times.map((_, i) => Math.round((i + 1) * 100 * step) - Math.round(i * 100 * step));
   const warnings: string[] = [];
   const px = W * H * n;
   if (delaysCs.some((d) => d < 2)) warnings.push('Most viewers clamp GIF frame delays under 20 ms; frame rates above 50 FPS will play slower than expected.');
@@ -47,14 +49,18 @@ export async function exportGif(doc: FlowDocument, s: GifSettings, onProgress: (
   const worker = new Worker(new URL('./gif.worker.ts', import.meta.url), { type: 'module' });
   let pending: { resolve: (v: unknown) => void; reject: (e: Error) => void } | null = null;
   let result: Uint8Array | null = null;
+  // an error that arrives while nothing is waiting is kept, so the next wait() fails instead of hanging
+  let failure: Error | null = null;
+  const settle = (fn: (p: NonNullable<typeof pending>) => void) => { const p = pending; pending = null; if (p) fn(p); };
+  const fail = (err: Error) => { failure ??= err; settle((p) => p.reject(err)); };
   worker.onmessage = (ev) => {
     const m = ev.data;
-    if (m.type === 'error') pending?.reject(new Error(m.message));
-    else if (m.type === 'done') { result = m.bytes; pending?.resolve(null); }
-    else pending?.resolve(m);
+    if (m.type === 'error') fail(new Error(m.message));
+    else if (m.type === 'done') { result = m.bytes; settle((p) => p.resolve(null)); }
+    else settle((p) => p.resolve(m));
   };
-  worker.onerror = (e) => pending?.reject(new Error(e.message || 'GIF encoder crashed (possibly out of memory).'));
-  const wait = () => new Promise((resolve, reject) => { pending = { resolve, reject }; });
+  worker.onerror = (e) => fail(new Error(e.message || 'GIF encoder crashed (possibly out of memory).'));
+  const wait = () => new Promise((resolve, reject) => { if (failure) reject(failure); else pending = { resolve, reject }; });
   const abort = () => { worker.terminate(); r.canvas.width = r.canvas.height = 0; };
   try {
     worker.postMessage({ type: 'start', width: plan.width, height: plan.height, colors: s.colors, dither: s.dither, transparent: !s.background, repeat: s.loopCount === 0 ? 0 : s.loopCount, globalPalette: s.globalPalette });

@@ -70,8 +70,11 @@ export function deleteSelection() {
 // ---- clipboard -----------------------------------------------------------------
 const CLIP_MIME = 'flowsketch/elements';
 let internalClip: string | null = null;
+// true once internalClip also reached the system clipboard; then any different system text was copied later
+let internalClipShared = false;
 
-function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: number, dy: number): DiagramElement[] {
+/** Copies with fresh ids/seeds, their own groups (never the originals'), unlocked, internal connections remapped. */
+export function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: number, dy: number): DiagramElement[] {
   const idMap = new Map<string, string>();
   const groupMap = new Map<string, string>();
   for (const e of els) idMap.set(e.id, uid());
@@ -100,7 +103,8 @@ export function copySelection() {
   if (!els.length) return false;
   const assets = Object.fromEntries(els.filter((e) => e.type === 'image').map((e) => [(e as { assetId: string }).assetId, doc.assets[(e as { assetId: string }).assetId]]));
   internalClip = JSON.stringify({ type: CLIP_MIME, elements: els, assets });
-  navigator.clipboard?.writeText(internalClip).catch(() => undefined);
+  internalClipShared = false;
+  navigator.clipboard?.writeText(internalClip).then(() => { internalClipShared = true; }, () => undefined);
   return true;
 }
 
@@ -109,7 +113,7 @@ export function cutSelection() { if (copySelection()) deleteSelection(); }
 export async function paste(text?: string) {
   let raw = text ?? internalClip;
   if (!text) {
-    try { const t = await navigator.clipboard?.readText(); if (t && t.includes(CLIP_MIME)) raw = t; else if (t && !internalClip) return pastePlainText(t); } catch { /* permission denied: use internal */ }
+    try { const t = await navigator.clipboard?.readText(); if (t && t.includes(CLIP_MIME)) raw = t; else if (t && (!internalClip || internalClipShared)) return pastePlainText(t); } catch { /* permission denied: use internal */ }
   }
   if (!raw) return;
   let data: { type?: string; elements?: unknown[]; assets?: Record<string, unknown> };
@@ -158,6 +162,7 @@ export function copyStyle() {
 
 export function applyStyle(ids: string[], s: ToolStyle) {
   D().commit((d) => mapElements(d, ids, (e) => {
+    if (e.locked) return e;
     if (e.type === 'connector') return { ...e, style: { ...s.style, fillStyle: 'none' }, textStyle: { ...s.textStyle }, ...(s.routing ? { routing: s.routing } : {}), ...(s.endHead ? { endHead: s.endHead, startHead: s.startHead ?? 'none' } : {}), ...(s.connectorAnim ? { anim: { ...s.connectorAnim } } : {}) };
     return { ...e, style: { ...s.style }, textStyle: { ...s.textStyle, ...(e.type === 'text' ? { padding: e.textStyle.padding } : {}) }, ...(s.shapeAnim ? { anim: { ...s.shapeAnim } } : {}) } as DiagramElement;
   }));
@@ -269,6 +274,7 @@ export function distribute(axis: 'h' | 'v') {
 
 export function flip(axis: 'h' | 'v') {
   D().commit((d) => mapElements(d, selected(), (e) => {
+    if (e.locked) return e;
     if (e.type === 'shape') return axis === 'h' ? { ...e, flipX: !e.flipX } : { ...e, flipY: !e.flipY };
     if (e.type === 'freehand') return { ...e, points: e.points.map(([x, y]) => (axis === 'h' ? [1 - x, y] : [x, 1 - y]) as [number, number]) };
     return e;
@@ -362,13 +368,14 @@ export function applyAnimToSelection(shape?: Partial<ShapeAnim>, conn?: Partial<
   const ids = U().selection;
   if (!ids.length) { U().toast('Select objects first'); return; }
   D().commit((d) => mapElements(d, ids, (e) => {
+    if (e.locked) return e;
     if (e.type === 'connector') return conn ? { ...e, anim: { ...e.anim, ...conn } } : e;
     return shape ? { ...e, anim: { ...e.anim, ...shape } } : e;
   }));
 }
 
 export function resetAnimSelected() {
-  D().commit((d) => mapElements(d, U().selection, (e) => { if (!('anim' in e) || !e.anim) return e; const { anim: _a, ...rest } = e; return rest as DiagramElement; }));
+  D().commit((d) => mapElements(d, U().selection, (e) => { if (e.locked || !('anim' in e) || !e.anim) return e; const { anim: _a, ...rest } = e; return rest as DiagramElement; }));
 }
 
 export function resetDocAnimation() {

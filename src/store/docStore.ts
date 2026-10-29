@@ -27,6 +27,8 @@ interface DocActions {
   cancel(): void;
   undo(): void;
   redo(): void;
+  /** Drop the most recent history entry, restoring the document before it (no redo entry). */
+  revertLast(): void;
   markSaved(fileName?: string | null): void;
   markAutosaved(): void;
 }
@@ -94,6 +96,12 @@ export const useDoc = create<DocState & DocActions>((set, get) => ({
     if (!future.length) return;
     lastKey = undefined;
     set((s) => ({ doc: future[0], future: future.slice(1), past: [...s.past, doc], dirty: true, revision: s.revision + 1 }));
+  },
+  revertLast() {
+    const { past } = get();
+    if (!past.length) return;
+    lastKey = undefined;
+    set((s) => ({ doc: past[past.length - 1], past: past.slice(0, -1), revision: s.revision + 1 }));
   },
   markSaved(fileName) { set((s) => ({ dirty: false, lastSavedAt: Date.now(), fileName: fileName ?? s.fileName })); },
   markAutosaved() { set({ autosavedAt: Date.now() }); },

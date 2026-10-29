@@ -12,7 +12,7 @@ import { connectorPath } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, hitTest, portAnchors, portPositions } from './hitTest';
-import { applyStyle, expandGroups, fitShapeToText, insertImage, stage, styleOf, zoomAt } from '../store/commands';
+import { applyStyle, cloneElements, expandGroups, fitShapeToText, insertImage, stage, styleOf, zoomAt } from '../store/commands';
 import { TextEditor } from './TextEditor';
 
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -57,6 +57,8 @@ export function Canvas() {
   const pointers = useRef(new Map<number, Point>());
   const pinch = useRef<{ d: number; zoom: number; cx: number; cy: number } | null>(null);
   const redraw = useRef(true);
+  // a text element created by clicking, until its first edit finishes (so create + type is one undo step)
+  const newText = useRef<{ id: string; after: FlowDocument } | null>(null);
 
   // ---- resize --------------------------------------------------------------
   useEffect(() => {
@@ -317,6 +319,7 @@ export function Canvas() {
     const ts = u.toolStyle('text');
     const el = makeText(p.x, p.y - ts.textStyle.fontSize * 0.7, '', ts);
     useDoc.getState().commit((dd) => ({ ...dd, elements: [...dd.elements, el] }));
+    newText.current = { id: el.id, after: useDoc.getState().doc };
     u.select([el.id]);
     u.setEditing(el.id);
   }
@@ -416,9 +419,7 @@ export function Canvas() {
         if (!it.moved && e.altKey && !it.dupDone) {
           // Alt-drag duplicates: originals stay, copies move
           it.dupDone = true;
-          const clones = it.ids.map((id) => getElement(it.orig, id)!).map((el) => ({ ...structuredClone(el), id: uid(), seed: newSeed() }));
-          const map = new Map(it.ids.map((id, i) => [id, clones[i].id]));
-          for (const c of clones) if (c.type === 'connector') for (const k of ['start', 'end'] as const) if (c[k].elementId && map.has(c[k].elementId!)) c[k].elementId = map.get(c[k].elementId!)!;
+          const clones = cloneElements(it.orig, it.ids.map((id) => getElement(it.orig, id)!), 0, 0);
           D.live((d) => ({ ...d, elements: [...d.elements, ...clones] }));
           it.orig = useDoc.getState().doc;
           it.ids = clones.map((c) => c.id);
@@ -634,7 +635,7 @@ export function Canvas() {
     return () => { el.removeEventListener('wheel', onWheel); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); };
   }, []);
 
-  // Escape while an interaction is in progress cancels it (handled before global shortcuts)
+  // Escape while an interaction is in progress cancels it and returns to Select (handled before global shortcuts)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || !inter.current) return;
@@ -642,6 +643,7 @@ export function Canvas() {
       inter.current = null;
       if (it.k !== 'pan' && it.k !== 'marquee') useDoc.getState().cancel();
       setOverlay({});
+      if (useUI.getState().tool !== 'select') useUI.getState().setTool('select');
       e.stopImmediatePropagation();
     };
     window.addEventListener('keydown', onKey, true);
@@ -724,6 +726,8 @@ export function Canvas() {
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onDoubleClick={onDoubleClick}
+      // a click that just opened the text editor must not let the browser move focus off it (blur commits/deletes the text)
+      onMouseDown={(e) => { if (useUI.getState().editingId && !isEditable(e.target)) e.preventDefault(); }}
       onContextMenu={(e) => e.preventDefault()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
@@ -734,11 +738,20 @@ export function Canvas() {
       <svg className="stage-overlay" width={size.w} height={size.h} aria-hidden>
         <g transform={`scale(${z}) translate(${-view.x} ${-view.y})`}>{overlayEls}</g>
       </svg>
-      {editingId && <TextEditor id={editingId} toScreen={toScreen} onDone={(id, text) => {
+      {editingId && <TextEditor key={editingId} id={editingId} toScreen={toScreen} onDone={(id, text) => {
         const D = useDoc.getState();
         const el = getElement(D.doc, id);
         useUI.getState().setEditing(null);
+        const fresh = newText.current?.id === id ? newText.current : null;
+        newText.current = null;
         if (!el) return;
+        if (fresh && D.doc === fresh.after) {
+          // nothing else changed since the click: replace the empty creation with the finished text
+          D.revertLast();
+          if (!text.trim()) { useUI.getState().select([]); return; }
+          D.commit((d) => ({ ...d, elements: [...d.elements, fitShapeToText({ ...el, text } as DiagramElement)] }));
+          return;
+        }
         if (el.type === 'text' && !text.trim()) { D.commit((d) => deleteElements(d, new Set([id]))); useUI.getState().select([]); return; }
         if (text === el.text) return;
         D.commit((d) => mapElements(d, [id], (x) => fitShapeToText({ ...x, text } as DiagramElement)));

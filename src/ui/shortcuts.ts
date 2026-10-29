@@ -78,7 +78,7 @@ export function useShortcuts() {
       if (e.key === 'Delete' || e.key === 'Backspace') return run(cmd.deleteSelection);
       if (e.key === 'Enter' && u.selection.length === 1) {
         const el = D.doc.elements.find((x) => x.id === u.selection[0]);
-        if (el && (el.type === 'shape' || el.type === 'text' || el.type === 'connector')) return run(() => u.setEditing(el.id));
+        if (el && !el.locked && (el.type === 'shape' || el.type === 'text' || el.type === 'connector')) return run(() => u.setEditing(el.id));
       }
       if (e.key.startsWith('Arrow') && u.selection.length) {
         const s = e.shiftKey ? 10 : 1;

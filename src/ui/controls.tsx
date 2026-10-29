@@ -2,6 +2,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { ChevronDown, RotateCcw } from 'lucide-react';
 import { useUI } from '../store/uiStore';
+import { colorLabel } from './colorNames';
 
 export function Section({ title, children, defaultOpen = true, right }: { title: string; children: ReactNode; defaultOpen?: boolean; right?: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -87,12 +88,12 @@ export function ColorPicker({ value, onChange, palette, label, allowTransparent 
     <div className="color-picker" aria-label={label}>
       <div className="swatches">
         {swatches.map((c) => (
-          <button key={c} className={`sw ${c === 'transparent' ? 'transparent' : ''} ${value.toLowerCase() === c.toLowerCase() ? 'on' : ''}`} style={{ background: c === 'transparent' ? undefined : c }} aria-label={`${label} ${c}`} title={c} onClick={() => pick(c)} />
+          <button key={c} className={`sw ${c === 'transparent' ? 'transparent' : ''} ${value.toLowerCase() === c.toLowerCase() ? 'on' : ''}`} style={{ background: c === 'transparent' ? undefined : c }} aria-label={`${label} ${c}`} title={colorLabel(c)} onClick={() => pick(c)} />
         ))}
       </div>
       {recent.length > 0 && (
         <div className="swatches recent" aria-label="Recent colours">
-          {recent.slice(0, 8).map((c) => <button key={c} className={`sw small ${value === c ? 'on' : ''}`} style={{ background: c }} aria-label={`Recent ${c}`} title={c} onClick={() => pick(c)} />)}
+          {recent.slice(0, 8).map((c) => <button key={c} className={`sw small ${value === c ? 'on' : ''}`} style={{ background: c }} aria-label={`Recent ${c}`} title={`Recent: ${colorLabel(c)}`} onClick={() => pick(c)} />)}
         </div>
       )}
       <div className="hex-row">

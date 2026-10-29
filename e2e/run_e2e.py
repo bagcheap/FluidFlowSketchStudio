@@ -213,6 +213,48 @@ def main():
             assert s['text'] == 'Hello flow', s['text']
         ttext()
 
+        @test('Text tool: click empty canvas, type = one undo step; abandoned empty box leaves no history')
+        def ttexttool():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
+            n0 = len(app.els())
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.key('t'); app.click((5300, 5200)); page.wait_for_timeout(100)
+            app.key('Escape'); page.wait_for_timeout(100)
+            assert len(app.els()) == n0 and app.js('() => window.__flowsketch.history()')['past'] == h0, 'empty text box left history'
+            app.key('t'); app.click((5300, 5300))
+            page.wait_for_selector('.text-editor')
+            page.keyboard.type('Typed'); page.keyboard.press('Escape'); page.wait_for_timeout(100)
+            assert [e['text'] for e in app.els('text')][-1:] == ['Typed'], [e['text'] for e in app.els('text')]
+            assert app.js('() => window.__flowsketch.history()')['past'] == h0 + 1
+            app.key('Escape'); app.key('Control+z'); page.wait_for_timeout(100)
+            assert len(app.els()) == n0, 'undo left an element behind'
+            # clicking elsewhere while typing keeps the text and the next box is typeable
+            app.key('t'); app.click((5300, 5200)); page.wait_for_selector('.text-editor')
+            page.keyboard.type('One'); app.click((5300, 5400)); page.wait_for_timeout(100)
+            page.keyboard.type('Two'); page.keyboard.press('Escape'); page.wait_for_timeout(100)
+            assert [e['text'] for e in app.els('text')][-2:] == ['One', 'Two'], [e['text'] for e in app.els('text')]
+            app.key('Escape'); app.key('Control+z'); app.key('Control+z'); page.wait_for_timeout(100)
+            assert len(app.els()) == n0
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        ttexttool()
+
+        @test('Esc: one press cancels a drag in progress and returns to Select')
+        def tesc():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
+            n0 = len(app.els())
+            app.key('a')
+            x, y = app.pt(5200, 5200)
+            page.mouse.move(x, y); page.mouse.down(); page.mouse.move(x + 120, y + 30, steps=4)
+            page.keyboard.press('Escape'); page.mouse.up(); page.wait_for_timeout(60)
+            assert app.ui()['tool'] == 'select', app.ui()['tool']
+            assert len(app.els()) == n0, 'cancelled arrow was kept'
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tesc()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]
@@ -511,10 +553,12 @@ def main():
                 page6.get_by_role('menuitem', name='Export').first.click(); page6.get_by_role('menuitem', name=re.compile('^Video')).click()
                 page6.get_by_label('Repeat loop value').fill('1')
                 with page6.expect_download(timeout=60000) as dl:
-                    page6.get_by_role('button', name=re.compile('^Export WebM')).click()
-                vp = f'{OUT}/e2e-video.webm'; dl.value.save_as(vp)
+                    # the dialog offers the browser's first supported format (MP4 or WebM)
+                    page6.get_by_role('button', name=re.compile('^Export (WebM|MP4)')).click()
+                ext = os.path.splitext(dl.value.suggested_filename)[1] or '.webm'
+                vp = f'{OUT}/e2e-video{ext}'; dl.value.save_as(vp)
                 assert os.path.getsize(vp) > 5000, os.path.getsize(vp)
-                print(f'      video: {os.path.getsize(vp)//1024} KB WebM')
+                print(f'      video: {os.path.getsize(vp)//1024} KB {ext[1:].upper()}')
             assert not err6, err6
             ctx6.close()
         tsmoke()
