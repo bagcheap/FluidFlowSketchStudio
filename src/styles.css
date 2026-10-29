@@ -255,6 +255,9 @@ code { font-size: 12px; }
 .shortcuts td:last-child { text-align: right; }
 .help p, .help li { line-height: 1.6; color: var(--fg-2); }
 .help h3 { color: var(--fg); }
+.whats-new section + section { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 4px; }
+.whats-new h4 { margin: 10px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-3); }
+.whats-new ul { margin: 0; padding-left: 18px; }
 .props td { padding: 4px 12px 4px 0; vertical-align: top; }
 .props td:first-child { color: var(--fg-3); }
 .recover { background: var(--accent-soft); padding: 8px 10px; border-radius: 8px; }

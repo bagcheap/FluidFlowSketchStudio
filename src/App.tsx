@@ -15,7 +15,7 @@ import { DocumentError } from './model/schema';
 import { resetTextMetrics } from './engine/text';
 import { GifDialog } from './ui/dialogs/GifDialog';
 import { ImageDialog, SvgDialog, VideoDialog } from './ui/dialogs/ExportDialogs';
-import { AboutDialog, AnimationDialog, DocPropsDialog, HelpDialog, PrefsDialog, RecentDialog, ShapesDialog, ShortcutsDialog, TemplatesDialog } from './ui/dialogs/MiscDialogs';
+import { AboutDialog, AnimationDialog, DocPropsDialog, HelpDialog, PrefsDialog, RecentDialog, ShapesDialog, ShortcutsDialog, TemplatesDialog, WhatsNewDialog } from './ui/dialogs/MiscDialogs';
 import { SAMPLES, STARTER_ID } from './templates/samples';
 import { Modal } from './ui/dialogs/Modal';
 
@@ -123,6 +123,7 @@ function Dialogs() {
     case 'shortcuts': return <ShortcutsDialog />;
     case 'help': return <HelpDialog />;
     case 'about': return <AboutDialog />;
+    case 'whatsnew': return <WhatsNewDialog />;
     case 'prefs': return <PrefsDialog />;
     case 'docprops': return <DocPropsDialog />;
     case 'recent': return <RecentDialog />;

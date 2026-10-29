@@ -146,6 +146,7 @@ export function TopBar() {
       { label: 'Getting started & feature guide', run: () => ui.openDialog('help') },
       { label: 'Keyboard shortcuts', shortcut: '?', run: () => ui.openDialog('shortcuts') },
       { label: 'Sample diagrams…', run: () => ui.openDialog('templates') },
+      { label: 'What’s new', run: () => ui.openDialog('whatsnew') },
       { label: 'About FlowSketch Studio', run: () => ui.openDialog('about') },
     ] },
   ];
