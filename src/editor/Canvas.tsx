@@ -635,7 +635,7 @@ export function Canvas() {
     return () => { el.removeEventListener('wheel', onWheel); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); };
   }, []);
 
-  // Escape while an interaction is in progress cancels it (handled before global shortcuts)
+  // Escape while an interaction is in progress cancels it and returns to Select (handled before global shortcuts)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || !inter.current) return;
@@ -643,6 +643,7 @@ export function Canvas() {
       inter.current = null;
       if (it.k !== 'pan' && it.k !== 'marquee') useDoc.getState().cancel();
       setOverlay({});
+      if (useUI.getState().tool !== 'select') useUI.getState().setTool('select');
       e.stopImmediatePropagation();
     };
     window.addEventListener('keydown', onKey, true);

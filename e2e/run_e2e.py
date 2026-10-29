@@ -240,6 +240,21 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         ttexttool()
 
+        @test('Esc: one press cancels a drag in progress and returns to Select')
+        def tesc():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
+            n0 = len(app.els())
+            app.key('a')
+            x, y = app.pt(5200, 5200)
+            page.mouse.move(x, y); page.mouse.down(); page.mouse.move(x + 120, y + 30, steps=4)
+            page.keyboard.press('Escape'); page.mouse.up(); page.wait_for_timeout(60)
+            assert app.ui()['tool'] == 'select', app.ui()['tool']
+            assert len(app.els()) == n0, 'cancelled arrow was kept'
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tesc()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]

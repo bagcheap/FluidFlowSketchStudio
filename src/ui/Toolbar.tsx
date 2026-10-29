@@ -1,5 +1,5 @@
 // Floating drawing toolbar. Tools stay active after drawing (continuous mode, lock icon).
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Circle, Diamond, Eraser, Hand, Highlighter, ImagePlus, Lock, LockOpen, Minus, MousePointer2, Paintbrush, Pencil, Shapes, Square, RectangleHorizontal, Type } from 'lucide-react';
 import type { ShapeKind } from '../model/types';
 import type { ToolId } from '../model/defaults';
@@ -37,6 +37,13 @@ export function Toolbar() {
   const shapeKind = useUI((s) => s.shapeKind);
   const continuous = useUI((s) => s.prefs.continuousDrawing);
   const [more, setMore] = useState(false);
+  // Esc closes the shape pop-up (the global Esc handler then returns to Select)
+  useEffect(() => {
+    if (!more) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMore(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [more]);
   const ui = useUI.getState();
   const btn = (t: T | 'sep', i: number) => {
     if (t === 'sep') return <span key={'s' + i} className="tb-sep" aria-hidden />;

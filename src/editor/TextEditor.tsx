@@ -67,6 +67,8 @@ export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p:
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); finish(); }
+          // Esc also ends the drawing tool (the global Esc handler never sees keys from the editor)
+          if (e.key === 'Escape' && useUI.getState().tool !== 'select') useUI.getState().setTool('select');
         }}
       />
     </div>
