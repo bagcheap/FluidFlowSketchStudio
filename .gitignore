@@ -4,3 +4,4 @@ src/player/dist/
 e2e/out/
 e2e/__pycache__/
 *.log
+.DS_Store
