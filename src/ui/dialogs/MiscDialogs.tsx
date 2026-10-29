@@ -16,6 +16,7 @@ import { SHAPE_LABELS } from '../../engine/shapes';
 import { SHAPE_KINDS } from '../../model/schema';
 import { ShapeIcon } from '../ShapeIcon';
 import { uid } from '../../model/defaults';
+import { version } from '../../../package.json';
 
 const close = () => useUI.getState().openDialog(null);
 
@@ -104,7 +105,7 @@ export function HelpDialog() {
 export function AboutDialog() {
   return (
     <Modal title="About FlowSketch Studio">
-      <p><b>FlowSketch Studio</b> 0.1 — an editor for gently animated, hand-drawn flow diagrams.</p>
+      <p><b>FlowSketch Studio</b> {version} — an editor for gently animated, hand-drawn flow diagrams.</p>
       <p className="note">Everything runs locally in your browser; documents are never uploaded. Built with React, Rough.js (MIT), gifenc (MIT), Zustand (MIT), idb-keyval (Apache-2.0), Lucide icons (ISC) and the Kalam & Inter fonts (OFL).</p>
     </Modal>
   );
