@@ -12,7 +12,7 @@ import { connectorPath } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, hitTest, portAnchors, portPositions } from './hitTest';
-import { applyStyle, expandGroups, fitShapeToText, insertImage, stage, styleOf, zoomAt } from '../store/commands';
+import { applyStyle, cloneElements, expandGroups, fitShapeToText, insertImage, stage, styleOf, zoomAt } from '../store/commands';
 import { TextEditor } from './TextEditor';
 
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -416,9 +416,7 @@ export function Canvas() {
         if (!it.moved && e.altKey && !it.dupDone) {
           // Alt-drag duplicates: originals stay, copies move
           it.dupDone = true;
-          const clones = it.ids.map((id) => getElement(it.orig, id)!).map((el) => ({ ...structuredClone(el), id: uid(), seed: newSeed() }));
-          const map = new Map(it.ids.map((id, i) => [id, clones[i].id]));
-          for (const c of clones) if (c.type === 'connector') for (const k of ['start', 'end'] as const) if (c[k].elementId && map.has(c[k].elementId!)) c[k].elementId = map.get(c[k].elementId!)!;
+          const clones = cloneElements(it.orig, it.ids.map((id) => getElement(it.orig, id)!), 0, 0);
           D.live((d) => ({ ...d, elements: [...d.elements, ...clones] }));
           it.orig = useDoc.getState().doc;
           it.ids = clones.map((c) => c.id);

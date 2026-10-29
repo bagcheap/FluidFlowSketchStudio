@@ -71,7 +71,8 @@ export function deleteSelection() {
 const CLIP_MIME = 'flowsketch/elements';
 let internalClip: string | null = null;
 
-function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: number, dy: number): DiagramElement[] {
+/** Copies with fresh ids/seeds, their own groups (never the originals'), unlocked, internal connections remapped. */
+export function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: number, dy: number): DiagramElement[] {
   const idMap = new Map<string, string>();
   const groupMap = new Map<string, string>();
   for (const e of els) idMap.set(e.id, uid());

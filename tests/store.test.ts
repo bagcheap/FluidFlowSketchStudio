@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { deleteElements, mapElements, useDoc } from '../src/store/docStore';
 import { useUI } from '../src/store/uiStore';
+import { cloneElements } from '../src/store/commands';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
 
 const D = () => useDoc.getState();
@@ -61,5 +62,23 @@ describe('remembered tool styles', () => {
     expect(useUI.getState().toolStyle('shape:ellipse').style.stroke).toBe('#e03131');
     useUI.getState().updatePrefs({ sharedStyles: false });
     expect(useUI.getState().toolStyle('shape:rectangle').style.stroke).toBe('#1971c2');
+  });
+});
+
+describe('cloning (duplicate / paste / Alt-drag)', () => {
+  it('gives copies their own group, unlocks them and remaps internal connections', () => {
+    const a = makeShape('roundRect', 0, 0, 100, 50, defaultToolStyle('shape:roundRect'));
+    const b = makeShape('roundRect', 300, 0, 100, 50, defaultToolStyle('shape:roundRect'));
+    a.groupIds = ['grp1']; b.groupIds = ['grp1']; a.locked = true;
+    const c = makeConnector({ x: 0, y: 0, elementId: a.id }, { x: 0, y: 0, elementId: b.id }, defaultToolStyle('arrow'));
+    c.groupIds = ['grp1'];
+    const doc = { ...newDocument(), elements: [a, b, c] };
+    const [ca, cb, cc] = cloneElements(doc, [a, b, c], 0, 0);
+    expect(ca.groupIds).toEqual(cb.groupIds);
+    expect(ca.groupIds[0]).not.toBe('grp1');
+    expect(ca.locked).toBe(false);
+    expect(ca.id).not.toBe(a.id);
+    expect((cc as typeof c).start.elementId).toBe(ca.id);
+    expect((cc as typeof c).end.elementId).toBe(cb.id);
   });
 });
