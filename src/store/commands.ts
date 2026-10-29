@@ -70,6 +70,8 @@ export function deleteSelection() {
 // ---- clipboard -----------------------------------------------------------------
 const CLIP_MIME = 'flowsketch/elements';
 let internalClip: string | null = null;
+// true once internalClip also reached the system clipboard; then any different system text was copied later
+let internalClipShared = false;
 
 /** Copies with fresh ids/seeds, their own groups (never the originals'), unlocked, internal connections remapped. */
 export function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: number, dy: number): DiagramElement[] {
@@ -101,7 +103,8 @@ export function copySelection() {
   if (!els.length) return false;
   const assets = Object.fromEntries(els.filter((e) => e.type === 'image').map((e) => [(e as { assetId: string }).assetId, doc.assets[(e as { assetId: string }).assetId]]));
   internalClip = JSON.stringify({ type: CLIP_MIME, elements: els, assets });
-  navigator.clipboard?.writeText(internalClip).catch(() => undefined);
+  internalClipShared = false;
+  navigator.clipboard?.writeText(internalClip).then(() => { internalClipShared = true; }, () => undefined);
   return true;
 }
 
@@ -110,7 +113,7 @@ export function cutSelection() { if (copySelection()) deleteSelection(); }
 export async function paste(text?: string) {
   let raw = text ?? internalClip;
   if (!text) {
-    try { const t = await navigator.clipboard?.readText(); if (t && t.includes(CLIP_MIME)) raw = t; else if (t && !internalClip) return pastePlainText(t); } catch { /* permission denied: use internal */ }
+    try { const t = await navigator.clipboard?.readText(); if (t && t.includes(CLIP_MIME)) raw = t; else if (t && (!internalClip || internalClipShared)) return pastePlainText(t); } catch { /* permission denied: use internal */ }
   }
   if (!raw) return;
   let data: { type?: string; elements?: unknown[]; assets?: Record<string, unknown> };

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { deleteElements, mapElements, useDoc } from '../src/store/docStore';
 import { useUI } from '../src/store/uiStore';
-import { cloneElements } from '../src/store/commands';
+import { cloneElements, copySelection, paste } from '../src/store/commands';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
 
 const D = () => useDoc.getState();
@@ -80,5 +80,41 @@ describe('cloning (duplicate / paste / Alt-drag)', () => {
     expect(ca.id).not.toBe(a.id);
     expect((cc as typeof c).start.elementId).toBe(ca.id);
     expect((cc as typeof c).end.elementId).toBe(cb.id);
+  });
+});
+
+describe('Edit ▸ Paste (no clipboard event)', () => {
+  let systemText = '';
+  let writeOk = true;
+  beforeEach(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (t: string) => { if (!writeOk) throw new Error('denied'); systemText = t; },
+        readText: async () => systemText,
+      },
+    });
+    const s = makeShape('roundRect', 0, 0, 100, 50, defaultToolStyle('shape:roundRect'));
+    D().load({ ...newDocument(), elements: [s] });
+    useUI.getState().select([s.id]);
+  });
+
+  it('pastes text copied in another app after copying shapes here', async () => {
+    writeOk = true;
+    copySelection();
+    await Promise.resolve();
+    systemText = 'from another app';
+    await paste();
+    expect(D().doc.elements.map((e) => e.text)).toContain('from another app');
+  });
+
+  it('falls back to the copied shapes when they never reached the system clipboard', async () => {
+    writeOk = false; systemText = 'older text';
+    copySelection();
+    await Promise.resolve();
+    await paste();
+    const els = D().doc.elements;
+    expect(els.length).toBe(2);
+    expect(els.every((e) => e.type === 'shape')).toBe(true);
   });
 });
