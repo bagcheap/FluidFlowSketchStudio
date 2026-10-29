@@ -65,6 +65,8 @@ src/templates/   samples.ts (7 built-in sample diagrams, generated in code)
 - **Dark theme does NOT invert the canvas.** The diagram always shows its true colours (what you see is what you export). Dark theme only restyles the app's interface. Users who want a dark canvas pick a dark canvas background.
 - **Palettes** (`model/defaults.ts`): a 10-column grid of neutrals plus 10 hues, in tint, light, bold and deep strengths, plus recent colours and hex/native picker. The e2e tests click swatches by aria-label, for example `Stroke colour #1864ab`. Update the tests if you change palette values.
 - **Welcome card** shows only on a fresh empty canvas. It can be dismissed (✕ / "Start with a blank canvas" / picking any drawing tool). File ▸ New diagram always gives a blank canvas with no card.
+- **Swap direction** (`cmd.swapDirection`; Inspector Connector section and Arrange menu) reverses arrows in place: ends trade places, bends reverse, and curvature/label position/offset are mirrored so the route and label stay where they were. One undo step; locked arrows are skipped.
+- **Request ⇄ response arrow pairs** were built and parked on the branch `claude/request-response-arrows` (not merged; it also bumps the file format to v2). Pick it up from there if wanted later.
 - Default arrow animation is the travelling highlight. Glow is drawn as translucent wide strokes, not blur filters, for speed.
 - Live view culls off-screen elements, and the grid is a cached canvas pattern.
 - Theme toggle: the top-bar sun/moon button cycles Light → Dark → System. It is also in View ▸ Theme and Edit ▸ Preferences.

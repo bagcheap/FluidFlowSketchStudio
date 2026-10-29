@@ -11,7 +11,7 @@ npm install
 npm run dev        # http://localhost:5173  (also builds the HTML-player bundle first)
 npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ on http://localhost:4173
-npm test           # unit tests (Vitest, 25 tests)
+npm test           # unit tests (Vitest, 27 tests)
 npm run test:e2e   # end-to-end acceptance tests (needs `npm run preview` running; see below)
 ```
 
@@ -22,7 +22,7 @@ Requirements: Node 18+ (tested on Node 22). The e2e suite uses Python 3 with `pl
 1. **Draw.** Press <kbd>U</kbd> (rounded rectangle) and click to drop a shape or drag to size it (<kbd>Shift</kbd> keeps proportions). **The tool stays active.** Draw as many as you like, then press <kbd>Esc</kbd> or <kbd>V</kbd> to go back to Select.
 2. **Style once, reuse.** With a drawing tool active, the inspector edits *that tool's remembered defaults*. Defaults are stored separately per tool (blue rectangles and red diamonds stay that way) and persist across sessions. Existing objects are never changed by editing defaults. Select objects to edit them instead.
 3. **Write.** Double-click a shape or arrow, or press <kbd>Enter</kbd>, to type. Shapes grow to fit their text.
-4. **Connect.** Press <kbd>A</kbd> and drag from one shape to another. Connectors are real relationships: they follow shapes when moved, resized or animated. Drop near a side's dot to pin to that port. Drag mid-dots to add bends, and switch Straight / Curved / Elbow in the inspector.
+4. **Connect.** Press <kbd>A</kbd> and drag from one shape to another. Connectors are real relationships: they follow shapes when moved, resized or animated. Drop near a side's dot to pin to that port. Drag mid-dots to add bends, and switch Straight / Curved / Elbow in the inspector. **Swap direction** (inspector, or Arrange ▸ Swap arrow direction) reverses an arrow without redrawing it.
 5. **Play.** <kbd>K</kbd> or the play button. Use the **Squiggle** slider (0–10) for motion and **Hand-drawn** for static sketchiness; the two are independent.
 6. **Save & export.** <kbd>Ctrl/⌘ S</kbd> saves a `.flowsketch` file. Work also autosaves in the browser. **Export GIF** renders a seamless loop.
 
