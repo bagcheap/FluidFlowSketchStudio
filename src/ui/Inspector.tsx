@@ -2,7 +2,7 @@
 // With a selection it edits those objects; with a drawing tool active it edits that tool's
 // remembered defaults (existing objects are never touched by default changes).
 import type { ReactNode } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, ArrowDownToLine, ArrowUpToLine, Bold, ClipboardPaste, Copy, CopyPlus, Italic, Lock, Paintbrush, RotateCcw, Trash2, Unlock, FoldVertical, BringToFront, SendToBack, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal } from 'lucide-react';
+import { AlignCenter, AlignLeft, ArrowRightLeft, AlignRight, ArrowDownToLine, ArrowUpToLine, Bold, ClipboardPaste, Copy, CopyPlus, Italic, Lock, Paintbrush, RotateCcw, Trash2, Unlock, FoldVertical, BringToFront, SendToBack, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal } from 'lucide-react';
 import type { ConnectorAnim, ConnectorElement, DiagramElement, FillStyle, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle } from '../model/types';
 import { HIGHLIGHT_COLORS, PALETTE_FILL, PALETTE_STROKE, styleKey } from '../model/defaults';
 import { getElement, mapElements, useDoc } from '../store/docStore';
@@ -141,6 +141,7 @@ export function Inspector() {
 
           {kinds.has('connector') && (
             <Section title="Connector">
+              {onSelection && <button className="btn small" title="Start and end trade places, so the arrow points the other way" onClick={() => cmd.swapDirection(ids)}><ArrowRightLeft size={13} /> Swap direction</button>}
               <Row label="Routing">
                 <Segmented label="Routing" value={routing} onChange={(v) => setConn({ routing: v })} options={[{ v: 'straight', label: 'Straight' }, { v: 'curved', label: 'Curved' }, { v: 'elbow', label: 'Elbow' }]} />
               </Row>

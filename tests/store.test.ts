@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { deleteElements, mapElements, useDoc } from '../src/store/docStore';
 import { useUI } from '../src/store/uiStore';
-import { applyStyle, cloneElements, copySelection, flip, paste } from '../src/store/commands';
+import { applyStyle, cloneElements, copySelection, flip, paste, swapDirection } from '../src/store/commands';
+import { connectorPath } from '../src/engine/connectors';
+import { makeLookup, renderDocumentAtTime } from '../src/engine/render';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
 
 const D = () => useDoc.getState();
@@ -134,5 +136,52 @@ describe('locked objects', () => {
     expect(la).toEqual(a);
     expect(lb.style.stroke).toBe('#e03131');
     expect(lb.flipX).toBe(true);
+  });
+});
+
+describe('swap arrow direction', () => {
+  const setup = () => {
+    const a = makeShape('roundRect', 0, 0, 100, 50, defaultToolStyle('shape:roundRect'));
+    const b = makeShape('roundRect', 400, 200, 100, 50, defaultToolStyle('shape:roundRect'));
+    const c = makeConnector({ x: 0, y: 0, elementId: a.id }, { x: 0, y: 0, elementId: b.id }, defaultToolStyle('arrow'));
+    c.curvature = 0.4; c.labelPos = 0.3; c.labelOffset = 18; c.text = 'Request';
+    D().load({ ...newDocument(), elements: [a, b, c] });
+    return c;
+  };
+  const labelAt = () => {
+    const doc = D().doc;
+    const c = doc.elements[2];
+    const item = renderDocumentAtTime(doc, 0, { flags: { still: true } }).items.find((i) => i.id === c.id + ':label')!;
+    return (item.parts.find((p) => p.k === 'text') as { lines: { x: number; y: number }[] }).lines[0];
+  };
+
+  it('reverses the arrow but keeps its curve and label in place', () => {
+    const c = setup();
+    const before = connectorPath(c, makeLookup(D().doc, null)).pts;
+    const label = labelAt();
+    swapDirection([c.id]);
+    const s = D().doc.elements[2] as typeof c;
+    expect(s.start.elementId).toBe(c.end.elementId);
+    expect(s.end.elementId).toBe(c.start.elementId);
+    const after = connectorPath(s, makeLookup(D().doc, null)).pts;
+    expect(after[0].x).toBeCloseTo(before[before.length - 1].x, 6);
+    expect(after[0].y).toBeCloseTo(before[before.length - 1].y, 6);
+    const mid = (pts: typeof before) => pts[Math.floor(pts.length / 2)];
+    expect(Math.hypot(mid(after).x - mid(before).x, mid(after).y - mid(before).y)).toBeLessThan(3); // same bulge
+    expect(labelAt().x).toBeCloseTo(label.x, 1);
+    expect(labelAt().y).toBeCloseTo(label.y, 1);
+    expect(D().past.length).toBe(1);
+  });
+
+  it('never stores -0 and leaves locked arrows alone', () => {
+    const c = setup();
+    D().commit((d) => mapElements(d, [c.id], (e) => ({ ...e, curvature: 0, labelOffset: 0 })));
+    swapDirection([c.id]);
+    const s = D().doc.elements[2] as typeof c;
+    expect(Object.is(s.curvature, -0) || Object.is(s.labelOffset, -0)).toBe(false);
+    D().commit((d) => mapElements(d, [c.id], (e) => ({ ...e, locked: true })));
+    const locked = D().doc.elements[2];
+    swapDirection([c.id]);
+    expect(D().doc.elements[2]).toBe(locked);
   });
 });

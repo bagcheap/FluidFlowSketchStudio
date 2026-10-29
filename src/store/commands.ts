@@ -294,6 +294,16 @@ export function nudge(dx: number, dy: number) {
   }), 'nudge');
 }
 
+// ---- connectors -------------------------------------------------------------------
+/** Reverse arrows: start and end trade places (heads stay at the ends, so each arrow now points the other way). */
+export function swapDirection(ids: string[] = U().selection) {
+  D().commit((d) => mapElements(d, ids, (e) => (e.type !== 'connector' || e.locked ? e : {
+    // same route and label spot, travelled the other way; `|| 0` keeps a flipped 0 from becoming -0
+    ...e, start: e.end, end: e.start, bends: [...e.bends].reverse(),
+    curvature: -e.curvature || 0, labelPos: 1 - e.labelPos, labelOffset: -e.labelOffset || 0,
+  })));
+}
+
 // ---- insertion ------------------------------------------------------------------
 export function insertShapeAtCenter(kind: ShapeKind) {
   const c = screenToWorld(stage.w / 2, stage.h / 2);

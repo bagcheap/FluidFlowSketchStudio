@@ -26,6 +26,7 @@ export function TopBar() {
   useEffect(() => setTitle(doc.title), [doc.title]);
   const a = doc.animation;
   const hasSel = sel.length > 0;
+  const selConnector = doc.elements.some((e) => e.type === 'connector' && sel.includes(e.id));
   const toggle = (k: keyof typeof prefs) => () => ui.updatePrefs({ [k]: !prefs[k] } as never);
 
   const anim = (patch: Partial<typeof a>) => () => cmd.setAnimation(patch, 'menu');
@@ -97,6 +98,7 @@ export function TopBar() {
       { sep: true },
       { label: 'Flip horizontal', run: () => cmd.flip('h'), disabled: !hasSel },
       { label: 'Flip vertical', run: () => cmd.flip('v'), disabled: !hasSel },
+      { label: 'Swap arrow direction', run: () => cmd.swapDirection(), disabled: !selConnector },
       { sep: true },
       { label: 'Lock / unlock', shortcut: `${MOD}${SHIFT}L`, run: cmd.toggleLock, disabled: !hasSel },
       { label: 'Unlock all', run: cmd.unlockAll },
