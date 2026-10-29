@@ -511,10 +511,12 @@ def main():
                 page6.get_by_role('menuitem', name='Export').first.click(); page6.get_by_role('menuitem', name=re.compile('^Video')).click()
                 page6.get_by_label('Repeat loop value').fill('1')
                 with page6.expect_download(timeout=60000) as dl:
-                    page6.get_by_role('button', name=re.compile('^Export WebM')).click()
-                vp = f'{OUT}/e2e-video.webm'; dl.value.save_as(vp)
+                    # the dialog offers the browser's first supported format (MP4 or WebM)
+                    page6.get_by_role('button', name=re.compile('^Export (WebM|MP4)')).click()
+                ext = os.path.splitext(dl.value.suggested_filename)[1] or '.webm'
+                vp = f'{OUT}/e2e-video{ext}'; dl.value.save_as(vp)
                 assert os.path.getsize(vp) > 5000, os.path.getsize(vp)
-                print(f'      video: {os.path.getsize(vp)//1024} KB WebM')
+                print(f'      video: {os.path.getsize(vp)//1024} KB {ext[1:].upper()}')
             assert not err6, err6
             ctx6.close()
         tsmoke()
