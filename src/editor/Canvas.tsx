@@ -57,6 +57,8 @@ export function Canvas() {
   const pointers = useRef(new Map<number, Point>());
   const pinch = useRef<{ d: number; zoom: number; cx: number; cy: number } | null>(null);
   const redraw = useRef(true);
+  // a text element created by clicking, until its first edit finishes (so create + type is one undo step)
+  const newText = useRef<{ id: string; after: FlowDocument } | null>(null);
 
   // ---- resize --------------------------------------------------------------
   useEffect(() => {
@@ -317,6 +319,7 @@ export function Canvas() {
     const ts = u.toolStyle('text');
     const el = makeText(p.x, p.y - ts.textStyle.fontSize * 0.7, '', ts);
     useDoc.getState().commit((dd) => ({ ...dd, elements: [...dd.elements, el] }));
+    newText.current = { id: el.id, after: useDoc.getState().doc };
     u.select([el.id]);
     u.setEditing(el.id);
   }
@@ -722,6 +725,8 @@ export function Canvas() {
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onDoubleClick={onDoubleClick}
+      // a click that just opened the text editor must not let the browser move focus off it (blur commits/deletes the text)
+      onMouseDown={(e) => { if (useUI.getState().editingId && !isEditable(e.target)) e.preventDefault(); }}
       onContextMenu={(e) => e.preventDefault()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
@@ -732,11 +737,20 @@ export function Canvas() {
       <svg className="stage-overlay" width={size.w} height={size.h} aria-hidden>
         <g transform={`scale(${z}) translate(${-view.x} ${-view.y})`}>{overlayEls}</g>
       </svg>
-      {editingId && <TextEditor id={editingId} toScreen={toScreen} onDone={(id, text) => {
+      {editingId && <TextEditor key={editingId} id={editingId} toScreen={toScreen} onDone={(id, text) => {
         const D = useDoc.getState();
         const el = getElement(D.doc, id);
         useUI.getState().setEditing(null);
+        const fresh = newText.current?.id === id ? newText.current : null;
+        newText.current = null;
         if (!el) return;
+        if (fresh && D.doc === fresh.after) {
+          // nothing else changed since the click: replace the empty creation with the finished text
+          D.revertLast();
+          if (!text.trim()) { useUI.getState().select([]); return; }
+          D.commit((d) => ({ ...d, elements: [...d.elements, fitShapeToText({ ...el, text } as DiagramElement)] }));
+          return;
+        }
         if (el.type === 'text' && !text.trim()) { D.commit((d) => deleteElements(d, new Set([id]))); useUI.getState().select([]); return; }
         if (text === el.text) return;
         D.commit((d) => mapElements(d, [id], (x) => fitShapeToText({ ...x, text } as DiagramElement)));

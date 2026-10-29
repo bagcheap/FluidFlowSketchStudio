@@ -213,6 +213,33 @@ def main():
             assert s['text'] == 'Hello flow', s['text']
         ttext()
 
+        @test('Text tool: click empty canvas, type = one undo step; abandoned empty box leaves no history')
+        def ttexttool():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
+            n0 = len(app.els())
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.key('t'); app.click((5300, 5200)); page.wait_for_timeout(100)
+            app.key('Escape'); page.wait_for_timeout(100)
+            assert len(app.els()) == n0 and app.js('() => window.__flowsketch.history()')['past'] == h0, 'empty text box left history'
+            app.key('t'); app.click((5300, 5300))
+            page.wait_for_selector('.text-editor')
+            page.keyboard.type('Typed'); page.keyboard.press('Escape'); page.wait_for_timeout(100)
+            assert [e['text'] for e in app.els('text')][-1:] == ['Typed'], [e['text'] for e in app.els('text')]
+            assert app.js('() => window.__flowsketch.history()')['past'] == h0 + 1
+            app.key('Escape'); app.key('Control+z'); page.wait_for_timeout(100)
+            assert len(app.els()) == n0, 'undo left an element behind'
+            # clicking elsewhere while typing keeps the text and the next box is typeable
+            app.key('t'); app.click((5300, 5200)); page.wait_for_selector('.text-editor')
+            page.keyboard.type('One'); app.click((5300, 5400)); page.wait_for_timeout(100)
+            page.keyboard.type('Two'); page.keyboard.press('Escape'); page.wait_for_timeout(100)
+            assert [e['text'] for e in app.els('text')][-2:] == ['One', 'Two'], [e['text'] for e in app.els('text')]
+            app.key('Escape'); app.key('Control+z'); app.key('Control+z'); page.wait_for_timeout(100)
+            assert len(app.els()) == n0
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        ttexttool()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]
