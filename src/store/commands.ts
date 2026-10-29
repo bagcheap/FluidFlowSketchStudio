@@ -162,6 +162,7 @@ export function copyStyle() {
 
 export function applyStyle(ids: string[], s: ToolStyle) {
   D().commit((d) => mapElements(d, ids, (e) => {
+    if (e.locked) return e;
     if (e.type === 'connector') return { ...e, style: { ...s.style, fillStyle: 'none' }, textStyle: { ...s.textStyle }, ...(s.routing ? { routing: s.routing } : {}), ...(s.endHead ? { endHead: s.endHead, startHead: s.startHead ?? 'none' } : {}), ...(s.connectorAnim ? { anim: { ...s.connectorAnim } } : {}) };
     return { ...e, style: { ...s.style }, textStyle: { ...s.textStyle, ...(e.type === 'text' ? { padding: e.textStyle.padding } : {}) }, ...(s.shapeAnim ? { anim: { ...s.shapeAnim } } : {}) } as DiagramElement;
   }));
@@ -273,6 +274,7 @@ export function distribute(axis: 'h' | 'v') {
 
 export function flip(axis: 'h' | 'v') {
   D().commit((d) => mapElements(d, selected(), (e) => {
+    if (e.locked) return e;
     if (e.type === 'shape') return axis === 'h' ? { ...e, flipX: !e.flipX } : { ...e, flipY: !e.flipY };
     if (e.type === 'freehand') return { ...e, points: e.points.map(([x, y]) => (axis === 'h' ? [1 - x, y] : [x, 1 - y]) as [number, number]) };
     return e;
@@ -366,13 +368,14 @@ export function applyAnimToSelection(shape?: Partial<ShapeAnim>, conn?: Partial<
   const ids = U().selection;
   if (!ids.length) { U().toast('Select objects first'); return; }
   D().commit((d) => mapElements(d, ids, (e) => {
+    if (e.locked) return e;
     if (e.type === 'connector') return conn ? { ...e, anim: { ...e.anim, ...conn } } : e;
     return shape ? { ...e, anim: { ...e.anim, ...shape } } : e;
   }));
 }
 
 export function resetAnimSelected() {
-  D().commit((d) => mapElements(d, U().selection, (e) => { if (!('anim' in e) || !e.anim) return e; const { anim: _a, ...rest } = e; return rest as DiagramElement; }));
+  D().commit((d) => mapElements(d, U().selection, (e) => { if (e.locked || !('anim' in e) || !e.anim) return e; const { anim: _a, ...rest } = e; return rest as DiagramElement; }));
 }
 
 export function resetDocAnimation() {

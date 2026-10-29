@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { deleteElements, mapElements, useDoc } from '../src/store/docStore';
 import { useUI } from '../src/store/uiStore';
-import { cloneElements, copySelection, paste } from '../src/store/commands';
+import { applyStyle, cloneElements, copySelection, flip, paste } from '../src/store/commands';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
 
 const D = () => useDoc.getState();
@@ -116,5 +116,23 @@ describe('Edit ▸ Paste (no clipboard event)', () => {
     const els = D().doc.elements;
     expect(els.length).toBe(2);
     expect(els.every((e) => e.type === 'shape')).toBe(true);
+  });
+});
+
+describe('locked objects', () => {
+  it('are not changed by paste style or flip', () => {
+    const a = makeShape('triangle', 0, 0, 100, 50, defaultToolStyle('shape:triangle'));
+    const b = makeShape('triangle', 200, 0, 100, 50, defaultToolStyle('shape:triangle'));
+    a.locked = true;
+    D().load({ ...newDocument(), elements: [a, b] });
+    useUI.getState().select([a.id, b.id]);
+    const red = { ...defaultToolStyle('shape:triangle') };
+    red.style = { ...red.style, stroke: '#e03131' };
+    applyStyle([a.id, b.id], red);
+    flip('h');
+    const [la, lb] = D().doc.elements as typeof a[];
+    expect(la).toEqual(a);
+    expect(lb.style.stroke).toBe('#e03131');
+    expect(lb.flipX).toBe(true);
   });
 });
