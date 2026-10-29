@@ -27,8 +27,10 @@ export function planGif(doc: FlowDocument, s: GifSettings): GifPlan {
   const n = Math.max(1, Math.round(s.duration * s.fps));
   // seamless: n frames spaced so frame n would equal frame 0 (we never render it twice)
   const times = Array.from({ length: n }, (_, i) => (s.seamless ? (i * s.duration) / n : Math.min(s.duration, i / s.fps)));
-  // GIF delays are in centiseconds; distribute rounding so total time stays exact
-  const delaysCs = times.map((_, i) => Math.round(((i + 1) * 100) / s.fps) - Math.round((i * 100) / s.fps));
+  // GIF delays are in centiseconds; distribute rounding so total time stays exact.
+  // Delays follow the actual frame spacing, so a seamless loop plays in exactly s.duration.
+  const step = s.seamless ? s.duration / n : 1 / s.fps;
+  const delaysCs = times.map((_, i) => Math.round((i + 1) * 100 * step) - Math.round(i * 100 * step));
   const warnings: string[] = [];
   const px = W * H * n;
   if (delaysCs.some((d) => d < 2)) warnings.push('Most viewers clamp GIF frame delays under 20 ms; frame rates above 50 FPS will play slower than expected.');
