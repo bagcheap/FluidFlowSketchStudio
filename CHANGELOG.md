@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.4] - 2026-10-30
 
 ### Added
 - **More icon sets:** Devicon (1,079 programming languages and developer tools), SVG Logos (2,043 company and product logos in colour), Simple Icons (3,467 one-colour brand marks) and Kubernetes (38 resource icons), alongside Tabler. Filter by set with the chips at the top of the Icons panel, or search all of them at once. Each set downloads the first time you open or search it.
@@ -13,7 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 - Colour icons keep their gradients, so logos look as their makers designed them.
-- Files now use format version 3. Older files open as before, but files saved with this version need this version of FlowSketch or later.
+- Files now use format version 3. Older files open as before, but files saved with this version need FlowSketch 0.1.4 or later.
 
 ## [0.1.3] - 2026-10-30
 
