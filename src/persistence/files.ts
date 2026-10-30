@@ -77,6 +77,21 @@ export async function openDocumentFile(): Promise<(ParseResult & { name: string 
 
 export async function openDroppedFile(file: File) { currentHandle = null; return readFile(file); }
 
+/** Pick several files, or (with `directory`) every file in a folder. Resolves [] if cancelled. */
+export function pickFiles(accept: string, directory = false): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = accept; input.multiple = true;
+    if (directory) input.setAttribute('webkitdirectory', '');
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    const done = (f: File[]) => { input.remove(); resolve(f); };
+    input.onchange = () => done([...(input.files ?? [])]);
+    input.addEventListener('cancel', () => done([]));
+    input.click();
+  });
+}
+
 export function pickFile(accept: string): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input');

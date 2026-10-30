@@ -1,5 +1,5 @@
 // Editor commands shared by menus, keyboard shortcuts, toolbar and inspector.
-import type { BoxElement, ConnectorAnim, DiagramElement, FlowDocument, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
+import type { Asset, BoxElement, ConnectorAnim, DiagramElement, FlowDocument, IconAsset, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
 import { SCHEMA_VERSION } from '../model/types';
 import { DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
@@ -11,6 +11,8 @@ import { DocumentError, parseDocument, serializeDocument } from '../model/schema
 import { layoutText } from '../engine/text';
 import { geometryFor } from '../engine/shapes';
 import { loadIconSet } from '../icons/sets';
+import { importFiles, slugName, useLibraries } from '../icons/libraries';
+import { svgToIcon } from '../icons/svgToIcon';
 
 const D = () => useDoc.getState();
 const U = () => useUI.getState();
@@ -324,16 +326,20 @@ export async function insertImage(file?: File, at?: { x: number; y: number }) {
   const f = file ?? (await pickFile('image/png,image/jpeg,image/gif,image/webp'));
   if (!f) return;
   try {
-    const asset = await fileToAsset(f);
-    const scale = Math.min(1, 480 / Math.max(asset.width, asset.height));
-    const w = asset.width * scale, h = asset.height * scale;
-    const c = at ?? screenToWorld(stage.w / 2, stage.h / 2);
-    const ts = U().toolStyle('image');
-    const el: DiagramElement = { id: uid(), type: 'image', assetId: asset.id, x: c.x - w / 2, y: c.y - h / 2, w, h, rotation: 0, locked: false, groupIds: [], seed: newSeed(), style: { ...ts.style }, text: '', textStyle: { ...ts.textStyle }, anim: { mode: 'float' } };
-    D().commit((d) => ({ ...d, assets: { ...d.assets, [asset.id]: asset }, elements: [...d.elements, el] }));
-    U().setTool('select');
-    U().select([el.id]);
+    placeImageAsset(await fileToAsset(f), at);
   } catch (e) { U().toast((e as Error).message || 'Could not insert the image.', 'error'); }
+}
+
+/** Add a raster picture to the document as an image element, at `at` or in the middle of the view. */
+function placeImageAsset(asset: Asset, at?: { x: number; y: number }, maxSize = 480) {
+  const scale = Math.min(1, maxSize / Math.max(asset.width, asset.height));
+  const w = asset.width * scale, h = asset.height * scale;
+  const c = at ?? screenToWorld(stage.w / 2, stage.h / 2);
+  const ts = U().toolStyle('image');
+  const el: DiagramElement = { id: uid(), type: 'image', assetId: asset.id, x: c.x - w / 2, y: c.y - h / 2, w, h, rotation: 0, locked: false, groupIds: [], seed: newSeed(), style: { ...ts.style }, text: '', textStyle: { ...ts.textStyle }, anim: { mode: 'float' } };
+  D().commit((d) => ({ ...d, assets: { ...d.assets, [asset.id]: asset }, elements: [...d.elements, el] }));
+  U().setTool('select');
+  U().select([el.id]);
 }
 
 export const toggleIconPanel = () => U().updatePrefs({ showIconPanel: !U().prefs.showIconPanel });
@@ -341,19 +347,54 @@ export const toggleIconPanel = () => U().updatePrefs({ showIconPanel: !U().prefs
 /** Size of a newly placed icon (world units). */
 export const ICON_SIZE = 56;
 
-/** Place an icon from a built-in set: at `at` (a drop point) or in the middle of the visible canvas. */
+/** Place an icon from a set or library: at `at` (a drop point) or in the middle of the visible canvas. */
 export async function insertIcon(setId: string, name: string, at?: { x: number; y: number }) {
   try {
-    const icon = (await loadIconSet(setId)).icon(name);
-    if (!icon) { U().toast(`The icon “${name}” could not be loaded.`, 'error'); return; }
+    const set = await loadIconSet(setId);
     // keep clear of the Icons panel on the left when placing in the middle
     const c = at ?? screenToWorld((stage.w + (U().prefs.showIconPanel ? ICON_PANEL_WIDTH : 0)) / 2, stage.h / 2);
-    const el = makeIcon(icon.id, c.x - ICON_SIZE / 2, c.y - ICON_SIZE / 2, ICON_SIZE, U().toolStyle('icon'));
-    D().commit((d) => ({ ...d, icons: { ...d.icons, [icon.id]: d.icons[icon.id] ?? icon }, elements: [...d.elements, el] }));
-    U().setTool('select');
-    U().select([el.id]);
+    const picture = set.picture?.(name);
+    if (picture) {
+      // pictures in your libraries become images; a fresh asset id keeps documents independent of the library
+      placeImageAsset({ ...picture, id: uid('asset') }, c, 160);
+    } else {
+      const icon = set.icon(name);
+      if (!icon) { U().toast(`The icon “${name}” could not be loaded.`, 'error'); return; }
+      placeIcon(icon, c);
+    }
     U().pushRecentIcon(`${setId}:${name}`);
   } catch (e) { U().toast((e as Error).message || 'Could not load the icon.', 'error'); }
+}
+
+/** SVG files dropped on the canvas become icons in this diagram (converted to plain shapes; not added to a library). */
+export async function dropSvgIcons(files: File[], at: { x: number; y: number }) {
+  const failed: string[] = [];
+  let placed = 0;
+  for (const f of files) {
+    try {
+      const name = slugName(f.name);
+      placeIcon(svgToIcon(await f.text(), { id: `file:${name}-${uid('')}`, name, set: 'Imported SVG', license: '' }), { x: at.x + placed * (ICON_SIZE + 24), y: at.y });
+      placed++;
+    } catch (e) { failed.push(`${f.name}: ${(e as Error).message}`); }
+  }
+  if (failed.length) U().toast(failed.length === 1 ? failed[0] : `${failed.length} SVG files could not be used as icons.`, 'error');
+}
+
+/** A .flowsketchlib (or other icon files) dropped on the canvas: add as a new library and show it. */
+export async function importIconLibraryFiles(files: File[]) {
+  const r = await importFiles(files);
+  if (!r.items.length) { U().toast(r.skipped[0] ? `No icons added: ${r.skipped[0]}` : 'No icons found in those files.', 'error'); return; }
+  const lib = await useLibraries.getState().add(r.items, { name: r.libraryName ?? 'My icons' });
+  U().updatePrefs({ showIconPanel: true });
+  U().toast(`Added ${r.items.length.toLocaleString()} icons to the library “${lib.name}”.`, 'success');
+}
+
+/** Add an icon (already converted and validated) to the document, centred on `c`. */
+export function placeIcon(icon: IconAsset, c: { x: number; y: number }) {
+  const el = makeIcon(icon.id, c.x - ICON_SIZE / 2, c.y - ICON_SIZE / 2, ICON_SIZE, U().toolStyle('icon'));
+  D().commit((d) => ({ ...d, icons: { ...d.icons, [icon.id]: d.icons[icon.id] ?? icon }, elements: [...d.elements, el] }));
+  U().setTool('select');
+  U().select([el.id]);
 }
 
 /** Grow a shape so its label fits (auto expansion). */

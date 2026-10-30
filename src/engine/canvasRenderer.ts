@@ -1,5 +1,5 @@
 // Draws a Frame to a 2D canvas. Used by the live editor AND every raster export.
-import type { Frame, Item, Part } from './render';
+import type { Frame, Item, Part, PartPaint } from './render';
 import type { Op } from './rough';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -30,6 +30,44 @@ function path2d(d: string): Path2D {
   return p;
 }
 
+/** A colour with extra opacity, for gradient stops ("#rgb"/"#rrggbb"; other colours keep full opacity). */
+function withAlpha(color: string, a: number): string {
+  if (a >= 1) return color;
+  const h = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color)?.[1];
+  if (!h) return color;
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const v = parseInt(full, 16);
+  return `rgba(${(v >> 16) & 255},${(v >> 8) & 255},${v & 255},${a})`;
+}
+
+/** Fill a path with a colour or a gradient. Gradients are drawn in their own space (bounding box and
+ * gradientTransform), with the path mapped into it, which matches SVG exactly. */
+function fillPaint(ctx: Ctx, path: Path2D, paint: PartPaint, rule: CanvasFillRule) {
+  if (!paint) return;
+  if (typeof paint === 'string') { ctx.fillStyle = paint; ctx.fill(path, rule); return; }
+  let m = new DOMMatrix();
+  if (paint.bbox) {
+    const b = paint.box;
+    if (!b || b[2] <= 0 || b[3] <= 0) { ctx.fillStyle = paint.stops[0].color; ctx.fill(path, rule); return; }
+    m = m.translate(b[0], b[1]).scale(b[2], b[3]);
+  }
+  if (paint.m) m = m.multiply(new DOMMatrix(paint.m));
+  if (Math.abs(m.a * m.d - m.b * m.c) < 1e-12) return; // degenerate: nothing to draw
+  const g = paint.type === 'linear' ? ctx.createLinearGradient(paint.x1, paint.y1, paint.x2, paint.y2) : ctx.createRadialGradient(paint.fx, paint.fy, 0, paint.cx, paint.cy, paint.r);
+  let last = 0;
+  for (const s of paint.stops) { last = Math.max(last, s.offset); g.addColorStop(last, withAlpha(s.color, s.opacity)); }
+  ctx.save();
+  ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+  const mapped = new Path2D();
+  mapped.addPath(path, m.inverse());
+  ctx.fillStyle = g;
+  ctx.fill(mapped, rule);
+  ctx.restore();
+}
+
+/** Strokes use a gradient's first colour (gradient strokes are rare in icons). */
+const strokeColor = (paint: PartPaint) => (typeof paint === 'object' && paint ? paint.stops[0].color : paint);
+
 function drawPart(ctx: Ctx, p: Part, images: Map<string, ImageSource>) {
   ctx.setLineDash([]);
   ctx.lineDashOffset = 0;
@@ -39,8 +77,8 @@ function drawPart(ctx: Ctx, p: Part, images: Map<string, ImageSource>) {
     if (p.k === 'path') {
       ctx.globalAlpha *= p.alpha;
       const path = path2d(p.d);
-      if (p.fill) { ctx.fillStyle = p.fill; ctx.fill(path, p.evenodd ? 'evenodd' : 'nonzero'); }
-      if (p.stroke && p.width > 0) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.width; ctx.lineCap = p.cap; ctx.lineJoin = p.join; ctx.stroke(path); }
+      fillPaint(ctx, path, p.fill, p.evenodd ? 'evenodd' : 'nonzero');
+      if (p.stroke && p.width > 0) { ctx.strokeStyle = strokeColor(p.stroke)!; ctx.lineWidth = p.width; ctx.lineCap = p.cap; ctx.lineJoin = p.join; ctx.stroke(path); }
     } else drawPart(ctx, { ...p, m: undefined }, images);
     ctx.restore();
     return;

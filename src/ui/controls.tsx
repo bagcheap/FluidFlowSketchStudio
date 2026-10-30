@@ -64,10 +64,10 @@ export function Segmented<T extends string | number>({ value, options, onChange,
   );
 }
 
-export function Toggle({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) {
+export function Toggle({ label, checked, onChange, hint, ariaLabel }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string; ariaLabel?: string }) {
   return (
     <label className="toggle" title={hint}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" checked={checked} aria-label={ariaLabel} onChange={(e) => onChange(e.target.checked)} />
       <span className="toggle-track" aria-hidden><span className="toggle-thumb" /></span>
       <span>{label}</span>
     </label>

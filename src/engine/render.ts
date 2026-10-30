@@ -2,7 +2,7 @@
 // The single source of truth for what a diagram looks like at time t. Pure with respect to the
 // document: it never mutates it. The live canvas, PNG/GIF/video export and SVG export all consume
 // the returned Frame, so preview and exports match exactly.
-import type { BoxElement, ConnectorElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, IconElement, Point, ShapeElement, TextElement, TextStyle } from '../model/types';
+import type { BoxElement, ConnectorElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, IconElement, IconGradient, IconPaint, Style, Point, ShapeElement, TextElement, TextStyle } from '../model/types';
 import type { Motion, PreviewFlags } from './animation';
 import { STILL, resolveConnectorAnim, shapeMotion } from './animation';
 import { connectorPath, endTangent, pointAt, slice, type ConnectorPath, type Lookup } from './connectors';
@@ -11,12 +11,15 @@ import { roughSets, type OpSet } from './rough';
 import { geometryFor } from './shapes';
 import { cssFont, layoutText } from './text';
 
+/** A colour, or a gradient with the bounding box of the path it fills (for bounding-box gradients). */
+export type PartPaint = string | (IconGradient & { box?: [number, number, number, number] }) | null;
+
 /** 2-D affine matrix (a b c d e f), as in SVG/canvas transforms. */
 export type Matrix = [number, number, number, number, number, number];
 
 export type Part =
   | { k: 'sets'; sets: OpSet[]; stroke: string; fill: string; sw: number; fillWeight: number; dash: number[] | null; shadow: boolean; m?: Matrix }
-  | { k: 'path'; d: string; fill: string | null; stroke: string | null; width: number; cap: 'butt' | 'round' | 'square'; join: 'miter' | 'round' | 'bevel'; evenodd: boolean; alpha: number; m: Matrix }
+  | { k: 'path'; d: string; fill: PartPaint; stroke: PartPaint; width: number; cap: 'butt' | 'round' | 'square'; join: 'miter' | 'round' | 'bevel'; evenodd: boolean; alpha: number; m: Matrix }
   | { k: 'line'; pts: number[]; color: string; width: number; alpha: number; cap: 'round' | 'butt'; dash: number[] | null; dashOffset?: number; glow?: string; closed?: boolean; fill?: string }
   | { k: 'text'; lines: { t: string; x: number; y: number }[]; font: string; color: string; align: 'left' | 'center' | 'right' }
   | { k: 'image'; assetId: string; x: number; y: number; w: number; h: number };
@@ -151,13 +154,13 @@ function iconItems(doc: FlowDocument, el: IconElement, m: Motion, loopLen: numbe
     const bw = el.w * (1 - 2 * inset), bh = el.h * (1 - 2 * inset);
     const s = Math.min(bw / icon.w, bh / icon.h);
     const base: Matrix = [s, 0, 0, s, el.w * inset + (bw - icon.w * s) / 2, el.h * inset + (bh - icon.h * s) / 2];
-    const paint = (c: string | null) => (c === 'currentColor' ? el.style.stroke : c);
     icon.parts.forEach((p, i) => {
+      const paint = (c: IconPaint): PartPaint => (c === 'currentColor' ? el.style.stroke : typeof c === 'object' && c ? { ...c, box: p.bbox } : c);
       const mm = p.m ? mulM(base, p.m) : base;
       const fill = paint(p.fill), stroke = paint(p.stroke);
-      if (el.sketch && icon.mono) {
-        // hand-drawn: cached Rough.js geometry in icon units; wobble scaled into those units
-        const style = { ...el.style, stroke: stroke ?? 'transparent', fill: fill ?? 'transparent', fillStyle: fill ? 'solid' as const : 'none' as const, strokeWidth: p.strokeWidth, strokeStyle: 'solid' as const, roughness: 0.45 };
+      if (el.sketch && icon.mono && (fill === null || typeof fill === 'string') && (stroke === null || typeof stroke === 'string')) {
+        // hand-drawn (one-colour icons only, so both paints are plain colours): cached Rough.js geometry in icon units; wobble scaled into those units
+        const style: Style = { ...el.style, stroke: stroke ?? 'transparent', fill: fill ?? 'transparent', fillStyle: fill ? 'solid' as const : 'none' as const, strokeWidth: p.strokeWidth, strokeStyle: 'solid' as const, roughness: 0.45 };
         const k = Math.max(1e-6, s * Math.hypot(p.m?.[0] ?? 1, p.m?.[1] ?? 0));
         const sets = warpSets(roughSets(`ic${el.iconId}#${i}`, p.d, style, seed + i, !!fill), { ...f, amp: f.amp / k, wavelength: f.wavelength / k });
         parts.push({ k: 'sets', sets, stroke: stroke ?? 'none', fill: fill ?? 'none', sw: stroke ? p.strokeWidth : 0, fillWeight: Math.max(0.5, p.strokeWidth / 2), dash: null, shadow: false, m: mm });

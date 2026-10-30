@@ -120,7 +120,7 @@ export function Inspector() {
           )}
           {firstIcon && (
             <Section title="Icon">
-              {iconEls.length === 1 && <p className="insp-tip">{doc.icons[firstIcon.iconId]?.set} · {doc.icons[firstIcon.iconId]?.license} licence</p>}
+              {iconEls.length === 1 && (() => { const a = doc.icons[firstIcon.iconId]; return a ? <p className="insp-tip">{a.license ? `${a.set} · ${a.license} licence` : a.set || 'Imported icon'}</p> : null; })()}
               {allMono && <ColorPicker label="Icon colour" value={firstIcon.style.stroke} palette={PALETTE_STROKE} onChange={(c) => setStyle({ stroke: c })} />}
               {allMono && <Toggle label="Hand-drawn" checked={firstIcon.sketch} onChange={(v) => setIcon({ sketch: v })} />}
               <Row label="Label">

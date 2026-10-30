@@ -13,11 +13,16 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "python3 e2e/run_e2e.py",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "icons:index": "node scripts/build-icon-index.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
     "@fontsource/kalam": "^5.3.0",
+    "@iconify-json/devicon": "^1.2.74",
+    "@iconify-json/k8s": "^1.2.2",
+    "@iconify-json/logos": "^1.2.18",
+    "@iconify-json/simple-icons": "^1.2.101",
     "@iconify-json/tabler": "^1.2.43",
     "gifenc": "^1.0.3",
     "idb-keyval": "^6.3.0",

@@ -296,6 +296,57 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         ticons()
 
+        @test('Icon libraries: logos with gradients, your own SVG/PNG library, SVG dropped on the canvas')
+        def ticonlibs():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 6000, zoom: 1})')  # empty area
+            app.key('Shift+I'); page.wait_for_selector('.icon-cell')
+            stage = page.get_by_test_id('stage')
+            box = stage.bounding_box()
+            def at(wx, wy):
+                x, y = app.pt(wx, wy); return {'x': x - box['x'], 'y': y - box['y']}
+            # a colour logo from SVG Logos (search across all sets finds it)
+            page.get_by_label('Search icons').fill('firefox')
+            page.locator('.icon-cell[data-icon="logos:firefox"]').wait_for()
+            page.locator('.icon-cell[data-icon="logos:firefox"]').drag_to(stage, target_position=at(5300, 6200))
+            page.wait_for_timeout(100)
+            ff = app.els('icon')[-1]
+            assert ff['iconId'] == 'logos:firefox'
+            icon = app.doc()['icons']['logos:firefox']
+            assert any(isinstance(p['fill'], dict) and p['fill']['stops'] for p in icon['parts']), 'gradients were not kept'
+            # your own library: an SVG and a PNG added through "Add icons"
+            svg = os.path.join(OUT, 'team-db.svg')
+            open(svg, 'w').write('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" onload="alert(1)"><script>alert(1)</script><rect x="3" y="3" width="18" height="18" rx="4" fill="#7048e8"/></svg>')
+            from PIL import Image
+            png = os.path.join(OUT, 'team-badge.png'); Image.new('RGB', (32, 32), (43, 138, 62)).save(png)
+            page.get_by_label('Search icons').fill('')
+            page.get_by_role('button', name='Add icons').click()
+            page.get_by_label('New library name').fill('E2E team')
+            with page.expect_file_chooser() as fc:
+                page.get_by_role('button', name='Choose files…').click()
+            fc.value.set_files([svg, png])
+            page.wait_for_selector('.note.ok')
+            assert 'Added 2 icons' in page.locator('.note.ok').inner_text()
+            page.keyboard.press('Escape')
+            page.locator('.ip-chips .chip', has_text='E2E team').click()
+            page.locator('.icon-cell[data-icon$=":team-db"]').drag_to(stage, target_position=at(5500, 6200)); page.wait_for_timeout(100)
+            mine = app.els('icon')[-1]
+            assert mine['iconId'].endswith(':team-db'), mine['iconId']
+            parts = app.doc()['icons'][mine['iconId']]['parts']
+            assert parts and 'script' not in json.dumps(parts) and 'alert' not in json.dumps(parts)
+            page.locator('.icon-cell[data-icon$=":team-badge"]').click(); page.wait_for_timeout(100)
+            assert app.els()[-1]['type'] == 'image', 'a PNG from a library is placed as an image'
+            # an SVG file dropped straight onto the canvas becomes an icon in this diagram
+            dt = page.evaluate_handle("(t) => { const d = new DataTransfer(); d.items.add(new File([t], 'dropped.svg', {type: 'image/svg+xml'})); return d; }", open(svg).read())
+            x, y = app.pt(5700, 6200)
+            stage.dispatch_event('drop', {'dataTransfer': dt, 'clientX': x, 'clientY': y})
+            page.wait_for_timeout(200)
+            assert app.els('icon')[-1]['iconId'].startswith('file:dropped'), app.els('icon')[-1]['iconId']
+            app.key('Shift+I')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        ticonlibs()
+
         @test('Swap direction: the Inspector button reverses an arrow; one undo restores it')
         def tswap():
             app.key('Escape')
@@ -403,7 +454,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 2
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 3
             assert len(data['elements']) == len(app.els())
         t7()
 
@@ -460,7 +511,10 @@ def main():
                 page.get_by_role('menuitem', name='Quick SVG (current frame)').click()
             p = f'{OUT}/e2e.svg'; dl.value.save_as(p)
             s = open(p).read()
-            assert s.count('<path') > 10 and '<text' in s and '<image' not in s and '<script' not in s
+            assert s.count('<path') > 10 and '<text' in s and '<script' not in s
+            # images in the export are only ever embedded rasters (e.g. a PNG from an icon library)
+            assert all(h.startswith(('data:image/png', 'data:image/jpeg', 'data:image/gif', 'data:image/webp')) for h in re.findall(r'<image href="([^"]*)"', s))
+            assert re.search(r'<(linear|radial)Gradient ', s), 'logo gradients missing from the SVG'
         tpng()
 
         @test('Standalone HTML player export')

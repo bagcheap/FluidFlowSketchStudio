@@ -2,7 +2,8 @@
 // then only geometry (path, rect, circle, ellipse, line, polyline, polygon inside svg/g) and plain paint
 // are read. Everything else (scripts, links, <use>, images, fonts, CSS, event handlers) is never copied.
 // The result goes through sanitizeIconAsset, the same check that runs when a file is opened.
-import type { IconAsset, IconPart } from '../model/types';
+import type { IconAsset, IconGradient, IconPaint, IconPart } from '../model/types';
+import { pathBBox } from './pathBounds';
 import { sanitizeIconAsset } from '../model/schema';
 
 type M = [number, number, number, number, number, number];
@@ -35,7 +36,7 @@ export function parseTransform(s: string | null): M {
   return m;
 }
 
-interface Paint { fill: string | null; stroke: string | null; strokeWidth: number; linecap: IconPart['linecap']; linejoin: IconPart['linejoin']; evenodd: boolean; opacity: number }
+interface Paint { fill: IconPaint; stroke: IconPaint; strokeWidth: number; linecap: IconPart['linecap']; linejoin: IconPart['linejoin']; evenodd: boolean; opacity: number }
 const PAINT_PROPS = ['fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'fill-rule', 'opacity', 'fill-opacity', 'stroke-opacity', 'transform'] as const;
 
 /** Presentation attributes plus the same properties from an inline style="…" (other CSS is ignored). */
@@ -54,16 +55,54 @@ function props(el: Element): Partial<Record<(typeof PAINT_PROPS)[number], string
 const num = (v: string | null | undefined, d = 0) => { const n = parseFloat(v ?? ''); return Number.isFinite(n) ? n : d; };
 const f = (n: number) => +n.toFixed(4);
 
-/** A colour from the SVG; gradients become their first stop colour (good enough for icons). */
-function color(v: string | undefined, inherited: string | null, doc: Document): string | null {
+const XLINK = 'http://www.w3.org/1999/xlink';
+const hrefOf = (el: Element) => el.getAttribute('href') ?? el.getAttributeNS(XLINK, 'href');
+const localRef = (h: string | null) => (h && /^#[\w.:-]+$/.test(h) ? h.slice(1) : null); // only references inside the same file
+
+/** A linear or radial gradient, following href chains (common in logo files) for stops and defaults. */
+function gradient(doc: Document, id: string, vbW: number, vbH: number): IconGradient | null {
+  const chain: Element[] = [];
+  for (let g = doc.getElementById(id); g && chain.length < 8 && !chain.includes(g) && (g.localName === 'linearGradient' || g.localName === 'radialGradient');
+    g = (() => { const r = localRef(hrefOf(g)); return r ? doc.getElementById(r) : null; })()) chain.push(g);
+  if (!chain.length) return null;
+  const attr = (n: string) => { for (const e of chain) { const v = e.getAttribute(n); if (v !== null) return v; } return null; };
+  const bbox = attr('gradientUnits') !== 'userSpaceOnUse';
+  const len = (n: string, d: number, axis: 'x' | 'y' | 'r') => {
+    const v = attr(n);
+    const f = parseFloat(v ?? '');
+    if (v === null || !Number.isFinite(f)) return d;
+    if (!v.trim().endsWith('%')) return f;
+    const frac = f / 100;
+    return bbox ? frac : frac * (axis === 'x' ? vbW : axis === 'y' ? vbH : Math.hypot(vbW, vbH) / Math.SQRT2);
+  };
+  const full = (axis: 'x' | 'y' | 'r') => (bbox ? 1 : axis === 'x' ? vbW : axis === 'y' ? vbH : Math.hypot(vbW, vbH) / Math.SQRT2);
+  const stopsOwner = chain.find((e) => e.getElementsByTagName('stop').length);
+  const stops = Array.from(stopsOwner?.getElementsByTagName('stop') ?? []).slice(0, 32).map((st) => {
+    const style = st.getAttribute('style') ?? '';
+    const prop = (n: string) => st.getAttribute(n) ?? new RegExp(`${n}\\s*:\\s*([^;]+)`).exec(style)?.[1]?.trim() ?? null;
+    const off = prop('offset') ?? '0';
+    const o = parseFloat(off);
+    return { offset: Math.min(1, Math.max(0, off.trim().endsWith('%') ? o / 100 : o || 0)), color: prop('stop-color') ?? '#000000', opacity: num(prop('stop-opacity'), 1) };
+  });
+  if (!stops.length) return null;
+  const radial = chain[0].localName === 'radialGradient';
+  const cx = len('cx', 0.5 * full('x'), 'x'), cy = len('cy', 0.5 * full('y'), 'y');
+  const gt = parseTransform(attr('gradientTransform'));
+  return {
+    type: radial ? 'radial' : 'linear', bbox,
+    x1: len('x1', 0, 'x'), y1: len('y1', 0, 'y'), x2: len('x2', full('x'), 'x'), y2: len('y2', 0, 'y'),
+    cx, cy, r: len('r', 0.5 * full('r'), 'r'), fx: len('fx', cx, 'x'), fy: len('fy', cy, 'y'),
+    stops,
+    ...(isIdentity(gt) ? {} : { m: gt }),
+  };
+}
+
+/** A paint from the SVG: none, a colour, or a gradient defined in the same file. */
+function paint(v: string | undefined, inherited: IconPaint, doc: Document, vb: [number, number]): IconPaint {
   if (v === undefined || v === 'inherit') return inherited;
   if (v === 'none' || v === 'transparent') return null;
-  const ref = /^url\(\s*#([\w.-]+)\s*\)/.exec(v);
-  if (ref) {
-    const stop = doc.getElementById(ref[1])?.querySelector('stop');
-    const sc = stop?.getAttribute('stop-color') ?? /stop-color\s*:\s*([^;]+)/.exec(stop?.getAttribute('style') ?? '')?.[1];
-    return sc ? sc.trim() : inherited;
-  }
+  const ref = /^url\(\s*['"]?#([\w.:-]+)['"]?\s*\)/.exec(v);
+  if (ref) return gradient(doc, ref[1], vb[0], vb[1]) ?? inherited;
   return v;
 }
 
@@ -113,30 +152,42 @@ export function svgToIcon(svg: string, meta: { id: string; name: string; set: st
     ? vb : [0, 0, num(root.getAttribute('width'), 24), num(root.getAttribute('height'), 24)];
   const parts: IconPart[] = [];
   let visited = 0;
-  const walk = (el: Element, paint: Paint, m: M) => {
-    if (++visited > 5000 || parts.length >= 500) return;
+  const walk = (el: Element, inh: Paint, m: M, depth = 0) => {
+    if (++visited > 5000 || parts.length >= 500 || depth > 8) return;
     const p = props(el);
-    const fill = color(p.fill, paint.fill, doc), stroke = color(p.stroke, paint.stroke, doc);
+    const fill = paint(p.fill, inh.fill, doc, [w, h]), stroke = paint(p.stroke, inh.stroke, doc, [w, h]);
     const op = num(p.opacity, 1);
     const fillOnly = (stroke === null) ? num(p['fill-opacity'], 1) : 1;
     const strokeOnly = (fill === null) ? num(p['stroke-opacity'], 1) : 1;
     const next: Paint = {
       fill, stroke,
-      strokeWidth: p['stroke-width'] !== undefined ? num(p['stroke-width'], paint.strokeWidth) : paint.strokeWidth,
-      linecap: (['butt', 'round', 'square'] as const).find((v) => v === p['stroke-linecap']) ?? paint.linecap,
-      linejoin: (['miter', 'round', 'bevel'] as const).find((v) => v === p['stroke-linejoin']) ?? paint.linejoin,
-      evenodd: p['fill-rule'] ? p['fill-rule'] === 'evenodd' : paint.evenodd,
-      opacity: paint.opacity * op * fillOnly * strokeOnly,
+      strokeWidth: p['stroke-width'] !== undefined ? num(p['stroke-width'], inh.strokeWidth) : inh.strokeWidth,
+      linecap: (['butt', 'round', 'square'] as const).find((v) => v === p['stroke-linecap']) ?? inh.linecap,
+      linejoin: (['miter', 'round', 'bevel'] as const).find((v) => v === p['stroke-linejoin']) ?? inh.linejoin,
+      evenodd: p['fill-rule'] ? p['fill-rule'] === 'evenodd' : inh.evenodd,
+      opacity: inh.opacity * op * fillOnly * strokeOnly,
     };
     const mm = el === root ? m : mul(m, parseTransform(el.getAttribute('transform') ?? p.transform ?? null));
     if (CONTAINERS.has(el.localName)) {
-      for (const c of Array.from(el.children)) walk(c, next, mm);
+      for (const c of Array.from(el.children)) walk(c, next, mm, depth);
+      return;
+    }
+    if (el.localName === 'use') {
+      // <use> repeats a shape or group defined elsewhere in the same file (never an external file)
+      const ref = localRef(hrefOf(el));
+      const target = ref ? doc.getElementById(ref) : null;
+      if (!target) return;
+      const at = mul(mm, [1, 0, 0, 1, num(el.getAttribute('x')), num(el.getAttribute('y'))]);
+      if (target.localName === 'symbol') for (const c of Array.from(target.children)) walk(c, next, at, depth + 1);
+      else walk(target, next, at, depth + 1);
       return;
     }
     if (!SHAPES.has(el.localName)) return; // defs, use, image, text, script, foreignObject, style, a, …: dropped
     const d = geometry(el);
     if (!d || (next.fill === null && next.stroke === null)) return;
-    parts.push({ d, ...next, ...(isIdentity(mm) ? {} : { m: mm }) });
+    const usesBox = [next.fill, next.stroke].some((c) => typeof c === 'object' && c !== null && c.bbox);
+    const bb = usesBox ? pathBBox(d) : null;
+    parts.push({ d, ...next, ...(isIdentity(mm) ? {} : { m: mm }), ...(bb ? { bbox: bb } : {}) });
   };
   const rootPaint: Paint = { fill: '#000000', stroke: null, strokeWidth: 1, linecap: 'butt', linejoin: 'miter', evenodd: false, opacity: 1 };
   walk(root, rootPaint, minX || minY ? [1, 0, 0, 1, -minX, -minY] : ID);
