@@ -1,7 +1,7 @@
 // Validation, sanitisation and migration for .flowsketch files.
 // Every imported value is coerced into a known-safe shape; nothing is executed.
 import type {
-  Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, ShapeAnim, ShapeKind, Style, TextStyle,
+  Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, IconAsset, IconPart, ShapeAnim, ShapeKind, Style, TextStyle,
 } from './types';
 import { SCHEMA_VERSION } from './types';
 import { DEFAULT_ANIMATION, DEFAULT_CONNECTOR_ANIM, DEFAULT_SHAPE_ANIM, DEFAULT_STYLE, DEFAULT_TEXT, newDocument, newSeed, uid } from './defaults';
@@ -124,7 +124,7 @@ function endpoint(v: unknown): Endpoint {
 
 function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
   if (!isObj(v)) return null;
-  const type = oneOf(v.type, ['shape', 'text', 'freehand', 'image', 'connector'] as const, 'shape');
+  const type = oneOf(v.type, ['shape', 'text', 'freehand', 'image', 'icon', 'connector'] as const, 'shape');
   if (typeof v.type !== 'string' || v.type !== type) { warn(`Skipped element of unknown type "${String(v.type)}"`); return null; }
   const base = {
     id: str(v.id, uid(), 100) || uid(),
@@ -155,6 +155,12 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
     }
     case 'image':
       return { ...base, ...sAnim, type, assetId: str(v.assetId, '', 100) };
+    case 'icon':
+      return {
+        ...base, ...sAnim, type, iconId: str(v.iconId, '', 140), sketch: bool(v.sketch, false),
+        labelPos: oneOf(v.labelPos, ['below', 'right', 'none'] as const, 'below'),
+        frame: oneOf(v.frame, ['none', 'circle', 'square'] as const, 'none'),
+      };
     case 'connector': {
       const bends = Array.isArray(v.bends)
         ? v.bends.filter(isObj).slice(0, 50).map((b) => ({ x: num(b.x, 0), y: num(b.y, 0) }))
@@ -190,6 +196,55 @@ function asset(v: unknown): Asset | null {
   };
 }
 
+// ---- icons -------------------------------------------------------------------------
+// Icons arrive as SVG, which can carry scripts, so they are only ever stored as plain path data
+// and paint. This check runs on every icon, both after conversion and when a file is opened.
+export const MAX_ICON_PARTS = 500;
+const PATH_D_RE = /^[MmZzLlHhVvCcSsQqTtAa0-9eE+\-.,\s]+$/;
+const iconPaint = (v: unknown): string | null => {
+  if (v === null || v === undefined || v === 'none') return null;
+  if (v === 'currentColor') return 'currentColor';
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  return COLOR_RE.test(t) || /^[a-zA-Z]{3,20}$/.test(t) ? t : null; // hex, rgb(), or a CSS colour name
+};
+
+function iconPart(v: unknown): IconPart | null {
+  if (!isObj(v) || typeof v.d !== 'string' || v.d.length > 50000 || !PATH_D_RE.test(v.d)) return null;
+  const m = Array.isArray(v.m) && v.m.length === 6 && v.m.every((n) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < 1e6)
+    ? (v.m as IconPart['m']) : undefined;
+  return {
+    d: v.d,
+    fill: iconPaint(v.fill),
+    stroke: iconPaint(v.stroke),
+    strokeWidth: num(v.strokeWidth, 1, 0, 1000),
+    linecap: oneOf(v.linecap, ['butt', 'round', 'square'] as const, 'butt'),
+    linejoin: oneOf(v.linejoin, ['miter', 'round', 'bevel'] as const, 'miter'),
+    evenodd: bool(v.evenodd, false),
+    opacity: num(v.opacity, 1, 0, 1),
+    ...(m ? { m: [...m] as IconPart['m'] } : {}),
+  };
+}
+
+/** Validate an icon's vector data; null if nothing drawable is left. */
+export function sanitizeIconAsset(v: unknown, id: string): IconAsset | null {
+  if (!isObj(v) || !Array.isArray(v.parts)) return null;
+  // parts left with no fill and no stroke (e.g. their paint was unsafe) draw nothing and are dropped
+  const parts = v.parts.slice(0, MAX_ICON_PARTS).map(iconPart).filter((p): p is IconPart => !!p && (p.fill !== null || p.stroke !== null));
+  if (!parts.length) return null;
+  const isMono = (c: string | null) => c === null || c === 'currentColor';
+  return {
+    id: id.slice(0, 140),
+    name: str(v.name, id, 100),
+    set: str(v.set, '', 60),
+    license: str(v.license, '', 40),
+    w: num(v.w, 24, 0.1, 10000),
+    h: num(v.h, 24, 0.1, 10000),
+    parts,
+    mono: parts.every((p) => isMono(p.fill) && isMono(p.stroke)), // computed, never trusted from the file
+  };
+}
+
 /** Upgrade older schema versions in place. Add a case per future version bump. */
 export function migrate(raw: Obj): Obj {
   let version = typeof raw.schemaVersion === 'number' ? raw.schemaVersion : 0;
@@ -202,6 +257,10 @@ export function migrate(raw: Obj): Obj {
       raw.elements = [...((raw.shapes as unknown[]) ?? []), ...((raw.connectors as unknown[]) ?? [])];
     }
     version = 1;
+  }
+  if (version === 1) {
+    // v1 -> v2: adds icons (IconElement + FlowDocument.icons); nothing to convert
+    version = 2;
   }
   raw.schemaVersion = version;
   return raw;
@@ -259,12 +318,20 @@ export function parseDocument(input: string | unknown): ParseResult {
     },
     elements: [],
     assets: {},
+    icons: {},
   };
   // assets
   if (isObj(o.assets)) {
     for (const [k, v] of Object.entries(o.assets).slice(0, 500)) {
       const a = asset(v);
       if (a) doc.assets[k] = { ...a, id: k }; else warn(`Dropped an image asset that was not a safe raster image (${k}).`);
+    }
+  }
+  // icons
+  if (isObj(o.icons)) {
+    for (const [k, v] of Object.entries(o.icons).slice(0, 2000)) {
+      const ic = sanitizeIconAsset(v, k);
+      if (ic) doc.icons[ic.id] = ic; else warn(`Dropped an icon whose data was not valid (${k.slice(0, 60)}).`);
     }
   }
   // elements
@@ -277,6 +344,7 @@ export function parseDocument(input: string | unknown): ParseResult {
     if (seen.has(e.id)) e.id = uid();
     seen.add(e.id);
     if (e.type === 'image' && !doc.assets[e.assetId]) { warn('Removed an image whose data is missing.'); continue; }
+    if (e.type === 'icon' && !doc.icons[e.iconId]) { warn('Removed an icon whose data is missing.'); continue; }
     doc.elements.push(e);
   }
   // referential integrity: connectors may only attach to existing non-connector elements

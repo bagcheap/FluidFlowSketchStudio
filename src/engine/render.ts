@@ -2,7 +2,7 @@
 // The single source of truth for what a diagram looks like at time t. Pure with respect to the
 // document: it never mutates it. The live canvas, PNG/GIF/video export and SVG export all consume
 // the returned Frame, so preview and exports match exactly.
-import type { BoxElement, ConnectorElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, Point, ShapeElement, TextElement } from '../model/types';
+import type { BoxElement, ConnectorElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, IconElement, Point, ShapeElement, TextElement, TextStyle } from '../model/types';
 import type { Motion, PreviewFlags } from './animation';
 import { STILL, resolveConnectorAnim, shapeMotion } from './animation';
 import { connectorPath, endTangent, pointAt, slice, type ConnectorPath, type Lookup } from './connectors';
@@ -11,8 +11,12 @@ import { roughSets, type OpSet } from './rough';
 import { geometryFor } from './shapes';
 import { cssFont, layoutText } from './text';
 
+/** 2-D affine matrix (a b c d e f), as in SVG/canvas transforms. */
+export type Matrix = [number, number, number, number, number, number];
+
 export type Part =
-  | { k: 'sets'; sets: OpSet[]; stroke: string; fill: string; sw: number; fillWeight: number; dash: number[] | null; shadow: boolean }
+  | { k: 'sets'; sets: OpSet[]; stroke: string; fill: string; sw: number; fillWeight: number; dash: number[] | null; shadow: boolean; m?: Matrix }
+  | { k: 'path'; d: string; fill: string | null; stroke: string | null; width: number; cap: 'butt' | 'round' | 'square'; join: 'miter' | 'round' | 'bevel'; evenodd: boolean; alpha: number; m: Matrix }
   | { k: 'line'; pts: number[]; color: string; width: number; alpha: number; cap: 'round' | 'butt'; dash: number[] | null; dashOffset?: number; glow?: string; closed?: boolean; fill?: string }
   | { k: 'text'; lines: { t: string; x: number; y: number }[]; font: string; color: string; align: 'left' | 'center' | 'right' }
   | { k: 'image'; assetId: string; x: number; y: number; w: number; h: number };
@@ -109,6 +113,68 @@ function freehandItems(el: FreehandElement, m: Motion, loopLen: number | null): 
     id: el.id, opacity: el.style.opacity, tf: { x: el.x + m.tx, y: el.y + m.ty, w: el.w, h: el.h, rot: el.rotation + m.rot },
     parts: [{ k: 'line', pts: flat, color: el.style.stroke, width: el.style.strokeWidth, alpha: 1, cap: el.highlighter ? 'butt' : 'round', dash: dashFor(el.style.strokeStyle, el.style.strokeWidth) }],
   }];
+}
+
+// ---- icons -----------------------------------------------------------------
+
+const mulM = (a: Matrix, b: Matrix): Matrix => [
+  a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
+  a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+  a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5],
+];
+
+/** Where an icon's label sits, in the icon's local coordinates (below or to the right of the icon). */
+export function iconLabelLayout(el: IconElement, text = el.text): { box: Rect; ts: TextStyle } {
+  const ts: TextStyle = { ...el.textStyle, align: el.labelPos === 'right' ? 'left' : 'center', vAlign: 'middle' };
+  const lay = layoutText(text || ' ', ts, null);
+  const w = lay.width + ts.padding * 2 + 4, h = lay.height + ts.padding * 2;
+  if (el.labelPos === 'right') return { box: { x: el.w + 6, y: el.h / 2 - h / 2, w, h }, ts };
+  return { box: { x: el.w / 2 - w / 2, y: el.h + 4, w, h }, ts };
+}
+
+const ellipseD = (w: number, h: number) => `M0 ${h / 2}a${w / 2} ${h / 2} 0 1 0 ${w} 0a${w / 2} ${h / 2} 0 1 0 ${-w} 0Z`;
+const roundRectD = (w: number, h: number, r: number) =>
+  `M${r} 0H${w - r}Q${w} 0 ${w} ${r}V${h - r}Q${w} ${h} ${w - r} ${h}H${r}Q0 ${h} 0 ${h - r}V${r}Q0 0 ${r} 0Z`;
+
+function iconItems(doc: FlowDocument, el: IconElement, m: Motion, loopLen: number | null, hideLabel: boolean): Item[] {
+  const icon = doc.icons[el.iconId];
+  const f = field(el, m, loopLen);
+  const seed = el.seed + m.boil * 7919;
+  const parts: Part[] = [];
+  if (el.frame !== 'none') {
+    const d = el.frame === 'circle' ? ellipseD(el.w, el.h) : roundRectD(el.w, el.h, Math.min(el.w, el.h) * 0.2);
+    parts.push({ k: 'sets', sets: warpSets(roughSets(`if${el.frame}${el.w.toFixed(1)}x${el.h.toFixed(1)}`, d, el.style, seed, true), f), stroke: el.style.stroke, fill: el.style.fill, sw: el.style.strokeWidth, fillWeight: Math.max(0.6, el.style.strokeWidth / 2), dash: dashFor(el.style.strokeStyle, el.style.strokeWidth), shadow: el.style.shadow });
+  }
+  if (icon) {
+    // the glyph fills the box, or the middle 60% of it inside a background frame
+    const inset = el.frame === 'none' ? 0 : 0.2;
+    const bw = el.w * (1 - 2 * inset), bh = el.h * (1 - 2 * inset);
+    const s = Math.min(bw / icon.w, bh / icon.h);
+    const base: Matrix = [s, 0, 0, s, el.w * inset + (bw - icon.w * s) / 2, el.h * inset + (bh - icon.h * s) / 2];
+    const paint = (c: string | null) => (c === 'currentColor' ? el.style.stroke : c);
+    icon.parts.forEach((p, i) => {
+      const mm = p.m ? mulM(base, p.m) : base;
+      const fill = paint(p.fill), stroke = paint(p.stroke);
+      if (el.sketch && icon.mono) {
+        // hand-drawn: cached Rough.js geometry in icon units; wobble scaled into those units
+        const style = { ...el.style, stroke: stroke ?? 'transparent', fill: fill ?? 'transparent', fillStyle: fill ? 'solid' as const : 'none' as const, strokeWidth: p.strokeWidth, strokeStyle: 'solid' as const, roughness: 0.45 };
+        const k = Math.max(1e-6, s * Math.hypot(p.m?.[0] ?? 1, p.m?.[1] ?? 0));
+        const sets = warpSets(roughSets(`ic${el.iconId}#${i}`, p.d, style, seed + i, !!fill), { ...f, amp: f.amp / k, wavelength: f.wavelength / k });
+        parts.push({ k: 'sets', sets, stroke: stroke ?? 'none', fill: fill ?? 'none', sw: stroke ? p.strokeWidth : 0, fillWeight: Math.max(0.5, p.strokeWidth / 2), dash: null, shadow: false, m: mm });
+      } else {
+        parts.push({ k: 'path', d: p.d, fill, stroke, width: p.strokeWidth, cap: p.linecap, join: p.linejoin, evenodd: p.evenodd, alpha: p.opacity, m: mm });
+      }
+    });
+  } else {
+    parts.push({ k: 'line', pts: [0, 0, el.w, 0, el.w, el.h, 0, el.h], color: '#999999', width: 1, alpha: 1, cap: 'butt', dash: [4, 4], closed: true });
+  }
+  const tf = { x: el.x + m.tx, y: el.y + m.ty, w: el.w, h: el.h, rot: el.rotation + m.rot };
+  const items: Item[] = [{ id: el.id, opacity: el.style.opacity, tf, parts }];
+  if (el.text && el.labelPos !== 'none' && !hideLabel) {
+    const { box, ts } = iconLabelLayout(el);
+    items.push({ id: el.id + ':label', opacity: el.style.opacity, tf: { x: el.x + m.text.tx, y: el.y + m.text.ty, w: el.w, h: el.h, rot: el.rotation + m.text.rot }, parts: labelParts({ ...el, textStyle: ts }, box, false) });
+  }
+  return items;
 }
 
 // ---- connectors ------------------------------------------------------------
@@ -302,6 +368,7 @@ export function renderDocumentAtTime(doc: FlowDocument, t: number, opts: RenderO
     switch (el.type) {
       case 'shape': items.push(...shapeItems(el, m, loopLen, hide)); break;
       case 'text': items.push(...textItems(el, m, hide)); break;
+      case 'icon': items.push(...iconItems(doc, el, m, loopLen, hide)); break;
       case 'freehand': items.push(...freehandItems(el, m, loopLen)); break;
       case 'image':
         items.push({ id: el.id, opacity: el.style.opacity, tf: { x: el.x + m.tx, y: el.y + m.ty, w: el.w, h: el.h, rot: el.rotation + m.rot }, parts: [{ k: 'image', assetId: el.assetId, x: 0, y: 0, w: el.w, h: el.h }] });
@@ -334,6 +401,11 @@ export function elementBounds(doc: FlowDocument, el: DiagramElement): Rect {
     return { x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 };
   }
   pts = boxCorners(el);
+  if (el.type === 'icon' && el.text && el.labelPos !== 'none') {
+    // include the label, which sits outside the icon's box
+    const { box } = iconLabelLayout(el);
+    pts = pts.concat(boxCorners({ ...el, x: el.x + box.x, y: el.y + box.y, w: box.w, h: box.h, rotation: 0 } as BoxElement));
+  }
   const xs = pts.map((q) => q.x), ys = pts.map((q) => q.y);
   const pad = el.style.strokeWidth;
   return { x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 };

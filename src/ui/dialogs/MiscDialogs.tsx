@@ -94,6 +94,7 @@ export function HelpDialog() {
         <p>Your work autosaves in this browser. <kbd>⌘/Ctrl S</kbd> saves a <code>.flowsketch</code> file you can reopen later with everything editable. Export ▸ Animated GIF renders deterministic frames using the same maths as the preview; PNG, SVG, video and a standalone HTML player are also available.</p>
         <h3>Tips</h3>
         <ul>
+          <li>Icons: press <kbd>⇧ I</kbd> to open the Icons panel, search, then drag an icon onto the canvas or click it.</li>
           <li>Alt-drag duplicates; arrow keys nudge (<kbd>Shift</kbd> ×10); hold <kbd>Space</kbd> to pan; <kbd>⌘/Ctrl</kbd>+scroll or pinch to zoom.</li>
           <li>Format painter (<kbd>F</kbd>): click a shape to pick its style, then click others to apply it.</li>
           <li>Presentation mode (<kbd>⌘/Ctrl ⇧ P</kbd>) hides all chrome and plays fullscreen.</li>

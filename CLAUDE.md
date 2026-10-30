@@ -43,6 +43,7 @@ src/export/      gif.ts + gif.worker.ts · raster.ts · video.ts · staticExport
 src/persistence/ storage.ts (IndexedDB autosave, recents, custom templates) · files.ts (open/save, File System Access + download fallback)
 src/player/      main.ts → built to player.bundle.js (committed), embedded into exported HTML
 src/templates/   samples.ts (7 built-in sample diagrams, generated in code)
+src/icons/       svgToIcon.ts (SVG → icon path data, allowlist only) · sets.ts (built-in icon sets, loading, search)
 ```
 
 ### Rules that must not be broken
@@ -53,7 +54,7 @@ src/templates/   samples.ts (7 built-in sample diagrams, generated in code)
 4. **Static roughness (Style.roughness) and animated squiggle (anim.intensity) are independent settings.**
 5. **Connectors are real relationships** (`Endpoint.elementId` + optional `anchor`), resolved against the *animated* target transform so arrows stay attached while shapes move.
 6. **Rough.js geometry is generated once and cached** (`engine/rough.ts`) per geometry, style and seed. Each frame only transforms or warps it. Don't regenerate paths per frame.
-7. **Imported files are untrusted.** Everything goes through `parseDocument` in `model/schema.ts`: coerce every field, raster-only images (no SVG), detach dangling references, no executable content. Bump `SCHEMA_VERSION` and add a `migrate()` case for any format change.
+7. **Imported files are untrusted.** Everything goes through `parseDocument` in `model/schema.ts`: coerce every field, raster-only images (SVG only ever enters as an **icon**: `svgToIcon` keeps plain geometry and paint, and `sanitizeIconAsset` re-validates icon data on every load), detach dangling references, no executable content. Bump `SCHEMA_VERSION` and add a `migrate()` case for any format change.
 8. **Undo/redo:** use `commit(fn, coalesceKey?)` for discrete edits (rapid slider changes coalesce on the key). Use `begin()` / `live()` / `end()` (or `cancel()`) for drags, so one gesture is one history entry.
 9. **No native `alert` / `confirm` / `prompt`.** They don't work in sandboxed hosts. Use `useUI.getState().ask(message, okLabel)`, which returns `Promise<boolean>` and renders `ConfirmDialog` in `App.tsx`. `confirmDiscard()` is async.
 
@@ -67,6 +68,7 @@ src/templates/   samples.ts (7 built-in sample diagrams, generated in code)
 - **Welcome card** shows only on a fresh empty canvas. It can be dismissed (✕ / "Start with a blank canvas" / picking any drawing tool). File ▸ New diagram always gives a blank canvas with no card.
 - **Swap direction** (`cmd.swapDirection`; Inspector Connector section and Arrange menu) reverses arrows in place: ends trade places, bends reverse, and curvature/label position/offset are mirrored so the route and label stay where they were. One undo step; locked arrows are skipped.
 - **Request ⇄ response arrow pairs** were built and parked on the branch `claude/request-response-arrows` (not merged; it also bumps the file format to v2). Pick it up from there if wanted later.
+- **Icons** (phase 1 of the icon library; plan: research page in the session, phases 2–4 = more built-in sets and user libraries, official AWS/Azure/GCP ZIP import, optional online search). `IconElement` (`iconId`, `sketch`, `labelPos`, `frame`) is a box element: arrows attach (circle frames have a round outline), it animates like shapes, label sits below/right outside its box (`iconLabelLayout`). Vector data lives once per document in `doc.icons` and is pruned on delete; it is copied with copy/paste. Rendering: crisp `path` parts (Path2D on canvas, real `<path>` in SVG), or cached Rough.js `sets` with a matrix when `sketch` is on (one-colour icons only); `currentColor` resolves to `style.stroke`, the frame uses `style.fill`. Built-in sets are Iconify JSON shipped as separate files (`?url`), fetched when the panel first opens; only Tabler for now. Panel: `ui/IconsPanel.tsx`, docked left (`prefs.showIconPanel`, Shift+I), drag type `application/x-flowsketch-icon`. Never ship vendor cloud icons (AWS/Azure/GCP); users import the official ZIPs instead (licence terms).
 - Default arrow animation is the travelling highlight. Glow is drawn as translucent wide strokes, not blur filters, for speed.
 - Live view culls off-screen elements, and the grid is a cached canvas pattern.
 - Theme toggle: the top-bar sun/moon button cycles Light → Dark → System. It is also in View ▸ Theme and Edit ▸ Preferences.
@@ -80,7 +82,7 @@ src/templates/   samples.ts (7 built-in sample diagrams, generated in code)
 
 ## Testing conventions
 
-- Unit tests are in `tests/` (Vitest + jsdom): engine determinism and continuity, connectors, schema round-trip and sanitising, history, tool styles.
+- Unit tests are in `tests/` (Vitest + jsdom): engine determinism and continuity, connectors, schema round-trip and sanitising, icons (`tests/icons.test.ts`: conversion, hostile SVGs, file round-trips, rendering, export, search), history, tool styles.
 - `src/main.tsx` exposes a **read-only** `window.__flowsketch` hook (`doc`, `ui`, `toolStyle`, `frame(t)`, `connectorEnds`, `pause`, `setView`, `benchRender`, `measureFps`, `history`) used by the e2e tests. Keep it working and read-only.
 - Stable test selectors: `data-testid` = `stage`, `play`, `open-sample`, `start-blank`, `gif-export`, `confirm-ok`. Templates use `data-template=<id>`.
 - E2E opens files with `delete window.showOpenFilePicker` so the `<input type=file>` fallback (attached to the DOM in `pickFile`) is exercised.

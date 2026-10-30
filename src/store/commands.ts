@@ -1,6 +1,7 @@
 // Editor commands shared by menus, keyboard shortcuts, toolbar and inspector.
 import type { BoxElement, ConnectorAnim, DiagramElement, FlowDocument, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
-import { DEFAULT_ANIMATION, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
+import { SCHEMA_VERSION } from '../model/types';
+import { DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { useUI } from './uiStore';
 import { contentBounds } from '../engine/render';
@@ -9,12 +10,15 @@ import { openDocumentFile, pickFile, resetFileHandle, saveDocumentFile } from '.
 import { DocumentError, parseDocument, serializeDocument } from '../model/schema';
 import { layoutText } from '../engine/text';
 import { geometryFor } from '../engine/shapes';
+import { loadIconSet } from '../icons/sets';
 
 const D = () => useDoc.getState();
 const U = () => useUI.getState();
 
 // ---- stage geometry (set by the canvas component) ---------------------------
 export const stage = { w: 1200, h: 800 };
+/** Width of the Icons panel docked on the left (CSS uses the same value). */
+export const ICON_PANEL_WIDTH = 290;
 
 export function screenToWorld(sx: number, sy: number) {
   const v = U().view;
@@ -102,7 +106,8 @@ export function copySelection() {
   const els = doc.elements.filter((e) => ids.has(e.id));
   if (!els.length) return false;
   const assets = Object.fromEntries(els.filter((e) => e.type === 'image').map((e) => [(e as { assetId: string }).assetId, doc.assets[(e as { assetId: string }).assetId]]));
-  internalClip = JSON.stringify({ type: CLIP_MIME, elements: els, assets });
+  const icons = Object.fromEntries(els.flatMap((e) => (e.type === 'icon' && doc.icons[e.iconId] ? [[e.iconId, doc.icons[e.iconId]]] : [])));
+  internalClip = JSON.stringify({ type: CLIP_MIME, elements: els, assets, icons });
   internalClipShared = false;
   navigator.clipboard?.writeText(internalClip).then(() => { internalClipShared = true; }, () => undefined);
   return true;
@@ -116,14 +121,14 @@ export async function paste(text?: string) {
     try { const t = await navigator.clipboard?.readText(); if (t && t.includes(CLIP_MIME)) raw = t; else if (t && (!internalClip || internalClipShared)) return pastePlainText(t); } catch { /* permission denied: use internal */ }
   }
   if (!raw) return;
-  let data: { type?: string; elements?: unknown[]; assets?: Record<string, unknown> };
+  let data: { type?: string; elements?: unknown[]; assets?: Record<string, unknown>; icons?: Record<string, unknown> };
   try { data = JSON.parse(raw); } catch { return pastePlainText(raw); }
   if (data.type !== CLIP_MIME || !Array.isArray(data.elements)) return pastePlainText(raw);
   // run through the same sanitiser as files
-  const { doc: parsed } = parseDocument({ format: 'flowsketch', schemaVersion: 1, elements: data.elements, assets: data.assets ?? {} });
+  const { doc: parsed } = parseDocument({ format: 'flowsketch', schemaVersion: SCHEMA_VERSION, elements: data.elements, assets: data.assets ?? {}, icons: data.icons ?? {} });
   const doc = D().doc;
   const clones = cloneElements(doc, parsed.elements, 24, 24);
-  D().commit((d) => ({ ...d, assets: { ...d.assets, ...parsed.assets }, elements: [...d.elements, ...clones] }));
+  D().commit((d) => ({ ...d, assets: { ...d.assets, ...parsed.assets }, icons: { ...parsed.icons, ...d.icons }, elements: [...d.elements, ...clones] }));
   U().setTool('select');
   U().select(clones.map((c) => c.id));
 }
@@ -177,7 +182,7 @@ export function pasteStyle() {
 /** Make the selected object's look the default for its tool. */
 /** The remembered-style key of the tool that draws this kind of element. */
 export function toolKeyFor(e: DiagramElement): string | null {
-  return e.type === 'shape' ? styleKey('shape', e.shape) : e.type === 'connector' ? (e.endHead === 'none' && e.startHead === 'none' ? 'line' : 'arrow') : e.type === 'freehand' ? (e.highlighter ? 'highlighter' : 'freehand') : e.type === 'text' ? 'text' : null;
+  return e.type === 'icon' ? 'icon' : e.type === 'shape' ? styleKey('shape', e.shape) : e.type === 'connector' ? (e.endHead === 'none' && e.startHead === 'none' ? 'line' : 'arrow') : e.type === 'freehand' ? (e.highlighter ? 'highlighter' : 'freehand') : e.type === 'text' ? 'text' : null;
 }
 
 /** Copy style changes made on selected objects into their tools' defaults (Excalidraw-like "current item style"). */
@@ -329,6 +334,26 @@ export async function insertImage(file?: File, at?: { x: number; y: number }) {
     U().setTool('select');
     U().select([el.id]);
   } catch (e) { U().toast((e as Error).message || 'Could not insert the image.', 'error'); }
+}
+
+export const toggleIconPanel = () => U().updatePrefs({ showIconPanel: !U().prefs.showIconPanel });
+
+/** Size of a newly placed icon (world units). */
+export const ICON_SIZE = 56;
+
+/** Place an icon from a built-in set: at `at` (a drop point) or in the middle of the visible canvas. */
+export async function insertIcon(setId: string, name: string, at?: { x: number; y: number }) {
+  try {
+    const icon = (await loadIconSet(setId)).icon(name);
+    if (!icon) { U().toast(`The icon “${name}” could not be loaded.`, 'error'); return; }
+    // keep clear of the Icons panel on the left when placing in the middle
+    const c = at ?? screenToWorld((stage.w + (U().prefs.showIconPanel ? ICON_PANEL_WIDTH : 0)) / 2, stage.h / 2);
+    const el = makeIcon(icon.id, c.x - ICON_SIZE / 2, c.y - ICON_SIZE / 2, ICON_SIZE, U().toolStyle('icon'));
+    D().commit((d) => ({ ...d, icons: { ...d.icons, [icon.id]: d.icons[icon.id] ?? icon }, elements: [...d.elements, el] }));
+    U().setTool('select');
+    U().select([el.id]);
+    U().pushRecentIcon(`${setId}:${name}`);
+  } catch (e) { U().toast((e as Error).message || 'Could not load the icon.', 'error'); }
 }
 
 /** Grow a shape so its label fits (auto expansion). */

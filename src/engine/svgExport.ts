@@ -13,8 +13,15 @@ function fontAttrs(font: string): string {
   return `font-family="${esc(m[4])}" font-size="${m[3]}" font-weight="${m[2]}"${m[1] ? ' font-style="italic"' : ''}`;
 }
 
+const mtx = (m: number[]) => `matrix(${m.map(n).join(' ')})`;
+
 function partSvg(p: Part, assets: Record<string, Asset>, defs: Set<string>): string {
+  if (p.k === 'sets' && p.m) { const inner = partSvg({ ...p, m: undefined }, assets, defs); return inner ? `<g transform="${mtx(p.m)}">${inner}</g>` : ''; }
   switch (p.k) {
+    case 'path': {
+      if (!p.fill && !(p.stroke && p.width > 0)) return '';
+      return `<path d="${esc(p.d)}" transform="${mtx(p.m)}" fill="${p.fill ? esc(p.fill) : 'none'}"${p.evenodd ? ' fill-rule="evenodd"' : ''}${p.stroke && p.width > 0 ? ` stroke="${esc(p.stroke)}" stroke-width="${n(p.width)}" stroke-linecap="${p.cap}" stroke-linejoin="${p.join}"` : ''}${p.alpha < 1 ? ` opacity="${n(p.alpha)}"` : ''}/>`;
+    }
     case 'sets': {
       let s = '';
       for (const set of p.sets) {

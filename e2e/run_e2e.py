@@ -255,6 +255,47 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tesc()
 
+        @test('Icons: Shift+I opens the panel; search, drag and click add icons; arrows attach')
+        def ticons():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
+            app.key('Shift+I')
+            page.wait_for_selector('.icon-cell')
+            page.get_by_label('Search icons').fill('database')
+            cell = page.locator('.icon-cell[data-icon="tabler:database"]')
+            assert cell.count() == 1
+            stage = page.get_by_test_id('stage')
+            box = stage.bounding_box()
+            x, y = app.pt(5500, 5200)
+            cell.drag_to(stage, target_position={'x': x - box['x'], 'y': y - box['y']})
+            page.wait_for_timeout(100)
+            db = app.els('icon')[-1]
+            assert db['iconId'] == 'tabler:database', db
+            assert abs(db['x'] + db['w'] / 2 - 5500) < 2 and abs(db['y'] + db['h'] / 2 - 5200) < 2, (db['x'], db['y'])
+            page.get_by_label('Search icons').fill('server')
+            page.locator('.icon-cell[data-icon="tabler:server"]').click(); page.wait_for_timeout(100)
+            srv = app.els('icon')[-1]
+            assert srv['iconId'] == 'tabler:server'
+            doc = app.doc()
+            assert set(doc['icons']) >= {'tabler:database', 'tabler:server'}
+            assert doc['icons']['tabler:database']['parts'], 'icon data missing from the document'
+            # label the database icon (double-click), then connect server -> database
+            app.key('Escape')
+            app.click((5500, 5200), count=2); page.wait_for_selector('.text-editor')
+            page.keyboard.type('Orders DB'); page.keyboard.press('Escape'); page.wait_for_timeout(80)
+            assert [e for e in app.els('icon') if e['id'] == db['id']][0]['text'] == 'Orders DB'
+            app.key('a'); app.drag((srv['x'] + 28, srv['y'] + 28), (5500, 5200)); app.key('Escape')
+            c = app.els('connector')[-1]
+            assert c['start']['elementId'] == srv['id'] and c['end']['elementId'] == db['id'], (c['start'], c['end'])
+            # the icons stay (later save/export tests then cover them); the arrow is undone so tests that use "the last arrow" are unaffected
+            app.key('Control+z'); page.wait_for_timeout(80)
+            assert not [e for e in app.els('connector') if e['id'] == c['id']]
+            app.key('Shift+I')
+            assert page.locator('.icons-panel').count() == 0, 'Shift+I should close the panel'
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        ticons()
+
         @test('Swap direction: the Inspector button reverses an arrow; one undo restores it')
         def tswap():
             app.key('Escape')
@@ -362,7 +403,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 1
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 2
             assert len(data['elements']) == len(app.els())
         t7()
 

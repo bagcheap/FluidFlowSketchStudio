@@ -23,6 +23,8 @@ export interface Prefs {
   suspendWhileDragging: boolean;
   autoplay: boolean;
   selectionUpdatesDefaults: boolean;
+  showIconPanel: boolean; // the Icons panel docked on the left
+  recentIcons: string[]; // "<set>:<name>", most recent first
 }
 
 const PREFS_KEY = 'flowsketch.prefs.v1';
@@ -41,6 +43,8 @@ const DEFAULT_PREFS: Prefs = {
   suspendWhileDragging: true,
   autoplay: true,
   selectionUpdatesDefaults: true,
+  showIconPanel: false,
+  recentIcons: [],
 };
 
 function loadPrefs(): Prefs {
@@ -90,6 +94,7 @@ interface UIActions {
   toolStyle(key?: string): ToolStyle;
   setToolStyle(key: string, s: ToolStyle): void;
   pushRecentColor(c: string): void;
+  pushRecentIcon(key: string): void;
   toast(text: string, kind?: Toast['kind'], action?: Toast['action']): void;
   dismissToast(id: number): void;
   setHint(h: string | null): void;
@@ -150,6 +155,9 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   pushRecentColor(c) {
     const rc = [c, ...get().prefs.recentColors.filter((x) => x !== c)].slice(0, 8);
     get().updatePrefs({ recentColors: rc });
+  },
+  pushRecentIcon(key) {
+    get().updatePrefs({ recentIcons: [key, ...get().prefs.recentIcons.filter((x) => x !== key)].slice(0, 15) });
   },
   toast(text, kind = 'info', action) {
     const id = ++toastId;

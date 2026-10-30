@@ -6,7 +6,7 @@ import { useUI } from '../store/uiStore';
 import { geometryFor } from '../engine/shapes';
 import { cssFont } from '../engine/text';
 import { connectorPath, pointAt } from '../engine/connectors';
-import { makeLookup } from '../engine/render';
+import { iconLabelLayout, makeLookup } from '../engine/render';
 
 export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p: Point) => Point; onDone: (id: string, text: string) => void }) {
   const doc = useDoc((s) => s.doc);
@@ -41,6 +41,14 @@ export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p:
     const w = Math.max(120, (text.length + 2) * ts.fontSize * 0.6) * z;
     outer = { left: c.x - w / 2, top: c.y - (lines * lh * z) / 2, width: w, height: lines * lh * z };
     inner = { ...common, left: 0, top: 0, width: '100%', height: '100%', textAlign: 'center', background: 'var(--canvas-chip)' };
+  } else if (el.type === 'icon') {
+    // the label sits below (or right of) the icon; a hidden label is edited below and shown there
+    const { box } = iconLabelLayout({ ...el, labelPos: el.labelPos === 'right' ? 'right' : 'below' }, text);
+    const s = toScreen({ x: el.x, y: el.y });
+    outer = { left: s.x, top: s.y, width: el.w * z, height: el.h * z, transform: `rotate(${el.rotation}deg)`, transformOrigin: 'center' };
+    const w = Math.max(120, box.w + 40);
+    const left = el.labelPos === 'right' ? box.x : el.w / 2 - w / 2;
+    inner = { ...common, left: left * z, top: (box.y + ts.padding) * z, width: w * z, height: lines * lh * z + 4, textAlign: el.labelPos === 'right' ? 'left' : 'center' };
   } else {
     const tb = el.type === 'shape' ? geometryFor(el).textBox : { x: 0, y: 0, w: Math.max(el.w, 200), h: el.h };
     const s = toScreen({ x: el.x, y: el.y });

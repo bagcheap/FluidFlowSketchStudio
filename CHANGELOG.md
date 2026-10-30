@@ -4,6 +4,16 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.3] - 2026-10-30
+
+### Added
+- **Icons:** an Icons panel on the left (toolbar button, Insert ▸ Icons, or Shift+I) with the 6,257 Tabler Icons. Search by name, then drag an icon onto the canvas or click to add it. Recently used icons are listed first.
+- Icons work like shapes: arrows attach to them, they can have a label (below or to the right), and they float and wobble with the animation. In the Inspector you can recolour them, draw them hand-drawn, and give them a circle or square background.
+- Icons stay sharp at any zoom and in every export, and are saved inside the .flowsketch file, so diagrams open anywhere.
+
+### Changed
+- Files now use format version 2. Older files open as before, but files saved with this version need FlowSketch 0.1.3 or later.
+
 ## [0.1.2] - 2026-10-29
 
 ### Added
