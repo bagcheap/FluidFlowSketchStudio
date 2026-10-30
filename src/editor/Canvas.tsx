@@ -12,7 +12,7 @@ import { connectorPath } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, hitTest, portAnchors, portPositions } from './hitTest';
-import { applyStyle, cloneElements, expandGroups, fitShapeToText, insertIcon, insertImage, stage, styleOf, zoomAt } from '../store/commands';
+import { applyStyle, cloneElements, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
 
@@ -656,7 +656,11 @@ export function Canvas() {
     e.preventDefault();
     const icon = e.dataTransfer.getData(ICON_DRAG_TYPE); // "<set>:<name>" dragged from the Icons panel
     if (icon) { const i = icon.indexOf(':'); void insertIcon(icon.slice(0, i), icon.slice(i + 1), toWorldPt(e)); return; }
-    const f = e.dataTransfer.files?.[0];
+    const files = [...(e.dataTransfer.files ?? [])];
+    const svgs = files.filter((f) => f.type === 'image/svg+xml' || /\.svg$/i.test(f.name));
+    if (svgs.length) { void dropSvgIcons(svgs, toWorldPt(e)); return; }
+    if (files.some((f) => /\.flowsketchlib$/i.test(f.name))) { void importIconLibraryFiles(files); return; }
+    const f = files[0];
     if (!f) return;
     if (f.type.startsWith('image/')) void insertImage(f, toWorldPt(e));
     else window.dispatchEvent(new CustomEvent('flowsketch:openfile', { detail: f }));

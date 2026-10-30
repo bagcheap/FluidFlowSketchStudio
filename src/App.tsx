@@ -19,6 +19,7 @@ import { ImageDialog, SvgDialog, VideoDialog } from './ui/dialogs/ExportDialogs'
 import { AboutDialog, AnimationDialog, DocPropsDialog, HelpDialog, PrefsDialog, RecentDialog, ShapesDialog, ShortcutsDialog, TemplatesDialog, WhatsNewDialog } from './ui/dialogs/MiscDialogs';
 import { SAMPLES, STARTER_ID } from './templates/samples';
 import { Modal } from './ui/dialogs/Modal';
+import { IconLibrariesDialog } from './ui/dialogs/IconLibrariesDialog';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -125,6 +126,7 @@ function Dialogs() {
     case 'help': return <HelpDialog />;
     case 'about': return <AboutDialog />;
     case 'whatsnew': return <WhatsNewDialog />;
+    case 'iconlibs': return <IconLibrariesDialog />;
     case 'prefs': return <PrefsDialog />;
     case 'docprops': return <DocPropsDialog />;
     case 'recent': return <RecentDialog />;

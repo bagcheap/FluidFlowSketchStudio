@@ -7,7 +7,7 @@ import { defaultToolStyle, styleKey, type ToolId } from '../model/defaults';
 export type Theme = 'light' | 'dark' | 'system';
 export type DialogId =
   | null | 'gif' | 'image' | 'svg' | 'video' | 'animation' | 'shortcuts' | 'help' | 'templates'
-  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes' | 'whatsnew';
+  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes' | 'whatsnew' | 'iconlibs';
 
 export interface Prefs {
   toolStyles: Record<string, ToolStyle>;
@@ -25,6 +25,7 @@ export interface Prefs {
   selectionUpdatesDefaults: boolean;
   showIconPanel: boolean; // the Icons panel docked on the left
   recentIcons: string[]; // "<set>:<name>", most recent first
+  hiddenIconSets: string[]; // built-in icon sets switched off in Manage icon libraries
 }
 
 const PREFS_KEY = 'flowsketch.prefs.v1';
@@ -45,6 +46,7 @@ const DEFAULT_PREFS: Prefs = {
   selectionUpdatesDefaults: true,
   showIconPanel: false,
   recentIcons: [],
+  hiddenIconSets: [],
 };
 
 function loadPrefs(): Prefs {

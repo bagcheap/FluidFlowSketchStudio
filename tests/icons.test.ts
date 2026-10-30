@@ -9,7 +9,7 @@ import { frameToSvg } from '../src/engine/svgExport';
 import type { FlowDocument, IconElement } from '../src/model/types';
 
 const meta = { id: 'test:x', name: 'x', set: 'Test', license: 'MIT' };
-const tabler = iconSetFromJSON({ id: 'tabler', name: 'Tabler Icons', license: 'MIT', url: '' }, JSON.parse(tablerRaw));
+const tabler = iconSetFromJSON({ id: 'tabler', name: 'Tabler Icons', group: 'General', license: 'MIT' }, JSON.parse(tablerRaw));
 
 function iconDoc(opts: Partial<IconElement> = {}): { doc: FlowDocument; el: IconElement } {
   const icon = tabler.icon('database')!;
@@ -43,8 +43,10 @@ describe('SVG → icon conversion', () => {
       <path d="M2 2h4" fill="url(javascript:alert(1))" stroke="expression(alert(1))"/>
     </svg>`;
     const ic = svgToIcon(evil, meta);
-    expect(ic.parts).toHaveLength(1); // only the red line; the last path's paint was unsafe, so it draws nothing and is dropped
-    expect(ic.parts[0]).toMatchObject({ d: 'M1 1L23 23', stroke: 'red', strokeWidth: 3 });
+    // only the red line survives: once itself, once through <use href="#p"> (a reference inside the same file);
+    // the last path's paint was unsafe, so it draws nothing and is dropped
+    expect(ic.parts).toHaveLength(2);
+    for (const p of ic.parts) expect(p).toMatchObject({ d: 'M1 1L23 23', stroke: 'red', strokeWidth: 3 });
     const json = JSON.stringify(ic);
     for (const bad of ['script', 'javascript', 'href', 'onload', 'onclick', 'alert', 'evil', 'expression', 'htc']) expect(json).not.toContain(bad);
   });
@@ -55,7 +57,8 @@ describe('SVG → icon conversion', () => {
       <circle cx="20" cy="20" r="3" fill="#00ff00"/><polygon points="10,10 12,10 11,12"/><line x1="10" y1="10" x2="30" y2="30" stroke="blue"/></svg>`, meta);
     expect(ic.w).toBe(20);
     expect(ic.parts.map((p) => p.d.slice(0, 1))).toEqual(['M', 'M', 'M', 'M']);
-    expect(ic.parts[0]).toMatchObject({ fill: '#ff0000', m: [2, 0, 0, 2, -8, -7] }); // translate(-10,-10) · translate(2,3) · scale(2)
+    expect(ic.parts[0]).toMatchObject({ m: [2, 0, 0, 2, -8, -7], bbox: [10, 10, 4, 4] }); // translate(-10,-10) · translate(2,3) · scale(2)
+    expect(ic.parts[0].fill).toMatchObject({ type: 'linear', bbox: true, x1: 0, x2: 1, stops: [{ offset: 0, color: '#ff0000', opacity: 1 }] });
     expect(ic.parts[1].fill).toBe('#00ff00');
     expect(ic.parts[2].fill).toBe('#000000'); // SVG's default fill
     expect(ic.parts[3]).toMatchObject({ stroke: 'blue', fill: '#000000' });

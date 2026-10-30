@@ -188,16 +188,30 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 2; // v2: icons (IconElement + FlowDocument.icons)
+export const SCHEMA_VERSION = 3; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).
  * Icons are converted from SVG to these on import; nothing else from the SVG is kept.
  */
+/** A gradient fill (linear or radial), kept as data and drawn by FlowSketch itself. */
+export interface IconGradient {
+  type: 'linear' | 'radial';
+  bbox: boolean; // coordinates are fractions of the part's bounding box (SVG's default "objectBoundingBox")
+  x1: number; y1: number; x2: number; y2: number; // linear
+  cx: number; cy: number; r: number; fx: number; fy: number; // radial
+  stops: { offset: number; color: string; opacity: number }[];
+  m?: [number, number, number, number, number, number]; // gradientTransform
+}
+
+/** A paint: a colour, 'currentColor' (follows the element's colour), a gradient, or null for none. */
+export type IconPaint = string | IconGradient | null;
+
 export interface IconPart {
   d: string;
-  fill: string | null; // a colour, 'currentColor' (follows the element's colour) or null for none
-  stroke: string | null;
+  fill: IconPaint;
+  stroke: IconPaint;
+  bbox?: [number, number, number, number]; // x, y, w, h of the path in its own units (for bounding-box gradients)
   strokeWidth: number;
   linecap: 'butt' | 'round' | 'square';
   linejoin: 'miter' | 'round' | 'bevel';

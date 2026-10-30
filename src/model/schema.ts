@@ -1,7 +1,7 @@
 // Validation, sanitisation and migration for .flowsketch files.
 // Every imported value is coerced into a known-safe shape; nothing is executed.
 import type {
-  Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, IconAsset, IconPart, ShapeAnim, ShapeKind, Style, TextStyle,
+  Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, IconAsset, IconGradient, IconPaint, IconPart, ShapeAnim, ShapeKind, Style, TextStyle,
 } from './types';
 import { SCHEMA_VERSION } from './types';
 import { DEFAULT_ANIMATION, DEFAULT_CONNECTOR_ANIM, DEFAULT_SHAPE_ANIM, DEFAULT_STYLE, DEFAULT_TEXT, newDocument, newSeed, uid } from './defaults';
@@ -183,7 +183,8 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
 
 const DATA_URL_RE = /^data:(image\/(png|jpeg|gif|webp));base64,[A-Za-z0-9+/=]+$/;
 
-function asset(v: unknown): Asset | null {
+/** A raster image (PNG, JPEG, GIF, WebP data URL); null for anything else, including SVG. */
+export function sanitizeAsset(v: unknown): Asset | null {
   if (!isObj(v) || typeof v.dataUrl !== 'string') return null;
   const m = DATA_URL_RE.exec(v.dataUrl);
   if (!m || v.dataUrl.length > MAX_ASSET_BYTES * 1.4) return null;
@@ -201,7 +202,27 @@ function asset(v: unknown): Asset | null {
 // and paint. This check runs on every icon, both after conversion and when a file is opened.
 export const MAX_ICON_PARTS = 500;
 const PATH_D_RE = /^[MmZzLlHhVvCcSsQqTtAa0-9eE+\-.,\s]+$/;
-const iconPaint = (v: unknown): string | null => {
+const finite6 = (v: unknown) => Array.isArray(v) && v.length === 6 && v.every((n) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < 1e6);
+
+function iconGradient(o: Obj): IconGradient | null {
+  const stops = (Array.isArray(o.stops) ? o.stops : []).filter(isObj).slice(0, 32)
+    .map((s) => ({ offset: num(s.offset, 0, 0, 1), color: iconColor(s.color) ?? '', opacity: num(s.opacity, 1, 0, 1) }))
+    .filter((s) => s.color && s.color !== 'currentColor');
+  if (!stops.length) return null;
+  const c = (v: unknown, d: number) => num(v, d, -1e5, 1e5);
+  return {
+    type: oneOf(o.type, ['linear', 'radial'] as const, 'linear'),
+    bbox: bool(o.bbox, true),
+    x1: c(o.x1, 0), y1: c(o.y1, 0), x2: c(o.x2, 1), y2: c(o.y2, 0),
+    cx: c(o.cx, 0.5), cy: c(o.cy, 0.5), r: num(o.r, 0.5, 0, 1e5), fx: c(o.fx, num(o.cx, 0.5)), fy: c(o.fy, num(o.cy, 0.5)),
+    stops,
+    ...(finite6(o.m) ? { m: [...(o.m as number[])] as IconGradient['m'] } : {}),
+  };
+}
+
+const iconPaint = (v: unknown): IconPaint => (isObj(v) ? iconGradient(v) : iconColor(v));
+
+const iconColor = (v: unknown): string | null => {
   if (v === null || v === undefined || v === 'none') return null;
   if (v === 'currentColor') return 'currentColor';
   if (typeof v !== 'string') return null;
@@ -210,9 +231,9 @@ const iconPaint = (v: unknown): string | null => {
 };
 
 function iconPart(v: unknown): IconPart | null {
-  if (!isObj(v) || typeof v.d !== 'string' || v.d.length > 50000 || !PATH_D_RE.test(v.d)) return null;
-  const m = Array.isArray(v.m) && v.m.length === 6 && v.m.every((n) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < 1e6)
-    ? (v.m as IconPart['m']) : undefined;
+  if (!isObj(v) || typeof v.d !== 'string' || v.d.length > 200000 || !PATH_D_RE.test(v.d)) return null;
+  const m = finite6(v.m) ? (v.m as IconPart['m']) : undefined;
+  const bb = Array.isArray(v.bbox) && v.bbox.length === 4 && v.bbox.every((n) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < 1e6) ? v.bbox as number[] : null;
   return {
     d: v.d,
     fill: iconPaint(v.fill),
@@ -223,6 +244,7 @@ function iconPart(v: unknown): IconPart | null {
     evenodd: bool(v.evenodd, false),
     opacity: num(v.opacity, 1, 0, 1),
     ...(m ? { m: [...m] as IconPart['m'] } : {}),
+    ...(bb ? { bbox: [bb[0], bb[1], Math.max(0, bb[2]), Math.max(0, bb[3])] as IconPart['bbox'] } : {}),
   };
 }
 
@@ -232,7 +254,7 @@ export function sanitizeIconAsset(v: unknown, id: string): IconAsset | null {
   // parts left with no fill and no stroke (e.g. their paint was unsafe) draw nothing and are dropped
   const parts = v.parts.slice(0, MAX_ICON_PARTS).map(iconPart).filter((p): p is IconPart => !!p && (p.fill !== null || p.stroke !== null));
   if (!parts.length) return null;
-  const isMono = (c: string | null) => c === null || c === 'currentColor';
+  const isMono = (c: IconPaint) => c === null || c === 'currentColor';
   return {
     id: id.slice(0, 140),
     name: str(v.name, id, 100),
@@ -261,6 +283,10 @@ export function migrate(raw: Obj): Obj {
   if (version === 1) {
     // v1 -> v2: adds icons (IconElement + FlowDocument.icons); nothing to convert
     version = 2;
+  }
+  if (version === 2) {
+    // v2 -> v3: icon parts may have gradient paints and a bbox; nothing to convert
+    version = 3;
   }
   raw.schemaVersion = version;
   return raw;
@@ -323,7 +349,7 @@ export function parseDocument(input: string | unknown): ParseResult {
   // assets
   if (isObj(o.assets)) {
     for (const [k, v] of Object.entries(o.assets).slice(0, 500)) {
-      const a = asset(v);
+      const a = sanitizeAsset(v);
       if (a) doc.assets[k] = { ...a, id: k }; else warn(`Dropped an image asset that was not a safe raster image (${k}).`);
     }
   }
