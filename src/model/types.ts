@@ -155,7 +155,17 @@ export interface ConnectorElement extends ElementBase {
   anim?: Partial<ConnectorAnim>;
 }
 
-export type BoxElement = ShapeElement | TextElement | FreehandElement | ImageElement;
+/** An icon placed on the canvas. Its vector data lives once per document in FlowDocument.icons. */
+export interface IconElement extends ElementBase {
+  type: 'icon';
+  iconId: string; // key into FlowDocument.icons, e.g. "tabler:database"
+  sketch: boolean; // draw one-colour icons hand-drawn (Rough.js) instead of crisp
+  labelPos: 'below' | 'right' | 'none'; // where the text label sits
+  frame: 'none' | 'circle' | 'square'; // optional background drawn behind the icon (style.fill / style.stroke)
+  anim?: Partial<ShapeAnim>;
+}
+
+export type BoxElement = ShapeElement | TextElement | FreehandElement | ImageElement | IconElement;
 export type DiagramElement = BoxElement | ConnectorElement;
 
 export interface Asset {
@@ -178,7 +188,34 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2; // v2: icons (IconElement + FlowDocument.icons)
+
+/**
+ * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).
+ * Icons are converted from SVG to these on import; nothing else from the SVG is kept.
+ */
+export interface IconPart {
+  d: string;
+  fill: string | null; // a colour, 'currentColor' (follows the element's colour) or null for none
+  stroke: string | null;
+  strokeWidth: number;
+  linecap: 'butt' | 'round' | 'square';
+  linejoin: 'miter' | 'round' | 'bevel';
+  evenodd: boolean;
+  opacity: number;
+  m?: [number, number, number, number, number, number]; // SVG transform matrix (a b c d e f)
+}
+
+export interface IconAsset {
+  id: string; // "<set>:<name>"
+  name: string;
+  set: string; // human-readable set name, e.g. "Tabler Icons"
+  license: string; // SPDX id, e.g. "MIT"
+  w: number; // viewBox width
+  h: number;
+  parts: IconPart[];
+  mono: boolean; // every colour is currentColor/none: the icon can be recoloured and sketched
+}
 
 export interface FlowDocument {
   format: 'flowsketch';
@@ -191,6 +228,7 @@ export interface FlowDocument {
   animation: AnimationSettings;
   elements: DiagramElement[]; // array order = z-order (last on top)
   assets: Record<string, Asset>;
+  icons: Record<string, IconAsset>; // vector data of the icons used in this document
   toolDefaults?: Record<string, ToolStyle>;
   exportPrefs: ExportPrefs;
 }

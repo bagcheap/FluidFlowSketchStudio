@@ -1,5 +1,5 @@
 import type {
-  AnimationSettings, ConnectorAnim, ConnectorElement, DiagramElement, FlowDocument, ShapeAnim,
+  AnimationSettings, ConnectorAnim, ConnectorElement, DiagramElement, FlowDocument, IconElement, ShapeAnim,
   ShapeElement, ShapeKind, Style, TextElement, TextStyle, ToolStyle, Endpoint,
 } from './types';
 import { SCHEMA_VERSION } from './types';
@@ -113,6 +113,7 @@ export function newDocument(title = 'Untitled diagram'): FlowDocument {
     animation: structuredClone(DEFAULT_ANIMATION),
     elements: [],
     assets: {},
+    icons: {},
     exportPrefs: { gifWidth: 1280, gifFps: 15, padding: 40 },
   };
 }
@@ -156,6 +157,15 @@ export function makeConnector(start: Endpoint, end: Endpoint, tool: ToolStyle): 
   };
 }
 
+export function makeIcon(iconId: string, x: number, y: number, size: number, tool: ToolStyle): IconElement {
+  return {
+    ...baseFields(tool), type: 'icon', iconId, x, y, w: size, h: size,
+    sketch: false, labelPos: 'below', frame: 'none',
+    textStyle: { ...tool.textStyle, padding: 2 },
+    ...(tool.shapeAnim && Object.keys(tool.shapeAnim).length ? { anim: { ...tool.shapeAnim } } : {}),
+  };
+}
+
 export const isConnector = (e: DiagramElement): e is ConnectorElement => e.type === 'connector';
 
 // ---- Tool defaults ---------------------------------------------------------
@@ -183,6 +193,9 @@ export function defaultToolStyle(key: string): ToolStyle {
   } else if (key === 'highlighter') {
     s.style = { ...s.style, fillStyle: 'none', stroke: '#facc15', strokeWidth: 18, opacity: 0.45 };
     s.shapeAnim = { mode: 'off' };
+  } else if (key === 'icon') {
+    s.style = { ...s.style, stroke: '#1e1e2e', fill: '#ffffff', fillStyle: 'solid', strokeWidth: 1.5 };
+    s.textStyle = { ...s.textStyle, fontSize: 15, vAlign: 'top' };
   } else if (key === 'text') {
     s.style = { ...s.style, fillStyle: 'none' };
     s.textStyle = { ...s.textStyle, align: 'left', vAlign: 'top' };

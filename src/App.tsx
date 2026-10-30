@@ -4,6 +4,7 @@ import { Canvas } from './editor/Canvas';
 import { TopBar } from './ui/TopBar';
 import { Toolbar } from './ui/Toolbar';
 import { Inspector } from './ui/Inspector';
+import { IconsPanel } from './ui/IconsPanel';
 import { Timeline } from './ui/Timeline';
 import { useShortcuts } from './ui/shortcuts';
 import { useDoc } from './store/docStore';
@@ -140,6 +141,7 @@ export function App() {
   const presentation = useUI((s) => s.presentation);
   const showInspector = useUI((s) => s.prefs.showInspector);
   const showTimeline = useUI((s) => s.prefs.showTimeline);
+  const showIcons = useUI((s) => s.prefs.showIconPanel);
   const [sheet, setSheet] = useState(false); // small screens: inspector as a toggleable bottom sheet
 
   useEffect(() => {
@@ -172,12 +174,13 @@ export function App() {
 
   return (
     <ErrorBoundary>
-      <div className={`app ${presentation ? 'presenting' : ''} ${showInspector ? '' : 'no-inspector'} ${showTimeline ? '' : 'no-timeline'} ${sheet ? 'sheet-open' : ''}`}>
+      <div className={`app ${presentation ? 'presenting' : ''} ${showInspector ? '' : 'no-inspector'} ${showTimeline ? '' : 'no-timeline'} ${sheet ? 'sheet-open' : ''} ${showIcons && !presentation ? 'icons-open' : ''}`}>
         {!presentation && <TopBar />}
         <main className="workspace">
           <Canvas />
           {!presentation && <Toolbar />}
           {!presentation && <Welcome />}
+          {!presentation && showIcons && <IconsPanel />}
           {!presentation && showInspector && <Inspector />}
           {!presentation && showInspector && (
             <button className="sheet-toggle no-canvas" aria-expanded={sheet} aria-label="Show properties" onClick={() => setSheet(!sheet)}>

@@ -12,7 +12,8 @@ import { connectorPath } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, hitTest, portAnchors, portPositions } from './hitTest';
-import { applyStyle, cloneElements, expandGroups, fitShapeToText, insertImage, stage, styleOf, zoomAt } from '../store/commands';
+import { applyStyle, cloneElements, expandGroups, fitShapeToText, insertIcon, insertImage, stage, styleOf, zoomAt } from '../store/commands';
+import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
 
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -653,6 +654,8 @@ export function Canvas() {
   // ---- drag & drop files ----------------------------------------------------------------
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    const icon = e.dataTransfer.getData(ICON_DRAG_TYPE); // "<set>:<name>" dragged from the Icons panel
+    if (icon) { const i = icon.indexOf(':'); void insertIcon(icon.slice(0, i), icon.slice(i + 1), toWorldPt(e)); return; }
     const f = e.dataTransfer.files?.[0];
     if (!f) return;
     if (f.type.startsWith('image/')) void insertImage(f, toWorldPt(e));
@@ -754,7 +757,8 @@ export function Canvas() {
         }
         if (el.type === 'text' && !text.trim()) { D.commit((d) => deleteElements(d, new Set([id]))); useUI.getState().select([]); return; }
         if (text === el.text) return;
-        D.commit((d) => mapElements(d, [id], (x) => fitShapeToText({ ...x, text } as DiagramElement)));
+        // typing a label on an icon whose label is hidden shows it
+        D.commit((d) => mapElements(d, [id], (x) => fitShapeToText({ ...x, text, ...(x.type === 'icon' && x.labelPos === 'none' && text.trim() ? { labelPos: 'below' } : {}) } as DiagramElement)));
       }} />}
     </div>
   );

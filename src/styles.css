@@ -108,6 +108,21 @@ code { font-size: 12px; }
 /* ---------- toolbar ---------- */
 .toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 5px; background: var(--panel); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); z-index: 20; }
 .app:not(.no-inspector) .toolbar { left: calc(50% - 150px); }
+/* Icons panel, docked on the left (width matches ICON_PANEL_WIDTH in commands.ts) */
+.icons-panel { position: absolute; top: 12px; left: 12px; bottom: 12px; width: 266px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); z-index: 15; overflow: hidden; }
+.ip-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 10px 8px 14px; gap: 8px; }
+.ip-search { margin: 0 12px 6px; }
+.ip-scroll { overflow-y: auto; flex: 1; padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
+.ip-sec { display: flex; flex-direction: column; gap: 6px; }
+.ip-sec h3 { margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--fg-3); }
+.ip-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; }
+.icon-cell { aspect-ratio: 1; display: grid; place-items: center; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--fg); cursor: grab; padding: 0; }
+.icon-cell:hover, .icon-cell:focus-visible { background: var(--accent-soft); border-color: var(--line); }
+.icon-cell:active { cursor: grabbing; }
+.ip-msg { color: var(--fg-2); font-size: 12.5px; margin: 0; }
+.ip-more { align-self: center; margin-top: 4px; }
+.app.icons-open .toolbar { left: calc(50% + 130px); }
+.app.icons-open:not(.no-inspector) .toolbar { left: calc(50% - 10px); }
 .tb-btn { position: relative; width: 38px; height: 38px; border-radius: 9px; border: 0; background: none; color: var(--fg-2); display: inline-flex; align-items: center; justify-content: center; }
 .tb-btn:hover { background: var(--panel-2); color: var(--fg); }
 .tb-btn.active { background: var(--accent-soft); color: var(--accent); }
@@ -291,6 +306,7 @@ code { font-size: 12px; }
 }
 @media (max-width: 900px) {
   .inspector { width: 250px; }
+  .app.icons-open:not(.no-inspector) .toolbar { left: calc(50% + 10px); }
   .app:not(.no-inspector) .toolbar { left: calc(50% - 125px); }
   .brand-name, .topbar-right .btn.ghost { display: none; }
   .export-grid, .cols2 { grid-template-columns: 1fr; }
@@ -303,6 +319,7 @@ code { font-size: 12px; }
   .tb-key { display: none; }
   .inspector { display: none; top: auto; left: 8px; right: 8px; width: auto; height: 46%; bottom: 66px; }
   .app.sheet-open .inspector { display: flex; }
+  .icons-panel { top: 8px; left: 8px; right: 8px; width: auto; bottom: auto; height: 46%; z-index: 25; }
   .sheet-toggle { display: flex; position: absolute; right: 12px; bottom: 12px; z-index: 25; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); align-items: center; justify-content: center; color: var(--fg); }
   .app.sheet-open .sheet-toggle { bottom: calc(46% + 74px); }
   .topbar .menubar-btn { padding: 6px 5px; }

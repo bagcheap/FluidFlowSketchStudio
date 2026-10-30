@@ -23,9 +23,28 @@ function tracePath(ctx: Ctx, ops: Op[]) {
   }
 }
 
+const paths = new Map<string, Path2D>();
+function path2d(d: string): Path2D {
+  let p = paths.get(d);
+  if (!p) { p = new Path2D(d); if (paths.size > 3000) paths.clear(); paths.set(d, p); }
+  return p;
+}
+
 function drawPart(ctx: Ctx, p: Part, images: Map<string, ImageSource>) {
   ctx.setLineDash([]);
   ctx.lineDashOffset = 0;
+  if ((p.k === 'sets' && p.m) || p.k === 'path') {
+    ctx.save();
+    ctx.transform(...p.m!);
+    if (p.k === 'path') {
+      ctx.globalAlpha *= p.alpha;
+      const path = path2d(p.d);
+      if (p.fill) { ctx.fillStyle = p.fill; ctx.fill(path, p.evenodd ? 'evenodd' : 'nonzero'); }
+      if (p.stroke && p.width > 0) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.width; ctx.lineCap = p.cap; ctx.lineJoin = p.join; ctx.stroke(path); }
+    } else drawPart(ctx, { ...p, m: undefined }, images);
+    ctx.restore();
+    return;
+  }
   switch (p.k) {
     case 'sets': {
       for (const s of p.sets) {

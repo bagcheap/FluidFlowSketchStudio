@@ -78,6 +78,7 @@ export function TopBar() {
       { label: 'Line', shortcut: 'L', run: () => ui.setTool('line') },
       { label: 'Text', shortcut: 'T', run: () => ui.setTool('text') },
       { label: 'Image…', shortcut: 'I', run: () => void cmd.insertImage() },
+      { label: 'Icons…', shortcut: `${SHIFT}I`, run: () => ui.updatePrefs({ showIconPanel: true }) },
       { label: 'Group selection', shortcut: `${MOD}G`, run: cmd.groupSelection, disabled: sel.length < 2 },
       { label: 'Template…', run: () => ui.openDialog('templates') },
     ] },

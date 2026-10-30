@@ -12,6 +12,10 @@ const rad = (d: number) => (d * Math.PI) / 180;
 
 export function localOutline(el: BoxElement): Point[] {
   if (el.type === 'shape') return geometryFor(el).poly;
+  if (el.type === 'icon' && el.frame === 'circle') {
+    // arrows end on the round background
+    return Array.from({ length: 48 }, (_, i) => { const a = (i / 48) * Math.PI * 2; return { x: el.w / 2 + Math.cos(a) * el.w / 2, y: el.h / 2 + Math.sin(a) * el.h / 2 }; });
+  }
   return [{ x: 0, y: 0 }, { x: el.w, y: 0 }, { x: el.w, y: el.h }, { x: 0, y: el.h }];
 }
 

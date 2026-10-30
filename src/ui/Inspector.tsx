@@ -3,7 +3,7 @@
 // remembered defaults (existing objects are never touched by default changes).
 import type { ReactNode } from 'react';
 import { AlignCenter, AlignLeft, ArrowRightLeft, AlignRight, ArrowDownToLine, ArrowUpToLine, Bold, ClipboardPaste, Copy, CopyPlus, Italic, Lock, Paintbrush, RotateCcw, Trash2, Unlock, FoldVertical, BringToFront, SendToBack, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal } from 'lucide-react';
-import type { ConnectorAnim, ConnectorElement, DiagramElement, FillStyle, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle } from '../model/types';
+import type { ConnectorAnim, ConnectorElement, DiagramElement, FillStyle, IconElement, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle } from '../model/types';
 import { HIGHLIGHT_COLORS, PALETTE_FILL, PALETTE_STROKE, styleKey } from '../model/defaults';
 import { getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
@@ -11,11 +11,12 @@ import * as cmd from '../store/commands';
 import { ColorPicker, NumberField, Row, Section, Segmented, Select, Slider, Toggle } from './controls';
 import { FONT_LABELS } from '../engine/text';
 import { SHAPE_LABELS } from '../engine/shapes';
+import { iconTitle } from '../icons/sets';
 import { SHAPE_KINDS } from '../model/schema';
 
 const ROUGH = [{ v: 0, label: 'Precise' }, { v: 0.7, label: 'Slight' }, { v: 1.5, label: 'Sketchy' }, { v: 2.6, label: 'Wild' }] as const;
 
-type Kind = 'shape' | 'text' | 'freehand' | 'image' | 'connector';
+type Kind = 'shape' | 'text' | 'freehand' | 'image' | 'icon' | 'connector';
 
 export function Inspector() {
   const doc = useDoc((s) => s.doc);
@@ -82,12 +83,17 @@ export function Inspector() {
   const endHead = conn?.endHead ?? ts?.endHead ?? 'arrow';
   const hasBox = kinds.has('shape') || kinds.has('text') || kinds.has('image') || kinds.has('freehand');
   const hasFillable = kinds.has('shape');
-  const hasText = kinds.has('shape') || kinds.has('text') || kinds.has('connector');
+  const hasText = kinds.has('shape') || kinds.has('text') || kinds.has('connector') || kinds.has('icon');
+  const iconEls = els.filter((e): e is IconElement => e.type === 'icon');
+  const onlyIcons = onSelection && iconEls.length === els.length;
+  const firstIcon = iconEls[0];
+  const allMono = iconEls.every((e) => doc.icons[e.iconId]?.mono);
+  const setIcon = (p: Partial<IconElement>) => useDoc.getState().commit((d) => mapElements(d, ids, (e) => (e.type === 'icon' ? { ...e, ...p } : e)), 'icon:' + Object.keys(p).join() + ids.join());
   const singleShape = els.length === 1 && first.type === 'shape' ? first : null;
   const singleBox = els.length === 1 && first.type !== 'connector' ? first : null;
 
   const heading = onSelection
-    ? els.length === 1 ? `${first.type === 'shape' ? SHAPE_LABELS[first.shape] : first.type === 'connector' ? (first.endHead === 'none' && first.startHead === 'none' ? 'Line' : 'Arrow') : first.type[0].toUpperCase() + first.type.slice(1)}` : `${els.length} objects`
+    ? els.length === 1 ? `${first.type === 'shape' ? SHAPE_LABELS[first.shape] : first.type === 'connector' ? (first.endHead === 'none' && first.startHead === 'none' ? 'Line' : 'Arrow') : first.type === 'icon' ? `Icon · ${iconTitle(doc.icons[first.iconId]?.name ?? 'missing')}` : first.type[0].toUpperCase() + first.type.slice(1)}` : `${els.length} objects`
     : `New ${toolKey!.startsWith('shape:') ? SHAPE_LABELS[toolKey!.slice(6) as ShapeKind].toLowerCase() : toolKey}`;
 
   return (
@@ -112,7 +118,21 @@ export function Inspector() {
               <Select label="Shape type" value={singleShape.shape} options={SHAPE_KINDS.map((k) => ({ v: k, label: SHAPE_LABELS[k] }))} onChange={(v) => useDoc.getState().commit((d) => mapElements(d, ids, (e) => (e.type === 'shape' ? { ...e, shape: v } : e)))} />
             </Section>
           )}
-          <Section title={kinds.has('connector') && !hasBox ? 'Line' : 'Stroke'}>
+          {firstIcon && (
+            <Section title="Icon">
+              {iconEls.length === 1 && <p className="insp-tip">{doc.icons[firstIcon.iconId]?.set} · {doc.icons[firstIcon.iconId]?.license} licence</p>}
+              {allMono && <ColorPicker label="Icon colour" value={firstIcon.style.stroke} palette={PALETTE_STROKE} onChange={(c) => setStyle({ stroke: c })} />}
+              {allMono && <Toggle label="Hand-drawn" checked={firstIcon.sketch} onChange={(v) => setIcon({ sketch: v })} />}
+              <Row label="Label">
+                <Segmented label="Label position" value={firstIcon.labelPos} onChange={(v) => setIcon({ labelPos: v })} options={[{ v: 'below', label: 'Below' }, { v: 'right', label: 'Right' }, { v: 'none', label: 'None' }]} />
+              </Row>
+              <Row label="Background">
+                <Segmented label="Icon background" value={firstIcon.frame} onChange={(v) => setIcon({ frame: v })} options={[{ v: 'none', label: 'None' }, { v: 'circle', label: 'Circle' }, { v: 'square', label: 'Square' }]} />
+              </Row>
+              {firstIcon.frame !== 'none' && <ColorPicker label="Background colour" value={firstIcon.style.fill} palette={PALETTE_FILL} onChange={(c) => setStyle({ fill: c })} />}
+            </Section>
+          )}
+          {!onlyIcons && <Section title={kinds.has('connector') && !hasBox ? 'Line' : 'Stroke'}>
             <ColorPicker label="Stroke colour" value={style.stroke} palette={PALETTE_STROKE} onChange={(c) => setStyle({ stroke: c })} />
             <Slider label="Width" value={style.strokeWidth} min={0} max={kinds.has('freehand') ? 40 : 16} step={0.5} unit="px" onChange={(v) => setStyle({ strokeWidth: v })} />
             <Row label="Pattern">
@@ -122,7 +142,7 @@ export function Inspector() {
               <Segmented label="Hand-drawn style" value={ROUGH.reduce((b, r) => (Math.abs(r.v - style.roughness) < Math.abs(b.v - style.roughness) ? r : b)).v} onChange={(v) => setStyle({ roughness: v })} options={ROUGH.map((r) => ({ v: r.v, label: r.label }))} />
             </Row>
             <Slider label="Roughness" value={style.roughness} min={0} max={3} step={0.1} onChange={(v) => setStyle({ roughness: v })} />
-          </Section>
+          </Section>}
 
           {hasFillable && (
             <Section title="Fill">
@@ -173,7 +193,7 @@ export function Inspector() {
                   <Segmented label="Horizontal alignment" value={text.align} onChange={(v) => setText({ align: v })} options={[{ v: 'left', label: <AlignLeft size={14} />, title: 'Left' }, { v: 'center', label: <AlignCenter size={14} />, title: 'Centre' }, { v: 'right', label: <AlignRight size={14} />, title: 'Right' }]} />
                 </div>
               </Row>
-              {!kinds.has('connector') && (
+              {!kinds.has('connector') && !onlyIcons && (
                 <Row label="Vertical">
                   <Segmented label="Vertical alignment" value={text.vAlign} onChange={(v) => setText({ vAlign: v })} options={[{ v: 'top', label: <ArrowUpToLine size={14} />, title: 'Top' }, { v: 'middle', label: <FoldVertical size={14} />, title: 'Middle' }, { v: 'bottom', label: <ArrowDownToLine size={14} />, title: 'Bottom' }]} />
                 </Row>

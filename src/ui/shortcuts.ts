@@ -11,7 +11,7 @@ export const SHIFT = isMac ? '⇧' : 'Shift+';
 export const ALT = isMac ? '⌥' : 'Alt+';
 
 export const SHORTCUTS: { group: string; items: [string, string][] }[] = [
-  { group: 'Tools', items: [['Select', 'V'], ['Hand / pan', 'H'], ['Rectangle', 'R'], ['Rounded rectangle', 'U'], ['Ellipse', 'O'], ['Diamond', 'D'], ['Arrow / connector', 'A'], ['Line', 'L'], ['Freehand pen', 'P'], ['Highlighter', 'M'], ['Text', 'T'], ['Image', 'I'], ['Eraser', 'E'], ['Format painter', 'F'], ['Shape library', 'S']] },
+  { group: 'Tools', items: [['Select', 'V'], ['Hand / pan', 'H'], ['Rectangle', 'R'], ['Rounded rectangle', 'U'], ['Ellipse', 'O'], ['Diamond', 'D'], ['Arrow / connector', 'A'], ['Line', 'L'], ['Freehand pen', 'P'], ['Highlighter', 'M'], ['Text', 'T'], ['Image', 'I'], ['Icons panel', 'Shift+I'], ['Eraser', 'E'], ['Format painter', 'F'], ['Shape library', 'S']] },
   { group: 'Edit', items: [['Undo', `${MOD}Z`], ['Redo', `${MOD}${SHIFT}Z`], ['Cut / Copy / Paste', `${MOD}X / C / V`], ['Copy / paste style', `${MOD}${ALT}C / V`], ['Duplicate', `${MOD}D`], ['Delete', 'Delete / Backspace'], ['Select all', `${MOD}A`], ['Edit text of selection', 'Enter'], ['Nudge (×10 with Shift)', 'Arrow keys']] },
   { group: 'Arrange', items: [['Group / ungroup', `${MOD}G / ${MOD}${SHIFT}G`], ['Bring forward / to front', `${MOD}] / ${MOD}${SHIFT}]`], ['Send backward / to back', `${MOD}[ / ${MOD}${SHIFT}[`], ['Lock / unlock', `${MOD}${SHIFT}L`]] },
   { group: 'View & play', items: [['Play / pause', 'K  (or Shift+Space)'], ['Restart animation', `${SHIFT}K`], ['Zoom in / out', `${MOD}+ / ${MOD}-`], ['Reset zoom', `${MOD}0`], ['Fit diagram', `${SHIFT}1`], ['Zoom to selection', `${SHIFT}2`], ['Temporary pan', 'Space + drag'], ['Presentation mode', `${MOD}${SHIFT}P`], ['Cancel / back to select', 'Esc']] },
@@ -89,6 +89,7 @@ export function useShortcuts() {
       if (k === 'k') return run(e.shiftKey ? cmd.restart : cmd.togglePlay);
       if (e.shiftKey && e.code === 'Digit1') return run(cmd.zoomToFit);
       if (e.shiftKey && e.code === 'Digit2') return run(cmd.zoomToSelection);
+      if (e.shiftKey && !e.altKey && k === 'i') return run(cmd.toggleIconPanel);
       if (e.shiftKey || e.altKey) return;
       if (k === 'i') return run(() => void cmd.insertImage());
       if (k === 's') return run(() => u.openDialog('shapes'));

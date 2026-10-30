@@ -1,6 +1,6 @@
 // Floating drawing toolbar. Tools stay active after drawing (continuous mode, lock icon).
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Circle, Diamond, Eraser, Hand, Highlighter, ImagePlus, Lock, LockOpen, Minus, MousePointer2, Paintbrush, Pencil, Shapes, Square, RectangleHorizontal, Type } from 'lucide-react';
+import { ArrowUpRight, LayoutGrid, Circle, Diamond, Eraser, Hand, Highlighter, ImagePlus, Lock, LockOpen, Minus, MousePointer2, Paintbrush, Pencil, Shapes, Square, RectangleHorizontal, Type } from 'lucide-react';
 import type { ShapeKind } from '../model/types';
 import type { ToolId } from '../model/defaults';
 import { useUI } from '../store/uiStore';
@@ -36,6 +36,7 @@ export function Toolbar() {
   const tool = useUI((s) => s.tool);
   const shapeKind = useUI((s) => s.shapeKind);
   const continuous = useUI((s) => s.prefs.continuousDrawing);
+  const iconsOpen = useUI((s) => s.prefs.showIconPanel);
   const [more, setMore] = useState(false);
   // Esc closes the shape pop-up (the global Esc handler then returns to Select)
   useEffect(() => {
@@ -87,6 +88,12 @@ export function Toolbar() {
       </div>
       <span className="tb-sep" aria-hidden />
       {TOOLS2.map(btn)}
+      <span className="tb-sep" aria-hidden />
+      <button className={`tb-btn ${iconsOpen ? 'active' : ''}`} aria-pressed={iconsOpen} aria-label="Icons (Shift+I)" data-tool="icons"
+        title={'Icons (Shift+I)\nOpen the icon library: search, then drag an icon onto the canvas or click to add it'}
+        onClick={() => ui.updatePrefs({ showIconPanel: !iconsOpen })}>
+        <LayoutGrid size={18} /><span className="tb-key">⇧I</span>
+      </button>
     </div>
   );
 }

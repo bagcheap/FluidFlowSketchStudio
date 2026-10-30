@@ -140,10 +140,12 @@ export function deleteElements(doc: FlowDocument, ids: Set<string>): FlowDocumen
     }
     return c;
   });
-  // drop asset data no longer referenced
+  // drop image and icon data no longer referenced
   const used = new Set(elements.filter((e) => e.type === 'image').map((e) => (e as { assetId: string }).assetId));
   const assets = Object.fromEntries(Object.entries(doc.assets).filter(([k]) => used.has(k)));
-  return { ...doc, elements, assets };
+  const usedIcons = new Set(elements.flatMap((e) => (e.type === 'icon' ? [e.iconId] : [])));
+  const icons = Object.fromEntries(Object.entries(doc.icons).filter(([k]) => usedIcons.has(k)));
+  return { ...doc, elements, assets, icons };
 }
 
 /** Union of the static bounds of the given elements. */
