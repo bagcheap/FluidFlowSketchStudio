@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.5] - 2026-10-31
 
 ### Added
 - **Cloud provider icons:** under Icons ▸ Add icons, a Cloud provider icons section links to the official AWS, Microsoft Azure and Google Cloud icon downloads. Choose the ZIP you downloaded and FlowSketch turns it into a library: one icon each (the largest size, light version), with readable names and grouped by category (Compute, Storage, …). Importing a newer package offers to replace the old library. The icons stay in your browser and follow the terms you accepted when downloading them.
