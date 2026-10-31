@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
-import { renderDocumentAtTime } from '../src/engine/render';
+import { renderDocumentAtTime, roundTripLeg } from '../src/engine/render';
 import { connectorPath } from '../src/engine/connectors';
 import { makeLookup } from '../src/engine/render';
 import { loopNoise } from '../src/engine/noise';
@@ -125,5 +125,41 @@ describe('connectors', () => {
     c.anim = { mode: 'drawOn' };
     const len = (t: number) => { const p = renderDocumentAtTime(doc, t).items.find((i) => i.id === c.id)!.parts[0] as any; return p.pts.length; };
     expect(len(0.2)).toBeLessThan(len(0.8));
+  });
+
+  it('round trip: the highlight goes out in its colour, waits, then comes back in the return colour', () => {
+    const doc = sampleDoc();
+    const c = doc.elements[2] as any;
+    c.anim = { direction: 'roundTrip', highlightColor: '#3b82f6', returnColor: '#ec4899', turnPause: 0.2, glow: false, segments: 1 };
+    const L = doc.animation.duration;
+    const conn = (t: number) => renderDocumentAtTime(doc, t).items.find((i) => i.id === c.id)!.parts as any[];
+    const lit = (t: number, color: string) => conn(t).find((p) => p.k === 'line' && p.color === color);
+    // sample the whole loop: never both colours at once; both appear; the blue one moves forward, the pink one back
+    let blue = 0, pink = 0, wait = 0;
+    let lastBlue: number | null = null, lastPink: number | null = null, blueBack = 0, pinkFwd = 0;
+    for (let i = 0; i < 400; i++) {
+      const t = (i / 400) * L;
+      const b = lit(t, '#3b82f6'), p = lit(t, '#ec4899');
+      expect(b && p).toBeFalsy();
+      if (b) { blue++; if (lastBlue !== null && b.pts[0] < lastBlue - 1) blueBack++; lastBlue = b.pts[0]; } else lastBlue = null;
+      if (p) { pink++; if (lastPink !== null && p.pts[0] > lastPink + 1) pinkFwd++; lastPink = p.pts[0]; } else lastPink = null;
+      if (!b && !p) wait++;
+    }
+    expect(blue).toBeGreaterThan(20);
+    expect(pink).toBeGreaterThan(20);
+    expect(wait).toBeGreaterThan(20);
+    expect(blueBack).toBeLessThanOrEqual(1); // allows one wrap to the next trip
+    expect(pinkFwd).toBeLessThanOrEqual(1);
+    // seamless: the loop end matches its start
+    expect(JSON.stringify(conn(0))).toEqual(JSON.stringify(conn(L)));
+  });
+
+  it('roundTripLeg splits each cycle into out, wait and back', () => {
+    expect(roundTripLeg(0.3, null)).toEqual({ f: 0.3, back: false });
+    expect(roundTripLeg(0.2, 0.2)).toEqual({ f: 0.5, back: false });
+    expect(roundTripLeg(0.5, 0.2)).toBeNull();
+    expect(roundTripLeg(0.8, 0.2)).toEqual({ f: 0.5, back: true });
+    expect(roundTripLeg(0.25, 0)).toEqual({ f: 0.5, back: false });
+    expect(roundTripLeg(0.75, 0)).toEqual({ f: 0.5, back: true });
   });
 });

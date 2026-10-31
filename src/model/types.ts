@@ -57,8 +57,10 @@ export type FlowMode = 'none' | 'drawOn' | 'travel' | 'dash' | 'pulse';
 export interface ConnectorAnim {
   mode: FlowMode;
   speed: number; // trips per second (snapped to loop when seamless)
-  direction: 'forward' | 'reverse';
+  direction: 'forward' | 'reverse' | 'roundTrip'; // roundTrip: travelling highlight goes out, then comes back
   highlightColor: string;
+  returnColor: string; // roundTrip: highlight colour on the way back
+  turnPause: number; // roundTrip: fraction of each round trip spent waiting at the far end
   highlightLength: number; // px
   highlightOpacity: number;
   segments: number; // simultaneous travelling segments
@@ -198,7 +200,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 4; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers
+export const SCHEMA_VERSION = 5; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).

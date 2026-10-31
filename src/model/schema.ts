@@ -93,8 +93,10 @@ export function sanitizeConnectorAnim(v: unknown, partial: boolean): Partial<Con
   const full: ConnectorAnim = {
     mode: oneOf(o.mode, ['none', 'drawOn', 'travel', 'dash', 'pulse'] as const, d.mode),
     speed: num(o.speed, d.speed, 0, 10),
-    direction: oneOf(o.direction, ['forward', 'reverse'] as const, d.direction),
+    direction: oneOf(o.direction, ['forward', 'reverse', 'roundTrip'] as const, d.direction),
     highlightColor: color(o.highlightColor, d.highlightColor),
+    returnColor: color(o.returnColor, d.returnColor),
+    turnPause: num(o.turnPause, d.turnPause, 0, 0.6),
     highlightLength: num(o.highlightLength, d.highlightLength, 2, 2000),
     highlightOpacity: num(o.highlightOpacity, d.highlightOpacity, 0, 1),
     segments: Math.round(num(o.segments, d.segments, 1, 12)),
@@ -293,6 +295,10 @@ export function migrate(raw: Obj): Obj {
   if (version === 3) {
     // v3 -> v4: adds containers; nothing to convert
     version = 4;
+  }
+  if (version === 4) {
+    // v4 -> v5: arrows may use the round-trip highlight (direction 'roundTrip', returnColor, turnPause); nothing to convert
+    version = 5;
   }
   raw.schemaVersion = version;
   return raw;

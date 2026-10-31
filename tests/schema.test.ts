@@ -59,6 +59,17 @@ describe('native .flowsketch format', () => {
     expect(doc.elements).toHaveLength(1);
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION);
   });
+
+  it('keeps round-trip arrow highlights and coerces bad values', () => {
+    const conn = (anim: unknown) => ({ id: 'c', type: 'connector', start: { x: 0, y: 0 }, end: { x: 100, y: 0 }, anim });
+    const { doc } = parseDocument({ format: 'flowsketch', schemaVersion: 5, elements: [conn({ direction: 'roundTrip', returnColor: '#ec4899', turnPause: 0.3 })] });
+    const again = parseDocument(serializeDocument(doc)).doc.elements[0] as any;
+    expect(again.anim).toEqual({ direction: 'roundTrip', returnColor: '#ec4899', turnPause: 0.3 });
+    const bad = parseDocument({ format: 'flowsketch', schemaVersion: 5, elements: [conn({ direction: 'sideways', returnColor: 'javascript:x', turnPause: 9 })] }).doc.elements[0] as any;
+    expect(bad.anim.direction).toBe('forward');
+    expect(bad.anim.returnColor).toBe('#ec4899');
+    expect(bad.anim.turnPause).toBe(0.6);
+  });
 });
 
 describe('SVG export', () => {

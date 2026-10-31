@@ -57,6 +57,8 @@ export const DEFAULT_CONNECTOR_ANIM: ConnectorAnim = {
   speed: 0.5,
   direction: 'forward',
   highlightColor: '#3b82f6',
+  returnColor: '#ec4899',
+  turnPause: 0.1,
   highlightLength: 36,
   highlightOpacity: 1,
   segments: 1,

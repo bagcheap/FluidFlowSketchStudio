@@ -4,6 +4,14 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Round-trip arrows:** with the travelling highlight, set Direction to ⇄ Round trip and the highlight travels to the end of the arrow and back again, in a different colour on the way back (blue out, pink back by default). It shows a request and its response on one arrow. Choose the return colour and how long it waits at the far end in the Inspector.
+
+### Changed
+- Files now use format version 5. Older files open as before, but files saved with this version need this version of FlowSketch or later.
+
 ## [0.1.6] - 2026-10-31
 
 ### Added

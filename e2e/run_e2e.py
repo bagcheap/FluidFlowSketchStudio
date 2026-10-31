@@ -439,6 +439,20 @@ def main():
             app.key('Escape'); app.key('Control+z'); page.wait_for_timeout(80)
             s = [e for e in app.els('connector') if e['id'] == c['id']][0]
             assert s['start']['elementId'] == ids[0], 'undo did not restore the direction'
+            # round trip: choose it in the Inspector, pick a return colour; the highlight comes back in that colour
+            app.click((5380, 5240))
+            page.get_by_role('radiogroup', name='Direction').get_by_role('radio', name='⇄ Round trip').click()
+            page.get_by_label('Return colour #8b5cf6').click(); page.wait_for_timeout(80)
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert s['anim']['direction'] == 'roundTrip' and s['anim']['returnColor'] == '#8b5cf6', s.get('anim')
+            dur = app.doc()['animation']['duration']
+            cols = set()
+            for i in range(40):
+                f = app.js('(t) => window.__flowsketch.frame(t)', dur * i / 40)
+                it = [x for x in f['items'] if x['id'] == c['id']][0]
+                cols |= {p['color'] for p in it['parts'] if p['k'] == 'line'}
+            assert '#8b5cf6' in cols and '#3b82f6' in cols, cols
+            app.key('Escape')
             # remove the test objects so later tests that use "the last arrow" are unaffected
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
             assert not [e for e in app.els() if e['id'] in ids + [c['id']]], 'test objects left behind'
@@ -528,7 +542,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 4
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 5
             assert len(data['elements']) == len(app.els())
         t7()
 
