@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.6] - 2026-10-31
 
 ### Added
 - **Right-click menu:** right-click an object for cut, copy, paste, duplicate, delete, styles, containers, grouping, order, alignment, swap direction and lock; right-click empty canvas for paste, select all, the grid (dots, lines or plain), snapping, zoom, icons and default styles. Shift+F10 opens it from the keyboard.
@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **Default styles are easier to manage:** Set as default style and Reset default style in the right-click and Edit menus, Reset all default styles in Edit, and a reset button in the Inspector while a drawing tool is active.
 
 ### Changed
-- Files now use format version 4. Older files open as before, but files saved with this version need this version of FlowSketch or later.
+- Files now use format version 4. Older files open as before, but files saved with this version need FlowSketch 0.1.6 or later.
 
 ## [0.1.5] - 2026-10-31
 
