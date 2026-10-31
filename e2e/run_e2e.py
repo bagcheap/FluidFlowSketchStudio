@@ -383,6 +383,44 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tziplib()
 
+        @test('Right-click menu and containers: wrap, rename, move with contents, join and leave')
+        def tcontainer():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 8000, zoom: 1})')  # empty area
+            app.key('u'); app.drag((5100, 8200), (5240, 8280)); app.drag((5400, 8200), (5540, 8280)); app.key('Escape')
+            a, b = app.els('shape')[-2:]
+            app.drag((5060, 8160), (5600, 8320))  # selection box around both
+            assert set(app.ui()['selection']) == {a['id'], b['id']}, app.ui()['selection']
+            x, y = app.pt(5170, 8240)
+            page.mouse.click(x, y, button='right'); page.wait_for_selector('.ctx-menu')
+            page.locator('.ctx-menu [role=menuitem]', has_text='Add container').click()
+            page.wait_for_selector('.text-editor')
+            page.keyboard.press('Control+a'); page.keyboard.type('Payments'); page.keyboard.press('Escape'); page.wait_for_timeout(80)
+            c = app.els('container')[-1]
+            assert c['text'] == 'Payments' and set(c['members']) == {a['id'], b['id']}, c
+            # drag the container by its title bar: the shapes come along
+            app.drag((c['x'] + 100, c['y'] + 12), (c['x'] + 160, c['y'] + 52))
+            a2 = [e for e in app.els() if e['id'] == a['id']][0]
+            assert (round(a2['x'] - a['x']), round(a2['y'] - a['y'])) == (60, 40), (a2['x'], a2['y'])
+            # drag b out: it leaves; drag it back in: it joins again
+            b2 = [e for e in app.els() if e['id'] == b['id']][0]
+            app.drag((b2['x'] + 70, b2['y'] + 40), (b2['x'] + 70, b2['y'] + 400))
+            assert b['id'] not in app.els('container')[-1]['members']
+            app.drag((b2['x'] + 70, b2['y'] + 400), (b2['x'] + 70, b2['y'] + 40))
+            assert b['id'] in app.els('container')[-1]['members']
+            # right-click empty canvas: the canvas menu, with the grid choice
+            x, y = app.pt(5900, 8700)
+            page.mouse.click(x, y, button='right'); page.wait_for_selector('.ctx-menu')
+            assert page.locator('.ctx-menu [role=menuitem]', has_text='Select all').count() == 1
+            page.locator('.ctx-menu [role=menuitem]', has_text='Grid').click()
+            page.locator('.ctx-menu .menu-pop.sub [role^=menuitem]', has_text='Line grid').click()
+            assert app.doc()['canvas']['grid'] == 'lines'
+            app.key('Control+z')  # back to the dot grid; the container stays for the save/export tests
+            assert app.doc()['canvas']['grid'] == 'dots'
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tcontainer()
+
         @test('Swap direction: the Inspector button reverses an arrow; one undo restores it')
         def tswap():
             app.key('Escape')
@@ -490,7 +528,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 3
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 4
             assert len(data['elements']) == len(app.els())
         t7()
 

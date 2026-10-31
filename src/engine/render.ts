@@ -2,7 +2,7 @@
 // The single source of truth for what a diagram looks like at time t. Pure with respect to the
 // document: it never mutates it. The live canvas, PNG/GIF/video export and SVG export all consume
 // the returned Frame, so preview and exports match exactly.
-import type { BoxElement, ConnectorElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, IconElement, IconGradient, IconPaint, Style, Point, ShapeElement, TextElement, TextStyle } from '../model/types';
+import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, IconElement, IconGradient, IconPaint, Style, Point, ShapeElement, TextElement, TextStyle } from '../model/types';
 import type { Motion, PreviewFlags } from './animation';
 import { STILL, resolveConnectorAnim, shapeMotion } from './animation';
 import { connectorPath, endTangent, pointAt, slice, type ConnectorPath, type Lookup } from './connectors';
@@ -176,6 +176,31 @@ function iconItems(doc: FlowDocument, el: IconElement, m: Motion, loopLen: numbe
   if (el.text && el.labelPos !== 'none' && !hideLabel) {
     const { box, ts } = iconLabelLayout(el);
     items.push({ id: el.id + ':label', opacity: el.style.opacity, tf: { x: el.x + m.text.tx, y: el.y + m.text.ty, w: el.w, h: el.h, rot: el.rotation + m.text.rot }, parts: labelParts({ ...el, textStyle: ts }, box, false) });
+  }
+  return items;
+}
+
+// ---- containers --------------------------------------------------------------
+
+/** Height of a container's title bar. */
+export const containerHeader = (el: { textStyle: TextStyle }) => Math.round(el.textStyle.fontSize * el.textStyle.lineHeight + 16);
+
+function containerItems(el: ContainerElement, m: Motion, loopLen: number | null, hideLabel: boolean): Item[] {
+  const f = field(el, m, loopLen);
+  const seed = el.seed + m.boil * 7919;
+  const r = Math.max(0, Math.min(el.style.cornerRadius, el.w / 2, el.h / 2));
+  const d = r > 0 ? roundRectD(el.w, el.h, r) : `M0 0H${el.w}V${el.h}H0Z`;
+  const head = Math.min(containerHeader(el), el.h);
+  const sw = el.style.strokeWidth;
+  const parts: Part[] = [
+    { k: 'sets', sets: warpSets(roughSets(`ct${el.w.toFixed(1)}x${el.h.toFixed(1)}r${r}`, d, el.style, seed, true), f), stroke: el.style.stroke, fill: el.style.fill, sw, fillWeight: Math.max(0.6, sw / 2), dash: dashFor(el.style.strokeStyle, sw), shadow: el.style.shadow },
+    // the line under the title bar
+    { k: 'sets', sets: warpSets(roughSets(`cth${el.w.toFixed(1)}`, `M0 ${head}H${el.w}`, el.style, seed + 1, false), f), stroke: el.style.stroke, fill: 'none', sw, fillWeight: 1, dash: dashFor(el.style.strokeStyle, sw), shadow: false },
+  ];
+  const tf = { x: el.x + m.tx, y: el.y + m.ty, w: el.w, h: el.h, rot: m.rot };
+  const items: Item[] = [{ id: el.id, opacity: el.style.opacity, tf, parts }];
+  if (el.text && !hideLabel) {
+    items.push({ id: el.id + ':label', opacity: el.style.opacity, tf: { x: el.x + m.text.tx, y: el.y + m.text.ty, w: el.w, h: el.h, rot: m.text.rot }, parts: labelParts({ ...el, textStyle: { ...el.textStyle, vAlign: 'middle' } }, { x: 0, y: 0, w: el.w, h: head }, true) });
   }
   return items;
 }
@@ -372,6 +397,7 @@ export function renderDocumentAtTime(doc: FlowDocument, t: number, opts: RenderO
       case 'shape': items.push(...shapeItems(el, m, loopLen, hide)); break;
       case 'text': items.push(...textItems(el, m, hide)); break;
       case 'icon': items.push(...iconItems(doc, el, m, loopLen, hide)); break;
+      case 'container': items.push(...containerItems(el, m, loopLen, hide)); break;
       case 'freehand': items.push(...freehandItems(el, m, loopLen)); break;
       case 'image':
         items.push({ id: el.id, opacity: el.style.opacity, tf: { x: el.x + m.tx, y: el.y + m.ty, w: el.w, h: el.h, rot: el.rotation + m.rot }, parts: [{ k: 'image', assetId: el.assetId, x: 0, y: 0, w: el.w, h: el.h }] });

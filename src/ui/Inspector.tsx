@@ -3,7 +3,7 @@
 // remembered defaults (existing objects are never touched by default changes).
 import type { ReactNode } from 'react';
 import { AlignCenter, AlignLeft, ArrowRightLeft, AlignRight, ArrowDownToLine, ArrowUpToLine, Bold, ClipboardPaste, Copy, CopyPlus, Italic, Lock, Paintbrush, RotateCcw, Trash2, Unlock, FoldVertical, BringToFront, SendToBack, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal } from 'lucide-react';
-import type { ConnectorAnim, ConnectorElement, DiagramElement, FillStyle, IconElement, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle } from '../model/types';
+import type { ConnectorAnim, ConnectorElement, ContainerElement, DiagramElement, FillStyle, IconElement, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle } from '../model/types';
 import { HIGHLIGHT_COLORS, PALETTE_FILL, PALETTE_STROKE, styleKey } from '../model/defaults';
 import { getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
@@ -17,7 +17,7 @@ import { SHAPE_KINDS } from '../model/schema';
 
 const ROUGH = [{ v: 0, label: 'Precise' }, { v: 0.7, label: 'Slight' }, { v: 1.5, label: 'Sketchy' }, { v: 2.6, label: 'Wild' }] as const;
 
-type Kind = 'shape' | 'text' | 'freehand' | 'image' | 'icon' | 'connector';
+type Kind = 'shape' | 'text' | 'freehand' | 'image' | 'icon' | 'container' | 'connector';
 
 export function Inspector() {
   const doc = useDoc((s) => s.doc);
@@ -83,8 +83,9 @@ export function Inspector() {
   const startHead = conn?.startHead ?? ts?.startHead ?? 'none';
   const endHead = conn?.endHead ?? ts?.endHead ?? 'arrow';
   const hasBox = kinds.has('shape') || kinds.has('text') || kinds.has('image') || kinds.has('freehand');
-  const hasFillable = kinds.has('shape');
-  const hasText = kinds.has('shape') || kinds.has('text') || kinds.has('connector') || kinds.has('icon');
+  const hasFillable = kinds.has('shape') || kinds.has('container');
+  const hasText = kinds.has('shape') || kinds.has('text') || kinds.has('connector') || kinds.has('icon') || kinds.has('container');
+  const containers = els.filter((e): e is ContainerElement => e.type === 'container');
   const iconEls = els.filter((e): e is IconElement => e.type === 'icon');
   const onlyIcons = onSelection && iconEls.length === els.length;
   const firstIcon = iconEls[0];
@@ -94,7 +95,7 @@ export function Inspector() {
   const singleBox = els.length === 1 && first.type !== 'connector' ? first : null;
 
   const heading = onSelection
-    ? els.length === 1 ? `${first.type === 'shape' ? SHAPE_LABELS[first.shape] : first.type === 'connector' ? (first.endHead === 'none' && first.startHead === 'none' ? 'Line' : 'Arrow') : first.type === 'icon' ? `Icon · ${iconTitle(doc.icons[first.iconId]?.name ?? 'missing')}` : first.type[0].toUpperCase() + first.type.slice(1)}` : `${els.length} objects`
+    ? els.length === 1 ? `${first.type === 'shape' ? SHAPE_LABELS[first.shape] : first.type === 'connector' ? (first.endHead === 'none' && first.startHead === 'none' ? 'Line' : 'Arrow') : first.type === 'icon' ? `Icon · ${iconTitle(doc.icons[first.iconId]?.name ?? 'missing')}` : first.type === 'container' ? `Container · ${first.text || 'untitled'}` : first.type[0].toUpperCase() + first.type.slice(1)}` : `${els.length} objects`
     : `New ${toolKey!.startsWith('shape:') ? SHAPE_LABELS[toolKey!.slice(6) as ShapeKind].toLowerCase() : toolKey}`;
 
   return (
@@ -104,6 +105,11 @@ export function Inspector() {
           <div className="insp-title">{heading}</div>
           <div className="insp-sub">{onSelection ? (anyLocked ? 'Locked — unlock to edit' : 'Editing selected objects') : 'Defaults for the next shapes you draw'}</div>
         </div>
+        {!onSelection && toolKey && (
+          <div className="insp-actions">
+            <button className="icon-btn sm" title="Reset this tool's default style to the original" aria-label="Reset default style" onClick={() => cmd.resetToolStyle(toolKey)}><RotateCcw size={14} /></button>
+          </div>
+        )}
         {onSelection && (
           <div className="insp-actions">
             <button className="icon-btn sm" title="Copy style" aria-label="Copy style" onClick={cmd.copyStyle} disabled={els.length !== 1}><Copy size={14} /></button>
@@ -117,6 +123,15 @@ export function Inspector() {
           {singleShape && (
             <Section title="Shape">
               <Select label="Shape type" value={singleShape.shape} options={SHAPE_KINDS.map((k) => ({ v: k, label: SHAPE_LABELS[k] }))} onChange={(v) => useDoc.getState().commit((d) => mapElements(d, ids, (e) => (e.type === 'shape' ? { ...e, shape: v } : e)))} />
+            </Section>
+          )}
+          {containers.length > 0 && (
+            <Section title="Container">
+              {containers.length === 1 && <p className="insp-tip">{containers[0].members.length === 1 ? '1 item' : `${containers[0].members.length} items`} inside. Drag shapes in or out to add or remove them; the container grows to fit. Double-click the title to rename it.</p>}
+              <div className="btn-row">
+                <button className="btn small" onClick={cmd.fitSelectedContainers} title="Resize to fit what is inside (grows or shrinks)">Fit to contents</button>
+                <button className="btn small" onClick={cmd.removeSelectedContainers} title="Delete the container but keep what is inside it">Remove container</button>
+              </div>
             </Section>
           )}
           {firstIcon && (
@@ -200,7 +215,7 @@ export function Inspector() {
                   <Segmented label="Horizontal alignment" value={text.align} onChange={(v) => setText({ align: v })} options={[{ v: 'left', label: <AlignLeft size={14} />, title: 'Left' }, { v: 'center', label: <AlignCenter size={14} />, title: 'Centre' }, { v: 'right', label: <AlignRight size={14} />, title: 'Right' }]} />
                 </div>
               </Row>
-              {!kinds.has('connector') && !onlyIcons && (
+              {!kinds.has('connector') && !onlyIcons && !kinds.has('container') && (
                 <Row label="Vertical">
                   <Segmented label="Vertical alignment" value={text.vAlign} onChange={(v) => setText({ vAlign: v })} options={[{ v: 'top', label: <ArrowUpToLine size={14} />, title: 'Top' }, { v: 'middle', label: <FoldVertical size={14} />, title: 'Middle' }, { v: 'bottom', label: <ArrowDownToLine size={14} />, title: 'Bottom' }]} />
                 </Row>

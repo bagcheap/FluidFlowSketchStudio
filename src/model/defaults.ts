@@ -193,6 +193,9 @@ export function defaultToolStyle(key: string): ToolStyle {
   } else if (key === 'highlighter') {
     s.style = { ...s.style, fillStyle: 'none', stroke: '#facc15', strokeWidth: 18, opacity: 0.45 };
     s.shapeAnim = { mode: 'off' };
+  } else if (key === 'container') {
+    s.style = { ...s.style, stroke: '#868e96', fill: '#f8f9fa', fillStyle: 'solid', strokeWidth: 1.5, cornerRadius: 12 };
+    s.textStyle = { ...s.textStyle, fontSize: 16, bold: true, align: 'left', vAlign: 'middle', padding: 12 };
   } else if (key === 'icon') {
     s.style = { ...s.style, stroke: '#1e1e2e', fill: '#ffffff', fillStyle: 'solid', strokeWidth: 1.5 };
     s.textStyle = { ...s.textStyle, fontSize: 15, vAlign: 'top' };

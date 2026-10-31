@@ -6,7 +6,7 @@ import { useUI } from '../store/uiStore';
 import { geometryFor } from '../engine/shapes';
 import { cssFont } from '../engine/text';
 import { connectorPath, pointAt } from '../engine/connectors';
-import { iconLabelLayout, makeLookup } from '../engine/render';
+import { containerHeader, iconLabelLayout, makeLookup } from '../engine/render';
 
 export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p: Point) => Point; onDone: (id: string, text: string) => void }) {
   const doc = useDoc((s) => s.doc);
@@ -50,7 +50,8 @@ export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p:
     const left = el.labelPos === 'right' ? box.x : el.w / 2 - w / 2;
     inner = { ...common, left: left * z, top: (box.y + ts.padding) * z, width: w * z, height: lines * lh * z + 4, textAlign: el.labelPos === 'right' ? 'left' : 'center' };
   } else {
-    const tb = el.type === 'shape' ? geometryFor(el).textBox : { x: 0, y: 0, w: Math.max(el.w, 200), h: el.h };
+    // a container's title sits in its title bar
+    const tb = el.type === 'shape' ? geometryFor(el).textBox : el.type === 'container' ? { x: 0, y: 0, w: el.w, h: containerHeader(el) } : { x: 0, y: 0, w: Math.max(el.w, 200), h: el.h };
     const s = toScreen({ x: el.x, y: el.y });
     outer = { left: s.x, top: s.y, width: el.w * z, height: el.h * z, transform: `rotate(${el.rotation}deg)`, transformOrigin: 'center' };
     const pad = ts.padding;

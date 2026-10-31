@@ -27,6 +27,7 @@ export function TopBar() {
   const a = doc.animation;
   const hasSel = sel.length > 0;
   const selConnector = doc.elements.some((e) => e.type === 'connector' && sel.includes(e.id));
+  const selContainer = doc.elements.some((e) => e.type === 'container' && sel.includes(e.id));
   const toggle = (k: keyof typeof prefs) => () => ui.updatePrefs({ [k]: !prefs[k] } as never);
 
   const anim = (patch: Partial<typeof a>) => () => cmd.setAnimation(patch, 'menu');
@@ -63,7 +64,9 @@ export function TopBar() {
       { label: 'Copy style', shortcut: `${MOD}${ALT}C`, run: cmd.copyStyle, disabled: sel.length !== 1 },
       { label: 'Paste style', shortcut: `${MOD}${ALT}V`, run: cmd.pasteStyle, disabled: !hasSel },
       { label: 'Format painter', shortcut: 'F', run: () => ui.setTool('painter') },
-      { label: 'Use selection’s style as tool default', run: cmd.applySelectionStyleToDefaults, disabled: sel.length !== 1 },
+      { label: 'Set as default style', run: cmd.applySelectionStyleToDefaults, disabled: sel.length !== 1, note: 'for new drawings with this tool' },
+      { label: 'Reset default style', run: cmd.resetSelectionToolStyle, disabled: sel.length !== 1 },
+      { label: 'Reset all default styles…', run: () => void cmd.resetAllToolStyles() },
       { sep: true },
       { label: 'Select all', shortcut: `${MOD}A`, run: cmd.selectAll },
       { label: 'Deselect', shortcut: 'Esc', run: cmd.deselect, disabled: !hasSel },
@@ -79,6 +82,7 @@ export function TopBar() {
       { label: 'Text', shortcut: 'T', run: () => ui.setTool('text') },
       { label: 'Image…', shortcut: 'I', run: () => void cmd.insertImage() },
       { label: 'Icons…', shortcut: `${SHIFT}I`, run: () => ui.updatePrefs({ showIconPanel: true }) },
+      { label: 'Container around selection', run: cmd.addContainer, disabled: !hasSel },
       { label: 'Group selection', shortcut: `${MOD}G`, run: cmd.groupSelection, disabled: sel.length < 2 },
       { label: 'Template…', run: () => ui.openDialog('templates') },
     ] },
@@ -100,6 +104,10 @@ export function TopBar() {
       { label: 'Flip horizontal', run: () => cmd.flip('h'), disabled: !hasSel },
       { label: 'Flip vertical', run: () => cmd.flip('v'), disabled: !hasSel },
       { label: 'Swap arrow direction', run: () => cmd.swapDirection(), disabled: !selConnector },
+      { sep: true },
+      { label: 'Add container', run: cmd.addContainer, disabled: !hasSel },
+      { label: 'Fit container to contents', run: cmd.fitSelectedContainers, disabled: !selContainer },
+      { label: 'Remove container (keep contents)', run: cmd.removeSelectedContainers, disabled: !selContainer },
       { sep: true },
       { label: 'Lock / unlock', shortcut: `${MOD}${SHIFT}L`, run: cmd.toggleLock, disabled: !hasSel },
       { label: 'Unlock all', run: cmd.unlockAll },

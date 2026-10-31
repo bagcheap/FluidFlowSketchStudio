@@ -165,7 +165,17 @@ export interface IconElement extends ElementBase {
   anim?: Partial<ShapeAnim>;
 }
 
-export type BoxElement = ShapeElement | TextElement | FreehandElement | ImageElement | IconElement;
+/**
+ * A titled frame around other elements (Visio/draw.io style). Members move with it; elements moved, drawn or
+ * pasted inside join it, moved outside leave it; it grows to fit its members. Its title is the element's text.
+ */
+export interface ContainerElement extends ElementBase {
+  type: 'container';
+  members: string[]; // ids of the elements directly inside (each element belongs to at most one container)
+  anim?: Partial<ShapeAnim>;
+}
+
+export type BoxElement = ShapeElement | TextElement | FreehandElement | ImageElement | IconElement | ContainerElement;
 export type DiagramElement = BoxElement | ConnectorElement;
 
 export interface Asset {
@@ -188,7 +198,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 3; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts
+export const SCHEMA_VERSION = 4; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).

@@ -2,7 +2,7 @@
 import type { BoxElement, ConnectorElement, DiagramElement, FlowDocument, Point } from '../model/types';
 import { STILL } from '../engine/animation';
 import { connectorPath, pointAt, toLocal, toWorld } from '../engine/connectors';
-import { iconLabelLayout, makeLookup } from '../engine/render';
+import { containerHeader, iconLabelLayout, makeLookup } from '../engine/render';
 import { distToPolyline, geometryFor, pointInPolygon } from '../engine/shapes';
 import { layoutText } from '../engine/text';
 
@@ -15,6 +15,12 @@ export function hitBox(el: BoxElement, p: Point, tol: number): boolean {
   if (el.type === 'freehand') {
     const pts = el.points.map(([x, y]) => ({ x: x * el.w, y: y * el.h }));
     return distToPolyline(l, pts) < tol + el.style.strokeWidth / 2;
+  }
+  if (el.type === 'container') {
+    // a container is picked by its title bar or border; its empty inside acts like canvas (so you can
+    // drag a selection box around shapes inside it)
+    if (l.x < -tol || l.y < -tol || l.x > el.w + tol || l.y > el.h + tol) return false;
+    return l.y <= containerHeader(el) || Math.min(l.x, l.y, el.w - l.x, el.h - l.y) < tol + 4;
   }
   if (el.type === 'icon' && el.text && el.labelPos !== 'none') {
     // an icon's label sits outside its box and counts as part of it

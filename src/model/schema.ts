@@ -124,7 +124,7 @@ function endpoint(v: unknown): Endpoint {
 
 function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
   if (!isObj(v)) return null;
-  const type = oneOf(v.type, ['shape', 'text', 'freehand', 'image', 'icon', 'connector'] as const, 'shape');
+  const type = oneOf(v.type, ['shape', 'text', 'freehand', 'image', 'icon', 'container', 'connector'] as const, 'shape');
   if (typeof v.type !== 'string' || v.type !== type) { warn(`Skipped element of unknown type "${String(v.type)}"`); return null; }
   const base = {
     id: str(v.id, uid(), 100) || uid(),
@@ -155,6 +155,8 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
     }
     case 'image':
       return { ...base, ...sAnim, type, assetId: str(v.assetId, '', 100) };
+    case 'container':
+      return { ...base, ...sAnim, type, rotation: 0, members: Array.isArray(v.members) ? v.members.filter((m): m is string => typeof m === 'string').slice(0, MAX_ELEMENTS) : [] };
     case 'icon':
       return {
         ...base, ...sAnim, type, iconId: str(v.iconId, '', 140), sketch: bool(v.sketch, false),
@@ -288,6 +290,10 @@ export function migrate(raw: Obj): Obj {
     // v2 -> v3: icon parts may have gradient paints and a bbox; nothing to convert
     version = 3;
   }
+  if (version === 3) {
+    // v3 -> v4: adds containers; nothing to convert
+    version = 4;
+  }
   raw.schemaVersion = version;
   return raw;
 }
@@ -372,6 +378,22 @@ export function parseDocument(input: string | unknown): ParseResult {
     if (e.type === 'image' && !doc.assets[e.assetId]) { warn('Removed an image whose data is missing.'); continue; }
     if (e.type === 'icon' && !doc.icons[e.iconId]) { warn('Removed an icon whose data is missing.'); continue; }
     doc.elements.push(e);
+  }
+  // containers: members must exist, not be the container itself, belong to one container only, and form no cycles
+  const ids = new Set(doc.elements.map((e) => e.id));
+  const parent = new Map<string, string>();
+  for (const e of doc.elements) {
+    if (e.type !== 'container') continue;
+    const kept: string[] = [];
+    for (const m of e.members) {
+      if (!ids.has(m) || m === e.id || parent.has(m)) continue;
+      let p: string | undefined = e.id, cyclic = false; // would e become its own ancestor?
+      for (let guard = 0; p && guard < MAX_ELEMENTS; guard++) { if (p === m) { cyclic = true; break; } p = parent.get(p); }
+      if (cyclic) { warn('Removed a container loop.'); continue; }
+      parent.set(m, e.id);
+      kept.push(m);
+    }
+    e.members = kept;
   }
   // referential integrity: connectors may only attach to existing non-connector elements
   const boxes = new Set(doc.elements.filter((e) => e.type !== 'connector').map((e) => e.id));
