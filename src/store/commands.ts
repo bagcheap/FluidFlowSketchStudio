@@ -384,7 +384,7 @@ export async function dropSvgIcons(files: File[], at: { x: number; y: number }) 
 export async function importIconLibraryFiles(files: File[]) {
   const r = await importFiles(files);
   if (!r.items.length) { U().toast(r.skipped[0] ? `No icons added: ${r.skipped[0]}` : 'No icons found in those files.', 'error'); return; }
-  const lib = await useLibraries.getState().add(r.items, { name: r.libraryName ?? 'My icons' });
+  const lib = await useLibraries.getState().add(r.items, { name: r.libraryName ?? 'My icons', vendor: r.vendor });
   U().updatePrefs({ showIconPanel: true });
   U().toast(`Added ${r.items.length.toLocaleString()} icons to the library “${lib.name}”.`, 'success');
 }

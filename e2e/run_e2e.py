@@ -347,6 +347,42 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         ticonlibs()
 
+        @test('Cloud icons: an AWS-style ZIP becomes a categorised library under AWS terms')
+        def tziplib():
+            import zipfile
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 7000, zoom: 1})')  # empty area
+            pack = os.path.join(OUT, 'Asset-Package_e2e.zip')  # built here: provider icons are never stored in the repo
+            svg = lambda c: f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="{c}"/></svg>'
+            with zipfile.ZipFile(pack, 'w') as z:
+                base = 'Asset-Package_e2e/Architecture-Service-Icons_07312025'
+                for size in (32, 64):
+                    z.writestr(f'{base}/Arch_Compute/{size}/Arch_AWS-Lambda_{size}.svg', svg('#ed7100'))
+                    z.writestr(f'{base}/Arch_Storage/{size}/Arch_Amazon-Simple-Storage-Service_{size}.svg', svg('#7aa116'))
+                z.writestr('__MACOSX/._x.svg', 'junk')
+            app.key('Shift+I'); page.wait_for_selector('.icon-cell')
+            page.get_by_role('button', name='Add icons').click()
+            row = page.locator('.iconlibs li', has_text='AWS Architecture Icons').first
+            with page.expect_file_chooser() as fc:
+                row.get_by_role('button', name='Choose ZIP…').click()
+            fc.value.set_files(pack)
+            page.wait_for_selector('.note.ok')
+            assert 'Added 2 icons to “AWS Architecture Icons”' in page.locator('.note.ok').inner_text(), page.locator('.note.ok').inner_text()
+            page.keyboard.press('Escape')
+            page.locator('.ip-chips .chip', has_text='AWS Architecture').click()
+            heads = [h.split('\n')[0].upper() for h in page.locator('.ip-sec h3').all_inner_texts()]
+            assert heads == ['COMPUTE', 'STORAGE'], heads
+            stage = page.get_by_test_id('stage'); box = stage.bounding_box()
+            x, y = app.pt(5300, 7200)
+            page.locator('.icon-cell[data-icon$=":aws-lambda"]').drag_to(stage, target_position={'x': x - box['x'], 'y': y - box['y']})
+            page.wait_for_timeout(100)
+            assert app.els('icon')[-1]['iconId'].endswith(':aws-lambda')
+            assert 'AWS terms' in page.locator('.inspector .insp-tip').first.inner_text()
+            app.key('Shift+I')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tziplib()
+
         @test('Swap direction: the Inspector button reverses an arrow; one undo restores it')
         def tswap():
             app.key('Escape')

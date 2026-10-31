@@ -9,7 +9,11 @@ import simpleUrl from '@iconify-json/simple-icons/icons.json?url';
 import k8sUrl from '@iconify-json/k8s/icons.json?url';
 import type { Asset, IconAsset } from '../model/types';
 import { iconifyToSvg, svgToIcon } from './svgToIcon';
-import { libSetId, useLibraries } from './libraries';
+import { libSetId, useLibraries, type IconLibrary } from './libraries';
+import type { Vendor } from './zipImport';
+
+/** How one of your libraries appears as a set. */
+export const libInfo = (l: IconLibrary): IconSetInfo => ({ id: libSetId(l.id), name: l.name, group: l.name, license: '', ...(l.vendor ? { vendor: l.vendor } : {}) });
 
 export interface IconSetInfo {
   id: string;
@@ -18,6 +22,7 @@ export interface IconSetInfo {
   license: string;
   brands?: boolean; // logos of companies and products (trademarks of their owners)
   url?: string; // built-in sets only
+  vendor?: Vendor; // an official cloud-provider package imported by the user
 }
 
 // keep the ids in sync with scripts/build-icon-index.mjs
@@ -76,7 +81,7 @@ export function loadIconSet(id: string): Promise<IconSet> {
   if (lib) {
     const byName = new Map(lib.items.map((it) => [it.name, it]));
     return Promise.resolve({
-      info: { id, name: lib.name, group: lib.name, license: '' },
+      info: libInfo(lib),
       names: lib.items.map((it) => it.name).sort(),
       icon: (n) => byName.get(n)?.icon ?? null,
       picture: (n) => byName.get(n)?.picture ?? null,
