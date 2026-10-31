@@ -9,7 +9,7 @@ export type MenuItem =
 
 export interface MenuDef { id: string; label: string; items: MenuItem[] }
 
-function ItemList({ items, onClose, depth = 0 }: { items: MenuItem[]; onClose: () => void; depth?: number }) {
+export function ItemList({ items, onClose, depth = 0 }: { items: MenuItem[]; onClose: () => void; depth?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const [openSub, setOpenSub] = useState<number | null>(null);
   useEffect(() => { if (depth === 0) (ref.current?.querySelector('[role^="menuitem"]:not([aria-disabled="true"])') as HTMLElement)?.focus(); }, [depth]);

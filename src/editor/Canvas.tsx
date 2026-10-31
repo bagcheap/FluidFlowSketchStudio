@@ -15,6 +15,7 @@ import { boxAt, hitTest, portAnchors, portPositions } from './hitTest';
 import { applyStyle, cloneElements, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
+import { updateMembership, withMembers } from '../store/containers';
 
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 const HANDLES: [Handle, number, number][] = [['nw', 0, 0], ['n', 0.5, 0], ['ne', 1, 0], ['e', 1, 0.5], ['se', 1, 1], ['s', 0.5, 1], ['sw', 0, 1], ['w', 0, 0.5]];
@@ -23,7 +24,7 @@ type Interaction =
   | { k: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { k: 'create'; id: string; start: Point; moved: boolean; onExisting: boolean }
   | { k: 'connect'; id: string; start: Point; moved: boolean }
-  | { k: 'move'; ids: string[]; start: Point; orig: FlowDocument; moved: boolean; dupDone: boolean }
+  | { k: 'move'; ids: string[]; top: string[]; start: Point; orig: FlowDocument; moved: boolean; dupDone: boolean } // ids = top + everything inside moved containers
   | { k: 'resize'; id: string; handle: Handle; orig: BoxElement }
   | { k: 'resizeMulti'; ids: string[]; handle: Handle; box: { x: number; y: number; w: number; h: number }; orig: FlowDocument }
   | { k: 'rotate'; id: string; orig: BoxElement; startAngle: number }
@@ -148,7 +149,7 @@ export function Canvas() {
     const r = 9 / view.zoom;
     const near = (q: Point) => Math.hypot(q.x - p.x, q.y - p.y) < r;
     if (singleBox && !singleBox.locked) {
-      if (near(toWorld(singleBox, STILL, { x: singleBox.w / 2, y: -26 / view.zoom }))) return { kind: 'rotate' };
+      if (singleBox.type !== 'container' && near(toWorld(singleBox, STILL, { x: singleBox.w / 2, y: -26 / view.zoom }))) return { kind: 'rotate' }; // containers stay upright
       for (const [h, fx, fy] of HANDLES) {
         if ((singleBox.type === 'text') && (h === 'n' || h === 's')) continue;
         if (near(toWorld(singleBox, STILL, { x: fx * singleBox.w, y: fy * singleBox.h }))) return { kind: 'resize', handle: h };
@@ -231,7 +232,8 @@ export function Canvas() {
           else ids = u.selection;
           if (ids.every((id) => getElement(d, id)?.locked)) return;
           D.begin();
-          inter.current = { k: 'move', ids: useUI.getState().selection.filter((id) => !getElement(d, id)?.locked), start: p, orig: d, moved: false, dupDone: false };
+          const top = useUI.getState().selection.filter((id) => !getElement(d, id)?.locked);
+          inter.current = { k: 'move', ids: withMembers(d, top), top, start: p, orig: d, moved: false, dupDone: false };
           return;
         }
         inter.current = { k: 'marquee', start: p, cur: p, additive: e.shiftKey ? u.selection : [] };
@@ -333,6 +335,20 @@ export function Canvas() {
     useUI.getState().setEditing(id);
   }
 
+  // Right-click: select what is under the pointer (keeping a selection it belongs to), then show the menu.
+  // Inside the text editor the browser's own menu stays (spelling suggestions).
+  const onContextMenu = (e: React.MouseEvent) => {
+    if (isEditable(e.target)) return;
+    e.preventDefault();
+    const u = useUI.getState();
+    if (u.presentation || (e.target as HTMLElement).closest('.no-canvas')) return;
+    const d = useDoc.getState().doc;
+    const hit = hitTest(d, toWorldPt(e), u.view.zoom);
+    if (!hit) u.select([]);
+    else if (!u.selection.includes(hit.id)) { u.setTool('select'); u.select(expandGroups(d, [hit.id])); }
+    u.setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
   // Pointer events always report detail=0, so double-clicks are handled here.
   const onDoubleClick = (e: React.MouseEvent) => {
     if (isEditable(e.target) || (e.target as HTMLElement).closest('.no-canvas')) return;
@@ -422,9 +438,11 @@ export function Canvas() {
           it.dupDone = true;
           const clones = cloneElements(it.orig, it.ids.map((id) => getElement(it.orig, id)!), 0, 0);
           D.live((d) => ({ ...d, elements: [...d.elements, ...clones] }));
+          const cloneOf = new Map(it.ids.map((id, i) => [id, clones[i].id]));
           it.orig = useDoc.getState().doc;
           it.ids = clones.map((c) => c.id);
-          u.select(it.ids);
+          it.top = it.top.map((id) => cloneOf.get(id)!);
+          u.select(it.top);
         }
         it.moved = true;
         if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
@@ -515,6 +533,7 @@ export function Canvas() {
         } else {
           D.live((d) => mapElements(d, [it.id], (el) => (el.w < 4 || el.h < 4 ? { ...el, w: Math.max(el.w, 20), h: Math.max(el.h, 20) } : el)));
         }
+        D.live((d) => updateMembership(d, [it.id])); // drawn inside a container: it joins it
         D.end();
         afterCreate(it.id);
         return;
@@ -531,6 +550,7 @@ export function Canvas() {
       }
       case 'freehand': {
         if (it.pts.length < 2) { D.cancel(); return; }
+        D.live((d) => updateMembership(d, [it.id]));
         D.end();
         return;
       }
@@ -541,10 +561,17 @@ export function Canvas() {
           if (h && !e.shiftKey && u.selection.length > 1) u.select(expandGroups(D.doc, [h.id]));
           return;
         }
+        // dropped shapes join the container they land in, or leave the one they were dragged out of
+        D.live((d) => updateMembership(d, it.top));
         D.end();
         return;
       case 'marquee': return;
       case 'pan': return;
+      case 'resize':
+      case 'resizeMulti':
+        D.live((d) => updateMembership(d, it.k === 'resize' ? [it.id] : it.ids));
+        D.end();
+        return;
       default:
         D.end();
     }
@@ -683,10 +710,12 @@ export function Canvas() {
       overlayEls.push(<polyline key={'csel' + el.id} points={path.pts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={accent} strokeOpacity={0.35} strokeWidth={(el.style.strokeWidth + 6) / z} strokeLinecap="round" />);
     }
     if (singleBox && !singleBox.locked && !editingId) {
-      const rp = toWorld(singleBox, STILL, { x: singleBox.w / 2, y: -26 / z });
-      const top = toWorld(singleBox, STILL, { x: singleBox.w / 2, y: 0 });
-      overlayEls.push(<line key="rotl" x1={top.x} y1={top.y} x2={rp.x} y2={rp.y} stroke={accent} strokeWidth={1 / z} />);
-      overlayEls.push(<circle key="rot" cx={rp.x} cy={rp.y} r={hs * 0.6} fill="var(--panel)" stroke={accent} strokeWidth={1.5 / z} />);
+      if (singleBox.type !== 'container') {
+        const rp = toWorld(singleBox, STILL, { x: singleBox.w / 2, y: -26 / z });
+        const top = toWorld(singleBox, STILL, { x: singleBox.w / 2, y: 0 });
+        overlayEls.push(<line key="rotl" x1={top.x} y1={top.y} x2={rp.x} y2={rp.y} stroke={accent} strokeWidth={1 / z} />);
+        overlayEls.push(<circle key="rot" cx={rp.x} cy={rp.y} r={hs * 0.6} fill="var(--panel)" stroke={accent} strokeWidth={1.5 / z} />);
+      }
       for (const [h, fx, fy] of HANDLES) {
         if (singleBox.type === 'text' && (h === 'n' || h === 's')) continue;
         const p = toWorld(singleBox, STILL, { x: fx * singleBox.w, y: fy * singleBox.h });
@@ -735,7 +764,7 @@ export function Canvas() {
       onDoubleClick={onDoubleClick}
       // a click that just opened the text editor must not let the browser move focus off it (blur commits/deletes the text)
       onMouseDown={(e) => { if (useUI.getState().editingId && !isEditable(e.target)) e.preventDefault(); }}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={onContextMenu}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
       role="application"
@@ -756,13 +785,13 @@ export function Canvas() {
           // nothing else changed since the click: replace the empty creation with the finished text
           D.revertLast();
           if (!text.trim()) { useUI.getState().select([]); return; }
-          D.commit((d) => ({ ...d, elements: [...d.elements, fitShapeToText({ ...el, text } as DiagramElement)] }));
+          D.commit((d) => updateMembership({ ...d, elements: [...d.elements, fitShapeToText({ ...el, text } as DiagramElement)] }, [id]));
           return;
         }
         if (el.type === 'text' && !text.trim()) { D.commit((d) => deleteElements(d, new Set([id]))); useUI.getState().select([]); return; }
         if (text === el.text) return;
         // typing a label on an icon whose label is hidden shows it
-        D.commit((d) => mapElements(d, [id], (x) => fitShapeToText({ ...x, text, ...(x.type === 'icon' && x.labelPos === 'none' && text.trim() ? { labelPos: 'below' } : {}) } as DiagramElement)));
+        D.commit((d) => updateMembership(mapElements(d, [id], (x) => fitShapeToText({ ...x, text, ...(x.type === 'icon' && x.labelPos === 'none' && text.trim() ? { labelPos: 'below' } : {}) } as DiagramElement)), [id])); // a shape that grew to fit its text grows its container too
       }} />}
     </div>
   );

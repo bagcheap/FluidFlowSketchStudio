@@ -1,5 +1,5 @@
 // Editor commands shared by menus, keyboard shortcuts, toolbar and inspector.
-import type { Asset, BoxElement, ConnectorAnim, DiagramElement, FlowDocument, IconAsset, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
+import type { Asset, BoxElement, ConnectorAnim, ContainerElement, DiagramElement, FlowDocument, IconAsset, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
 import { SCHEMA_VERSION } from '../model/types';
 import { DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
@@ -9,8 +9,9 @@ import { fileToAsset } from '../engine/images';
 import { openDocumentFile, pickFile, resetFileHandle, saveDocumentFile } from '../persistence/files';
 import { DocumentError, parseDocument, serializeDocument } from '../model/schema';
 import { layoutText } from '../engine/text';
-import { geometryFor } from '../engine/shapes';
+import { geometryFor, SHAPE_LABELS } from '../engine/shapes';
 import { loadIconSet } from '../icons/sets';
+import { fitToContents, isContainer, moveElements, removeContainer, updateMembership, withMembers, wrapInContainer } from './containers';
 import { importFiles, slugName, useLibraries } from '../icons/libraries';
 import { svgToIcon } from '../icons/svgToIcon';
 
@@ -65,10 +66,11 @@ export const deselect = () => U().select([]);
 const selected = () => new Set(U().selection);
 
 export function deleteSelection() {
-  const ids = selected();
+  const doc = D().doc;
+  const locked = doc.elements.filter((e) => selected().has(e.id) && e.locked).map((e) => e.id);
+  // deleting a container deletes what is inside it too (Remove container keeps the contents)
+  const ids = new Set(withMembers(doc, [...selected()].filter((id) => !locked.includes(id))));
   if (!ids.size) return;
-  const locked = D().doc.elements.filter((e) => ids.has(e.id) && e.locked).map((e) => e.id);
-  locked.forEach((id) => ids.delete(id));
   D().commit((d) => deleteElements(d, ids));
   U().select(locked);
 }
@@ -90,6 +92,7 @@ export function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: numb
     n.seed = newSeed();
     n.groupIds = n.groupIds.map((g) => { if (!groupMap.has(g)) groupMap.set(g, uid('grp')); return groupMap.get(g)!; });
     n.locked = false;
+    if (n.type === 'container') n.members = n.members.flatMap((m) => (idMap.has(m) ? [idMap.get(m)!] : [])); // only members copied along
     if (n.type === 'connector') {
       for (const k of ['start', 'end'] as const) {
         const end = n[k];
@@ -104,7 +107,7 @@ export function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: numb
 
 export function copySelection() {
   const doc = D().doc;
-  const ids = selected();
+  const ids = new Set(withMembers(doc, selected())); // a container is copied with its contents
   const els = doc.elements.filter((e) => ids.has(e.id));
   if (!els.length) return false;
   const assets = Object.fromEntries(els.filter((e) => e.type === 'image').map((e) => [(e as { assetId: string }).assetId, doc.assets[(e as { assetId: string }).assetId]]));
@@ -130,9 +133,10 @@ export async function paste(text?: string) {
   const { doc: parsed } = parseDocument({ format: 'flowsketch', schemaVersion: SCHEMA_VERSION, elements: data.elements, assets: data.assets ?? {}, icons: data.icons ?? {} });
   const doc = D().doc;
   const clones = cloneElements(doc, parsed.elements, 24, 24);
-  D().commit((d) => ({ ...d, assets: { ...d.assets, ...parsed.assets }, icons: { ...parsed.icons, ...d.icons }, elements: [...d.elements, ...clones] }));
+  const top = topLevel(clones);
+  D().commit((d) => updateMembership({ ...d, assets: { ...d.assets, ...parsed.assets }, icons: { ...parsed.icons, ...d.icons }, elements: [...d.elements, ...clones] }, top));
   U().setTool('select');
-  U().select(clones.map((c) => c.id));
+  U().select(top);
 }
 
 function pastePlainText(t: string) {
@@ -146,12 +150,19 @@ function pastePlainText(t: string) {
 
 export function duplicateSelection() {
   const doc = D().doc;
-  const ids = selected();
+  const ids = new Set(withMembers(doc, selected()));
   const els = doc.elements.filter((e) => ids.has(e.id));
   if (!els.length) return;
   const clones = cloneElements(doc, els, 20, 20);
-  D().commit((d) => ({ ...d, elements: [...d.elements, ...clones] }));
-  U().select(clones.map((c) => c.id));
+  const top = topLevel(clones);
+  D().commit((d) => updateMembership({ ...d, elements: [...d.elements, ...clones] }, top));
+  U().select(top);
+}
+
+/** The elements of a set that are not inside a container of the same set (what to select after a paste). */
+function topLevel(els: DiagramElement[]): string[] {
+  const inside = new Set(els.flatMap((e) => (e.type === 'container' ? e.members : [])));
+  return els.filter((e) => !inside.has(e.id)).map((e) => e.id);
 }
 
 // ---- style --------------------------------------------------------------------
@@ -184,7 +195,7 @@ export function pasteStyle() {
 /** Make the selected object's look the default for its tool. */
 /** The remembered-style key of the tool that draws this kind of element. */
 export function toolKeyFor(e: DiagramElement): string | null {
-  return e.type === 'icon' ? 'icon' : e.type === 'shape' ? styleKey('shape', e.shape) : e.type === 'connector' ? (e.endHead === 'none' && e.startHead === 'none' ? 'line' : 'arrow') : e.type === 'freehand' ? (e.highlighter ? 'highlighter' : 'freehand') : e.type === 'text' ? 'text' : null;
+  return e.type === 'icon' ? 'icon' : e.type === 'container' ? 'container' : e.type === 'shape' ? styleKey('shape', e.shape) : e.type === 'connector' ? (e.endHead === 'none' && e.startHead === 'none' ? 'line' : 'arrow') : e.type === 'freehand' ? (e.highlighter ? 'highlighter' : 'freehand') : e.type === 'text' ? 'text' : null;
 }
 
 /** Copy style changes made on selected objects into their tools' defaults (Excalidraw-like "current item style"). */
@@ -208,7 +219,31 @@ export function applySelectionStyleToDefaults() {
   const key = toolKeyFor(e);
   if (!key) return;
   U().setToolStyle(key, styleOf(e));
-  U().toast(`Saved as the default style for new ${key.replace('shape:', '')} drawings`, 'success');
+  U().toast(`Saved as the default style for new ${toolName(key)} drawings`, 'success');
+}
+
+/** "shape:roundRect" → "rounded rectangle", "arrow" → "arrow" */
+export const toolName = (key: string) => (key.startsWith('shape:') ? (SHAPE_LABELS[key.slice(6) as ShapeKind] ?? key.slice(6)).toLowerCase() : key);
+
+/** Forget a tool's remembered style, so new drawings use the original style again. */
+export function resetToolStyle(key: string) {
+  const { [key]: _gone, ...rest } = U().prefs.toolStyles;
+  U().updatePrefs({ toolStyles: rest });
+  U().toast(`New ${toolName(key)} drawings use the original style again`, 'success');
+}
+
+/** Reset the default style of the tool that draws the selected object. */
+export function resetSelectionToolStyle() {
+  const e = getElement(D().doc, U().selection[0]);
+  const key = e && toolKeyFor(e);
+  if (key) resetToolStyle(key);
+}
+
+/** Forget every tool's remembered style (objects already drawn don't change). */
+export async function resetAllToolStyles() {
+  if (!(await U().ask('Reset the default style of every tool to the original? Objects you already drew keep their style.', 'Reset all'))) return;
+  U().updatePrefs({ toolStyles: {}, sharedStyle: null });
+  U().toast('All tools use their original styles again', 'success');
 }
 
 // ---- arrange ------------------------------------------------------------------
@@ -253,17 +288,24 @@ export function align(kind: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | '
   if (els.length < 2) return;
   const x0 = Math.min(...els.map((e) => e.x)), x1 = Math.max(...els.map((e) => e.x + e.w));
   const y0 = Math.min(...els.map((e) => e.y)), y1 = Math.max(...els.map((e) => e.y + e.h));
-  D().commit((d) => mapElements(d, els.map((e) => e.id), (e) => {
-    const b = e as BoxElement;
+  const target = (b: BoxElement) => {
     switch (kind) {
-      case 'left': return { ...b, x: x0 };
-      case 'right': return { ...b, x: x1 - b.w };
-      case 'hcenter': return { ...b, x: (x0 + x1) / 2 - b.w / 2 };
-      case 'top': return { ...b, y: y0 };
-      case 'bottom': return { ...b, y: y1 - b.h };
-      case 'vcenter': return { ...b, y: (y0 + y1) / 2 - b.h / 2 };
+      case 'left': return { x: x0, y: b.y };
+      case 'right': return { x: x1 - b.w, y: b.y };
+      case 'hcenter': return { x: (x0 + x1) / 2 - b.w / 2, y: b.y };
+      case 'top': return { x: b.x, y: y0 };
+      case 'bottom': return { x: b.x, y: y1 - b.h };
+      case 'vcenter': return { x: b.x, y: (y0 + y1) / 2 - b.h / 2 };
     }
-  }));
+  };
+  D().commit((d) => moveBoxes(d, els.map((b) => { const t = target(b); return [b.id, t.x - b.x, t.y - b.y] as const; })));
+}
+
+/** Move boxes by their own offsets; a container brings its contents. Then re-check container membership. */
+function moveBoxes(doc: FlowDocument, moves: (readonly [string, number, number])[]): FlowDocument {
+  let out = doc;
+  for (const [id, dx, dy] of moves) out = moveElements(out, new Set(withMembers(out, [id])), dx, dy);
+  return updateMembership(out, moves.map((m) => m[0]));
 }
 
 export function distribute(axis: 'h' | 'v') {
@@ -276,7 +318,7 @@ export function distribute(axis: 'h' | 'v') {
   let cur = axis === 'h' ? first.x : first.y;
   const pos = new Map<string, number>();
   for (const e of els) { pos.set(e.id, cur); cur += (axis === 'h' ? e.w : e.h) + gap; }
-  D().commit((d) => mapElements(d, [...pos.keys()], (e) => ({ ...e, ...(axis === 'h' ? { x: pos.get(e.id)! } : { y: pos.get(e.id)! }) })));
+  D().commit((d) => moveBoxes(d, els.map((e) => [e.id, axis === 'h' ? pos.get(e.id)! - e.x : 0, axis === 'v' ? pos.get(e.id)! - e.y : 0] as const)));
 }
 
 export function flip(axis: 'h' | 'v') {
@@ -289,16 +331,38 @@ export function flip(axis: 'h' | 'v') {
 }
 
 export function nudge(dx: number, dy: number) {
-  const ids = selected();
-  if (!ids.size) return;
-  D().commit((d) => mapElements(d, ids, (e) => {
-    if (e.locked) return e;
-    if (e.type === 'connector') {
-      const mv = (p: typeof e.start) => (p.elementId && ids.has(p.elementId) ? p : p.elementId ? p : { ...p, x: p.x + dx, y: p.y + dy });
-      return { ...e, start: mv(e.start), end: mv(e.end), bends: e.bends.map((b) => ({ x: b.x + dx, y: b.y + dy })) };
-    }
-    return { ...e, x: e.x + dx, y: e.y + dy };
-  }), 'nudge');
+  const top = [...selected()];
+  if (!top.length) return;
+  D().commit((d) => updateMembership(moveElements(d, new Set(withMembers(d, top)), dx, dy), top), 'nudge');
+}
+
+// ---- containers ----------------------------------------------------------------------
+/** Wrap the selection in a container and start editing its title. */
+export function addContainer() {
+  const doc = D().doc;
+  const ids = U().selection.filter((id) => !getElement(doc, id)?.locked);
+  if (!ids.length) { U().toast('Select the shapes to put in a container first'); return; }
+  const r = wrapInContainer(doc, ids, U().toolStyle('container'));
+  if (!r) return;
+  D().commit(() => r.doc);
+  U().setTool('select');
+  U().select([r.id]);
+  U().setEditing(r.id); // type the title straight away
+}
+
+/** Remove the selected containers, keeping what was inside them. */
+export function removeSelectedContainers() {
+  const cs = U().selection.filter((id) => isContainer(getElement(D().doc, id)));
+  if (!cs.length) return;
+  const members = cs.flatMap((id) => (getElement(D().doc, id) as ContainerElement).members);
+  D().commit((d) => cs.reduce((acc, id) => removeContainer(acc, id), d));
+  U().select(members);
+}
+
+/** Resize the selected containers to fit their contents exactly. */
+export function fitSelectedContainers() {
+  const cs = U().selection.filter((id) => isContainer(getElement(D().doc, id)));
+  if (cs.length) D().commit((d) => cs.reduce((acc, id) => fitToContents(acc, id), d));
 }
 
 // ---- connectors -------------------------------------------------------------------
@@ -340,6 +404,16 @@ function placeImageAsset(asset: Asset, at?: { x: number; y: number }, maxSize = 
   D().commit((d) => ({ ...d, assets: { ...d.assets, [asset.id]: asset }, elements: [...d.elements, el] }));
   U().setTool('select');
   U().select([el.id]);
+}
+
+/** Open the right-click menu from the keyboard: at the selection, or in the middle of the canvas. */
+export function openContextMenuAtSelection() {
+  const r = document.querySelector('[data-testid=stage]')?.getBoundingClientRect();
+  if (!r) return;
+  const b = selectionBounds(D().doc, U().selection);
+  const v = U().view;
+  const x = b ? (b.x + b.w / 2 - v.x) * v.zoom : stage.w / 2, y = b ? (b.y + b.h / 2 - v.y) * v.zoom : stage.h / 2;
+  U().setContextMenu({ x: r.left + Math.max(0, Math.min(stage.w, x)), y: r.top + Math.max(0, Math.min(stage.h, y)) });
 }
 
 export const toggleIconPanel = () => U().updatePrefs({ showIconPanel: !U().prefs.showIconPanel });
@@ -392,7 +466,7 @@ export async function importIconLibraryFiles(files: File[]) {
 /** Add an icon (already converted and validated) to the document, centred on `c`. */
 export function placeIcon(icon: IconAsset, c: { x: number; y: number }) {
   const el = makeIcon(icon.id, c.x - ICON_SIZE / 2, c.y - ICON_SIZE / 2, ICON_SIZE, U().toolStyle('icon'));
-  D().commit((d) => ({ ...d, icons: { ...d.icons, [icon.id]: d.icons[icon.id] ?? icon }, elements: [...d.elements, el] }));
+  D().commit((d) => updateMembership({ ...d, icons: { ...d.icons, [icon.id]: d.icons[icon.id] ?? icon }, elements: [...d.elements, el] }, [el.id]));
   U().setTool('select');
   U().select([el.id]);
 }

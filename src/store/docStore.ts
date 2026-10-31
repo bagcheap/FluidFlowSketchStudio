@@ -131,6 +131,7 @@ export function deleteElements(doc: FlowDocument, ids: Set<string>): FlowDocumen
   const removed = doc.elements.filter((e) => ids.has(e.id));
   const removedBoxes = new Map(removed.filter((e): e is BoxElement => e.type !== 'connector').map((e) => [e.id, e]));
   const elements = doc.elements.filter((e) => !ids.has(e.id)).map((e) => {
+    if (e.type === 'container' && e.members.some((m) => ids.has(m))) return { ...e, members: e.members.filter((m) => !ids.has(m)) };
     if (e.type !== 'connector') return e;
     let c: ConnectorElement = e;
     for (const k of ['start', 'end'] as const) {

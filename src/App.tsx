@@ -5,6 +5,7 @@ import { TopBar } from './ui/TopBar';
 import { Toolbar } from './ui/Toolbar';
 import { Inspector } from './ui/Inspector';
 import { IconsPanel } from './ui/IconsPanel';
+import { ContextMenu } from './ui/ContextMenu';
 import { Timeline } from './ui/Timeline';
 import { useShortcuts } from './ui/shortcuts';
 import { useDoc } from './store/docStore';
@@ -198,6 +199,7 @@ export function App() {
         {!presentation && showTimeline && <Timeline />}
         <Toasts />
         <Dialogs />
+        <ContextMenu />
         <ConfirmDialog />
       </div>
     </ErrorBoundary>

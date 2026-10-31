@@ -13,7 +13,7 @@ npm install
 npm run dev        # http://localhost:5173  (also builds the HTML-player bundle first)
 npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ on http://localhost:4173
-npm test           # unit tests (Vitest, 51 tests)
+npm test           # unit tests (Vitest, 59 tests)
 npm run test:e2e   # end-to-end acceptance tests (needs `npm run preview` running; see below)
 ```
 
@@ -26,8 +26,9 @@ Requirements: Node 18+ (tested on Node 22). The e2e suite uses Python 3 with `pl
 3. **Write.** Double-click a shape or arrow, or press <kbd>Enter</kbd>, to type. Shapes grow to fit their text.
 4. **Connect.** Press <kbd>A</kbd> and drag from one shape to another. Connectors are real relationships: they follow shapes when moved, resized or animated. Drop near a side's dot to pin to that port. Drag mid-dots to add bends, and switch Straight / Curved / Elbow in the inspector. **Swap direction** (inspector, or Arrange ▸ Swap arrow direction) reverses an arrow without redrawing it.
 5. **Add icons.** Press <kbd>Shift</kbd>+<kbd>I</kbd> (or the grid button at the end of the toolbar) to open the Icons panel: 12,884 icons from [Tabler Icons](https://tabler.io/icons) (MIT), [Devicon](https://devicon.dev/) (MIT), [SVG Logos](https://github.com/gilbarbara/logos) (CC0), [Simple Icons](https://simpleicons.org/) (CC0) and the [Kubernetes icons](https://github.com/kubernetes/community/tree/master/icons) (Apache-2.0). Search them all, then drag an icon onto the canvas or click to add it. **Add icons** builds your own libraries from SVG/PNG files, folders, ZIPs or Iconify JSON, and imports the official AWS, Azure and Google Cloud icon ZIPs you download from each provider, and **Manage** exports them as `.flowsketchlib` files to share. Brand logos remain trademarks of their owners. Icons attach to arrows, take a label, animate like shapes, and can be recoloured, drawn hand-drawn or given a circle or square background in the inspector.
-6. **Play.** <kbd>K</kbd> or the play button. Use the **Squiggle** slider (0–10) for motion and **Hand-drawn** for static sketchiness; the two are independent.
-7. **Save & export.** <kbd>Ctrl/⌘ S</kbd> saves a `.flowsketch` file. Work also autosaves in the browser. **Export GIF** renders a seamless loop.
+6. **Group in containers.** Select shapes, right-click and choose **Add container**: a titled frame that moves everything inside it. Shapes dragged in join it, shapes dragged out leave it, and it grows to fit. Right-click anywhere for the most common actions (Shift+F10 from the keyboard).
+7. **Play.** <kbd>K</kbd> or the play button. Use the **Squiggle** slider (0–10) for motion and **Hand-drawn** for static sketchiness; the two are independent.
+8. **Save & export.** <kbd>Ctrl/⌘ S</kbd> saves a `.flowsketch` file. Work also autosaves in the browser. **Export GIF** renders a seamless loop.
 
 The full shortcut list is under Help ▸ Keyboard shortcuts (<kbd>?</kbd>).
 
