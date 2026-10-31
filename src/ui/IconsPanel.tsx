@@ -5,8 +5,9 @@ import { Plus, Search, Settings2, X } from 'lucide-react';
 import type { IconAsset, IconGradient, IconPaint } from '../model/types';
 import { useUI } from '../store/uiStore';
 import { insertIcon } from '../store/commands';
-import { ICON_SETS, iconTitle, loadedSets, loadIconSet, loadNamesIndex, searchNames, type IconSet, type IconSetInfo } from '../icons/sets';
+import { ICON_SETS, iconTitle, libInfo, loadedSets, loadIconSet, loadNamesIndex, searchNames, type IconSet, type IconSetInfo } from '../icons/sets';
 import { libSetId, useLibraries } from '../icons/libraries';
+import { VENDORS } from '../icons/zipImport';
 
 /** dataTransfer type for an icon dragged from the panel; the value is "<set>:<name>". */
 export const ICON_DRAG_TYPE = 'application/x-flowsketch-icon';
@@ -81,17 +82,19 @@ function IconCell({ set, name }: { set: IconSet; name: string }) {
 }
 
 const BRAND_NOTE = 'Logos are trademarks of their owners. Use them to show which products a system uses, not to suggest endorsement.';
+const vendorNote = (v: keyof typeof VENDORS) => `Imported from ${VENDORS[v].name}. These icons belong to ${VENDORS[v].name} and follow the terms you accepted when downloading them.${VENDORS[v].note ? ' ' + VENDORS[v].note : ''}`;
 
 /** One set's icons: a heading, an optional brand note, and a grid. */
-function SetSection({ info, names, total, onShowAll, more, brandNote = true }: { info: IconSetInfo; names: string[]; total: number; onShowAll?: () => void; more?: ReactNode; brandNote?: boolean }) {
+function SetSection({ info, names, total, onShowAll, more, brandNote = true, title }: { info: IconSetInfo; names: string[]; total: number; onShowAll?: () => void; more?: ReactNode; brandNote?: boolean; title?: string }) {
   const { set, error, retry } = useIconSet(info.id);
   return (
-    <section className="ip-sec" aria-label={info.name}>
+    <section className="ip-sec" aria-label={title ?? info.name}>
       <h3>
-        <span>{info.group === info.name ? info.name : `${info.group} · ${info.name}`}</span>
+        <span>{title ?? (info.group === info.name ? info.name : `${info.group} · ${info.name}`)}</span>
         {onShowAll && total > names.length && <button className="link" onClick={onShowAll}>Show all {total.toLocaleString()}</button>}
       </h3>
       {info.brands && brandNote && <p className="ip-note">{BRAND_NOTE}</p>}
+      {info.vendor && brandNote && <p className="ip-note">{vendorNote(info.vendor)}</p>}
       {error && <p className="ip-msg" role="alert">{error} <button className="link" onClick={retry}>Try again</button></p>}
       {!set && !error && <p className="ip-msg">Loading {info.name}…</p>}
       {set && <div className="ip-grid">{names.map((n) => <IconCell key={n} set={set} name={n} />)}</div>}
@@ -135,7 +138,7 @@ export function IconsPanel() {
 
   const sets: IconSetInfo[] = useMemo(() => [
     ...ICON_SETS.filter((s) => !hidden.includes(s.id)),
-    ...libs.map((l) => ({ id: libSetId(l.id), name: l.name, group: l.name, license: '' })),
+    ...libs.map(libInfo),
   ], [hidden, libs]);
   const namesOf = (info: IconSetInfo) => (info.url ? index?.[info.id] ?? [] : libs.find((l) => libSetId(l.id) === info.id)?.items.map((it) => it.name).sort() ?? []);
   const active = sets.find((s) => s.id === chip);
@@ -145,7 +148,20 @@ export function IconsPanel() {
 
   let body: ReactNode;
   if (!index) body = <p className="ip-msg">Loading icons…</p>;
-  else if (active) {
+  else if (active && !q && !active.url && libs.find((l) => libSetId(l.id) === active.id)?.items.some((it) => it.category)) {
+    // a library with categories (e.g. a cloud provider's package): one section per category
+    const lib = libs.find((l) => libSetId(l.id) === active.id)!;
+    const cats = new Map<string, string[]>();
+    for (const it of lib.items) cats.set(it.category ?? 'Other', [...(cats.get(it.category ?? 'Other') ?? []), it.name]);
+    body = (
+      <>
+        {active.vendor && <p className="ip-note">{vendorNote(active.vendor)}</p>}
+        {[...cats].sort(([a], [b]) => a.localeCompare(b)).map(([cat, names]) => (
+          <SetSection key={cat} info={active} title={cat} names={names.sort()} total={names.length} brandNote={false} />
+        ))}
+      </>
+    );
+  } else if (active) {
     const all = namesOf(active);
     const names = q ? searchNames(all, q, PAGE) : all.slice(0, shown);
     body = names.length || !q

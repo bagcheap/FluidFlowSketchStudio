@@ -13,7 +13,7 @@ npm install
 npm run dev        # http://localhost:5173  (also builds the HTML-player bundle first)
 npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ on http://localhost:4173
-npm test           # unit tests (Vitest, 47 tests)
+npm test           # unit tests (Vitest, 51 tests)
 npm run test:e2e   # end-to-end acceptance tests (needs `npm run preview` running; see below)
 ```
 
@@ -25,7 +25,7 @@ Requirements: Node 18+ (tested on Node 22). The e2e suite uses Python 3 with `pl
 2. **Style once, reuse.** With a drawing tool active, the inspector edits *that tool's remembered defaults*. Defaults are stored separately per tool (blue rectangles and red diamonds stay that way) and persist across sessions. Existing objects are never changed by editing defaults. Select objects to edit them instead.
 3. **Write.** Double-click a shape or arrow, or press <kbd>Enter</kbd>, to type. Shapes grow to fit their text.
 4. **Connect.** Press <kbd>A</kbd> and drag from one shape to another. Connectors are real relationships: they follow shapes when moved, resized or animated. Drop near a side's dot to pin to that port. Drag mid-dots to add bends, and switch Straight / Curved / Elbow in the inspector. **Swap direction** (inspector, or Arrange ▸ Swap arrow direction) reverses an arrow without redrawing it.
-5. **Add icons.** Press <kbd>Shift</kbd>+<kbd>I</kbd> (or the grid button at the end of the toolbar) to open the Icons panel: 12,884 icons from [Tabler Icons](https://tabler.io/icons) (MIT), [Devicon](https://devicon.dev/) (MIT), [SVG Logos](https://github.com/gilbarbara/logos) (CC0), [Simple Icons](https://simpleicons.org/) (CC0) and the [Kubernetes icons](https://github.com/kubernetes/community/tree/master/icons) (Apache-2.0). Search them all, then drag an icon onto the canvas or click to add it. **Add icons** builds your own libraries from SVG/PNG files, folders or Iconify JSON, and **Manage** exports them as `.flowsketchlib` files to share. Brand logos remain trademarks of their owners. Icons attach to arrows, take a label, animate like shapes, and can be recoloured, drawn hand-drawn or given a circle or square background in the inspector.
+5. **Add icons.** Press <kbd>Shift</kbd>+<kbd>I</kbd> (or the grid button at the end of the toolbar) to open the Icons panel: 12,884 icons from [Tabler Icons](https://tabler.io/icons) (MIT), [Devicon](https://devicon.dev/) (MIT), [SVG Logos](https://github.com/gilbarbara/logos) (CC0), [Simple Icons](https://simpleicons.org/) (CC0) and the [Kubernetes icons](https://github.com/kubernetes/community/tree/master/icons) (Apache-2.0). Search them all, then drag an icon onto the canvas or click to add it. **Add icons** builds your own libraries from SVG/PNG files, folders, ZIPs or Iconify JSON, and imports the official AWS, Azure and Google Cloud icon ZIPs you download from each provider, and **Manage** exports them as `.flowsketchlib` files to share. Brand logos remain trademarks of their owners. Icons attach to arrows, take a label, animate like shapes, and can be recoloured, drawn hand-drawn or given a circle or square background in the inspector.
 6. **Play.** <kbd>K</kbd> or the play button. Use the **Squiggle** slider (0–10) for motion and **Hand-drawn** for static sketchiness; the two are independent.
 7. **Save & export.** <kbd>Ctrl/⌘ S</kbd> saves a `.flowsketch` file. Work also autosaves in the browser. **Export GIF** renders a seamless loop.
 
@@ -152,6 +152,8 @@ The 60 FPS target for 100+150 objects is **not demonstrated** here, because no G
 * **Plain CSS with design tokens instead of Tailwind**, and **hand-written accessible menu/dialog components instead of Radix** (WAI-ARIA menubar pattern, focus trap, Escape handling). Both reduce dependencies with no loss of function and could be swapped later.
 * **E2E tests use Playwright for Python** rather than the Node test runner, because a Chromium build was available for it in the build environment.
 
-## Licences
+## Licences and usage
 
-Rough.js (MIT), gifenc (MIT), Zustand (MIT), React (MIT), Vite/Vitest (MIT), idb-keyval (Apache-2.0), Lucide (ISC), Kalam & Inter fonts (SIL OFL 1.1). The UI and branding are original; no Excalidraw assets are used.
+FlowSketch Studio is a personal learning project; it is not published or distributed. Its own code is under Apache-2.0 (`LICENSE`).
+
+The bundled icon sets (Tabler, Devicon, SVG Logos, Simple Icons, Kubernetes), fonts and libraries keep their own licences, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Brand logos are trademarks of their owners. AWS, Azure and Google Cloud icons are **not** included: you download them yourself from each provider, under that provider's terms, and import them into your browser.

@@ -133,7 +133,8 @@ export function AboutDialog() {
   return (
     <Modal title="About FlowSketch Studio">
       <p><b>FlowSketch Studio</b> {version} — an editor for gently animated, hand-drawn flow diagrams. <button className="link" onClick={() => useUI.getState().openDialog('whatsnew')}>What's new</button></p>
-      <p className="note">Everything runs locally in your browser; documents are never uploaded. Built with React, Rough.js (MIT), gifenc (MIT), Zustand (MIT), idb-keyval (Apache-2.0), Lucide icons (ISC) and the Kalam & Inter fonts (OFL).</p>
+      <p className="note">Everything runs locally in your browser; documents are never uploaded. Built with React, Rough.js (MIT), gifenc (MIT), fflate (MIT), Zustand (MIT), idb-keyval (Apache-2.0), Lucide icons (ISC) and the Kalam & Inter fonts (OFL).</p>
+      <p className="note">A personal learning project; it is not published or distributed. Built-in icons: Tabler Icons and Devicon (MIT), SVG Logos and Simple Icons (CC0), Kubernetes icons (Apache-2.0); see THIRD_PARTY_NOTICES.md. Logos are trademarks of their owners. AWS, Azure and Google Cloud icons are not included: you import them from each provider, under that provider’s terms.</p>
     </Modal>
   );
 }

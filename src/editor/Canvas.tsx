@@ -659,7 +659,7 @@ export function Canvas() {
     const files = [...(e.dataTransfer.files ?? [])];
     const svgs = files.filter((f) => f.type === 'image/svg+xml' || /\.svg$/i.test(f.name));
     if (svgs.length) { void dropSvgIcons(svgs, toWorldPt(e)); return; }
-    if (files.some((f) => /\.flowsketchlib$/i.test(f.name))) { void importIconLibraryFiles(files); return; }
+    if (files.some((f) => /\.(flowsketchlib|zip)$/i.test(f.name))) { void importIconLibraryFiles(files); return; }
     const f = files[0];
     if (!f) return;
     if (f.type.startsWith('image/')) void insertImage(f, toWorldPt(e));

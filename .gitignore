@@ -5,3 +5,7 @@ e2e/out/
 e2e/__pycache__/
 *.log
 .DS_Store
+
+# Icon packages and libraries (vendor icons must not be committed; see THIRD_PARTY_NOTICES.md)
+*.zip
+*.flowsketchlib

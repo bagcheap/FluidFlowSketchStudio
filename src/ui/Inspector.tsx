@@ -12,6 +12,7 @@ import { ColorPicker, NumberField, Row, Section, Segmented, Select, Slider, Togg
 import { FONT_LABELS } from '../engine/text';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { iconTitle } from '../icons/sets';
+import { VENDORS } from '../icons/zipImport';
 import { SHAPE_KINDS } from '../model/schema';
 
 const ROUGH = [{ v: 0, label: 'Precise' }, { v: 0.7, label: 'Slight' }, { v: 1.5, label: 'Sketchy' }, { v: 2.6, label: 'Wild' }] as const;
@@ -120,7 +121,13 @@ export function Inspector() {
           )}
           {firstIcon && (
             <Section title="Icon">
-              {iconEls.length === 1 && (() => { const a = doc.icons[firstIcon.iconId]; return a ? <p className="insp-tip">{a.license ? `${a.set} · ${a.license} licence` : a.set || 'Imported icon'}</p> : null; })()}
+              {iconEls.length === 1 && (() => {
+                const a = doc.icons[firstIcon.iconId];
+                if (!a) return null;
+                // built-in sets name a licence ("MIT"); provider packages name the provider's terms ("AWS terms")
+                const lic = !a.license ? '' : a.license.includes(' ') ? ` · ${a.license}` : ` · ${a.license} licence`;
+                return <p className="insp-tip">{(a.set || 'Imported icon') + lic}{a.license === VENDORS.azure.terms && <><br />{VENDORS.azure.note}</>}</p>;
+              })()}
               {allMono && <ColorPicker label="Icon colour" value={firstIcon.style.stroke} palette={PALETTE_STROKE} onChange={(c) => setStyle({ stroke: c })} />}
               {allMono && <Toggle label="Hand-drawn" checked={firstIcon.sketch} onChange={(v) => setIcon({ sketch: v })} />}
               <Row label="Label">

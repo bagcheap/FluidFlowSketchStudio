@@ -4,6 +4,16 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Cloud provider icons:** under Icons ▸ Add icons, a Cloud provider icons section links to the official AWS, Microsoft Azure and Google Cloud icon downloads. Choose the ZIP you downloaded and FlowSketch turns it into a library: one icon each (the largest size, light version), with readable names and grouped by category (Compute, Storage, …). Importing a newer package offers to replace the old library. The icons stay in your browser and follow the terms you accepted when downloading them.
+- Any ZIP of SVG icons can be added to a library, and a ZIP dropped on the canvas becomes a library. Large packages show their progress while importing.
+- Licensing notes: Help ▸ About and the new THIRD_PARTY_NOTICES.md list the included icon sets and their licences, and explain that logos are trademarks of their owners and that cloud provider icons are not included.
+
+### Fixed
+- The Show links in the Icons panel no longer get cut off at the panel's edge.
+
 ## [0.1.4] - 2026-10-30
 
 ### Added

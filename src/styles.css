@@ -115,7 +115,10 @@ code { font-size: 12px; }
 .ip-scroll { overflow-y: auto; flex: 1; padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
 .ip-sec { display: flex; flex-direction: column; gap: 6px; }
 .ip-sec h3 { margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--fg-3); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.ip-sec h3 .link { text-transform: none; letter-spacing: 0; font-size: 11.5px; font-weight: 500; }
+.ip-sec h3 .link { text-transform: none; letter-spacing: 0; font-size: 11.5px; font-weight: 500; flex: none; }
+.ip-sec h3 > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ip-scroll { overflow-x: hidden; }
+.ip-sec, .ip-grid { min-width: 0; }
 .ip-teaser h3 { padding: 6px 0; border-top: 1px solid var(--line); }
 .ip-note { margin: 0; font-size: 11px; line-height: 1.35; color: var(--fg-3); }
 .ip-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 12px 8px; }
