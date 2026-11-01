@@ -12,7 +12,8 @@ import { connectorPath } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, hitTest, portAnchors, portPositions } from './hitTest';
-import { applyStyle, cloneElements, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, stage, styleOf, zoomAt } from '../store/commands';
+import { addConnectedCopy, canQuickConnect, handleLocal, SIDES, type Side } from '../store/quickConnect';
+import { applyStyle, cloneElements, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
 import { updateMembership, withMembers } from '../store/containers';
@@ -33,13 +34,18 @@ type Interaction =
   | { k: 'bend'; id: string; index: number }
   | { k: 'freehand'; id: string; pts: Point[] }
   | { k: 'erase'; ids: Set<string> }
-  | { k: 'label'; id: string };
+  | { k: 'label'; id: string }
+  | { k: 'quick'; src: string; side: Side; start: Point; connId: string | null }; // dragging from a quick-connect handle
+
+/** Distance (screen px) of the quick-connect handles from a shape's sides. */
+const QC_OFF = 40;
 
 interface Overlay {
   marquee?: { x: number; y: number; w: number; h: number };
   guides?: { x1: number; y1: number; x2: number; y2: number }[];
   target?: string | null;
   port?: Point | null;
+  hover?: string | null; // shape under the pointer (Select tool): shows its quick-connect handles
 }
 
 const isEditable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
@@ -145,7 +151,18 @@ export function Canvas() {
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   })();
 
-  function handleAt(p: Point): { kind: 'resize' | 'rotate' | 'endpoint' | 'bend' | 'addBend' | 'multi'; handle?: Handle; which?: 'start' | 'end'; index?: number } | null {
+  // quick-connect handles: on the selected shape and on the shape under the pointer (Select tool only)
+  const quickEls = (() => {
+    if (presentation || editingId || useUI.getState().tool !== 'select') return [];
+    const hov = overlay.hover ? getElement(doc, overlay.hover) : null;
+    const out: BoxElement[] = [];
+    if (canQuickConnect(singleBox)) out.push(singleBox);
+    if (canQuickConnect(hov) && hov.id !== singleBox?.id) out.push(hov);
+    return out;
+  })();
+  const quickHandles = (el: BoxElement) => SIDES.map((side) => ({ side, p: toWorld(el, STILL, handleLocal(el, side, QC_OFF / view.zoom)) }));
+
+  function handleAt(p: Point): { kind: 'resize' | 'rotate' | 'endpoint' | 'bend' | 'addBend' | 'multi' | 'quick'; handle?: Handle; which?: 'start' | 'end'; index?: number; side?: Side; id?: string } | null {
     const r = 9 / view.zoom;
     const near = (q: Point) => Math.hypot(q.x - p.x, q.y - p.y) < r;
     if (singleBox && !singleBox.locked) {
@@ -155,6 +172,7 @@ export function Canvas() {
         if (near(toWorld(singleBox, STILL, { x: fx * singleBox.w, y: fy * singleBox.h }))) return { kind: 'resize', handle: h };
       }
     }
+    for (const el of quickEls) for (const q of quickHandles(el)) if (near(q.p)) return { kind: 'quick', side: q.side, id: el.id };
     if (singleConn && !singleConn.locked) {
       const path = connectorPath(singleConn, makeLookup(doc, null));
       if (near(path.pts[path.pts.length - 1])) return { kind: 'endpoint', which: 'end' };
@@ -203,6 +221,12 @@ export function Canvas() {
     switch (u.tool) {
       case 'select': {
         const h = handleAt(p);
+        if (h?.kind === 'quick') {
+          D.begin();
+          inter.current = { k: 'quick', src: h.id!, side: h.side!, start: p, connId: null };
+          setOverlay((o) => ({ ...o, hover: null }));
+          return;
+        }
         if (h) {
           D.begin();
           if (h.kind === 'rotate' && singleBox) {
@@ -386,6 +410,15 @@ export function Canvas() {
         const t = boxAt(D.doc, p, u.view.zoom);
         if ((t?.id ?? null) !== (overlay.target ?? null)) setOverlay((o) => ({ ...o, target: t?.id ?? null }));
       } else if (overlay.target) setOverlay((o) => ({ ...o, target: null }));
+      if (u.tool === 'select' && !u.editingId) {
+        // keep the hovered shape while the pointer is near it, so its handles (just outside it) can be reached
+        const cur = overlay.hover ? getElement(D.doc, overlay.hover) : null;
+        const m = (QC_OFF + 14) / u.view.zoom;
+        const keep = canQuickConnect(cur) && p.x > cur.x - m && p.x < cur.x + cur.w + m && p.y > cur.y - m && p.y < cur.y + cur.h + m
+          && !hitTest(D.doc, p, u.view.zoom, (x) => x.id !== cur.id && canQuickConnect(x));
+        const hov = keep ? cur!.id : (hitTest(D.doc, p, u.view.zoom, canQuickConnect)?.id ?? null);
+        if (hov !== (overlay.hover ?? null)) setOverlay((o) => ({ ...o, hover: hov }));
+      } else if (overlay.hover) setOverlay((o) => ({ ...o, hover: null }));
       updateCursor(p);
       return;
     }
@@ -415,6 +448,20 @@ export function Canvas() {
         const end: Endpoint = target ? attachEndpoint(target, q, null) : { x: q.x, y: q.y, elementId: null, anchor: null };
         setOverlay((o) => ({ ...o, target: target?.id ?? null }));
         D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), end })));
+        return;
+      }
+      case 'quick': {
+        if (!it.connId) {
+          if (Math.hypot(p.x - it.start.x, p.y - it.start.y) * u.view.zoom < 6) return;
+          const c = makeConnector({ x: 0, y: 0, elementId: it.src, anchor: null }, { x: p.x, y: p.y, elementId: null, anchor: null }, u.toolStyle('arrow'));
+          it.connId = c.id;
+          D.live((d) => ({ ...d, elements: [...d.elements, c] }));
+        }
+        const target = boxAt(D.doc, p, u.view.zoom, it.src);
+        const end: Endpoint = target && target.type !== 'container' ? attachEndpoint(target, p, null) : { x: p.x, y: p.y, elementId: null, anchor: null };
+        setOverlay((o) => ({ ...o, target: end.elementId }));
+        const id = it.connId;
+        D.live((d) => mapElements(d, [id], (el) => ({ ...(el as ConnectorElement), end })));
         return;
       }
       case 'endpoint': {
@@ -538,6 +585,17 @@ export function Canvas() {
         afterCreate(it.id);
         return;
       }
+      case 'quick': {
+        if (!it.connId) { D.cancel(); quickConnect(it.side, it.src); return; } // a click: add a connected copy on that side
+        const c = getElement(D.doc, it.connId) as ConnectorElement | undefined;
+        if (c && !c.end.elementId) {
+          // dropped on empty canvas: a connected copy of the shape appears there
+          const r = addConnectedCopy(D.doc, it.src, u.toolStyle('arrow'), { center: toWorldPt(e), connectorId: it.connId });
+          if (r) { D.live(() => r.doc); D.end(); u.select([r.id]); return; }
+        }
+        D.end();
+        return;
+      }
       case 'connect': {
         if (!it.moved) {
           const c = getElement(D.doc, it.id) as ConnectorElement;
@@ -630,6 +688,7 @@ export function Canvas() {
     else if (u.tool === 'select') {
       const h = handleAt(p);
       if (h?.kind === 'rotate') c = 'grab';
+      else if (h?.kind === 'quick') c = 'pointer';
       else if (h?.kind === 'resize' || h?.kind === 'multi') c = ({ n: 'ns', s: 'ns', e: 'ew', w: 'ew', nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw' } as const)[h.handle!] + '-resize';
       else if (h) c = 'crosshair';
       else if (hitTest(useDoc.getState().doc, p, u.view.zoom)) c = 'move';
@@ -740,6 +799,20 @@ export function Canvas() {
       overlayEls.push(<rect key="mb" x={multiBox.x} y={multiBox.y} width={multiBox.w} height={multiBox.h} fill="none" stroke={accent} strokeDasharray={`${4 / z} ${4 / z}`} strokeWidth={1 / z} />);
       for (const [h, fx, fy] of HANDLES) if (h.length === 2) overlayEls.push(<rect key={'m' + h} x={multiBox.x + fx * multiBox.w - hs / 2} y={multiBox.y + fy * multiBox.h - hs / 2} width={hs} height={hs} rx={2 / z} fill="var(--panel)" stroke={accent} strokeWidth={1.5 / z} />);
     }
+    if (!inter.current) {
+      for (const el of quickEls) {
+        for (const { side, p } of quickHandles(el)) {
+          const a = ({ n: -90, e: 0, s: 90, w: 180 } as const)[side] + el.rotation;
+          const r = 7 / z;
+          overlayEls.push(
+            <g key={`qc${el.id}${side}`} className="quick-handle" transform={`translate(${p.x} ${p.y}) rotate(${a})`}>
+              <circle r={r * 1.35} fill="var(--panel)" fillOpacity={0.9} stroke={accent} strokeOpacity={0.5} strokeWidth={1 / z} />
+              <path d={`M ${-r * 0.55} ${-r * 0.6} L ${r * 0.6} 0 L ${-r * 0.55} ${r * 0.6}`} fill="none" stroke={accent} strokeWidth={1.8 / z} strokeLinecap="round" strokeLinejoin="round" />
+            </g>,
+          );
+        }
+      }
+    }
     const target = overlay.target ? getElement(doc, overlay.target) : null;
     if (target && target.type !== 'connector') {
       overlayEls.push(<polygon key="tgt" points={boxCorners(target).map((p) => `${p.x},${p.y}`).join(' ')} fill={accent} fillOpacity={0.06} stroke={accent} strokeWidth={2 / z} />);
@@ -761,6 +834,7 @@ export function Canvas() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onPointerLeave={() => { if (!inter.current && overlay.hover) setOverlay((o) => ({ ...o, hover: null })); }}
       onDoubleClick={onDoubleClick}
       // a click that just opened the text editor must not let the browser move focus off it (blur commits/deletes the text)
       onMouseDown={(e) => { if (useUI.getState().editingId && !isEditable(e.target)) e.preventDefault(); }}

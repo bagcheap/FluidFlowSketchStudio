@@ -13,6 +13,7 @@ import { geometryFor, SHAPE_LABELS } from '../engine/shapes';
 import { loadIconSet } from '../icons/sets';
 import { fitToContents, isContainer, moveElements, removeContainer, updateMembership, withMembers, wrapInContainer } from './containers';
 import { importFiles, slugName, useLibraries } from '../icons/libraries';
+import { addConnectedCopy, canQuickConnect, type Side } from './quickConnect';
 import { svgToIcon } from '../icons/svgToIcon';
 
 const D = () => useDoc.getState();
@@ -348,6 +349,35 @@ export function addContainer() {
   U().setTool('select');
   U().select([r.id]);
   U().setEditing(r.id); // type the title straight away
+}
+
+/**
+ * Quick-connect from the selected shape: add a connected copy of it on `side` (Cmd/Ctrl+Arrow, or a click on a
+ * quick-connect handle) and select the copy, so typing (Enter) labels it. One undo step.
+ */
+export function quickConnect(side: Side, srcId?: string) {
+  const u = U();
+  const id = srcId ?? (u.selection.length === 1 ? u.selection[0] : undefined);
+  const doc = D().doc;
+  if (!id || !canQuickConnect(getElement(doc, id))) return;
+  const r = addConnectedCopy(doc, id, u.toolStyle('arrow'), { side });
+  if (!r) return;
+  D().commit(() => r.doc);
+  u.setTool('select');
+  u.select([r.id]);
+  revealElement(r.id);
+}
+
+/** Pan (without zooming) just enough to bring an element on screen. */
+export function revealElement(id: string) {
+  const el = getElement(D().doc, id);
+  if (!el || el.type === 'connector') return;
+  const v = U().view, m = 40 / v.zoom;
+  const vw = stage.w / v.zoom, vh = stage.h / v.zoom;
+  let x = v.x, y = v.y;
+  if (el.x - m < x) x = el.x - m; else if (el.x + el.w + m > x + vw) x = el.x + el.w + m - vw;
+  if (el.y - m < y) y = el.y - m; else if (el.y + el.h + m > y + vh) y = el.y + el.h + m - vh;
+  if (x !== v.x || y !== v.y) U().setView({ x, y });
 }
 
 /** Remove the selected containers, keeping what was inside them. */
