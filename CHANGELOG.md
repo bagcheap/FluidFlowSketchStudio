@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Changed
+- **Containers look simpler:** one outline with the title inside at the top-left, without the line under the title. New containers are square-cornered with a dashed border. Existing containers keep their colours and corners; change the corners with Corner radius in the Inspector.
+
 ## [0.1.8] - 2026-11-01
 
 ### Added
