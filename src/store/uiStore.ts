@@ -26,6 +26,7 @@ export interface Prefs {
   showIconPanel: boolean; // the Icons panel docked on the left
   recentIcons: string[]; // "<set>:<name>", most recent first
   hiddenIconSets: string[]; // built-in icon sets switched off in Manage icon libraries
+  recentQuickShapes: ShapeKind[]; // shapes picked in the quick-connect picker, most recent first
 }
 
 const PREFS_KEY = 'flowsketch.prefs.v1';
@@ -47,6 +48,7 @@ const DEFAULT_PREFS: Prefs = {
   showIconPanel: false,
   recentIcons: [],
   hiddenIconSets: [],
+  recentQuickShapes: [],
 };
 
 function loadPrefs(): Prefs {

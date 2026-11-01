@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
-- **Quick-connect:** hover a shape and small arrows appear around it. Click one to add a copy of the shape on that side, already connected by an arrow, then press Enter to type its label. Drag one onto another shape to connect the two, or onto empty canvas to drop a connected copy there. With a shape selected, ⌘/Ctrl + arrow keys do the same. Works for shapes, icons and pictures; a copy of a shape in a container joins that container.
+- **Quick-connect:** hover a shape and small arrows appear around it. Click one to add a copy of the shape on that side, already connected by an arrow, then press Enter to type its label. Rest the pointer on an arrow for a moment to pick a different shape instead (your recent picks come first). Drag one onto another shape to connect the two, or onto empty canvas to drop a connected copy there. With a shape selected, ⌘/Ctrl + arrow keys do the same. Works for shapes, icons and pictures; a copy of a shape in a container joins that container.
 
 ## [0.1.7] - 2026-11-01
 

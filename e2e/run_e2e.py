@@ -498,6 +498,16 @@ def main():
             assert e2['y'] > a['y'] + a['h'] and abs(e2['x'] - a['x']) < 1, (e2['x'], e2['y'])
             app.key('Control+z')
             assert e2['id'] not in [x['id'] for x in app.els()], 'one undo removes the shape and its arrow'
+            # rest on a handle: the shape picker opens; pick an ellipse
+            app.key('Escape'); hover(); page.wait_for_timeout(80)
+            page.mouse.move(*app.pt(cx, a['y'] - 40)); page.wait_for_selector('.qc-pop', timeout=3000)
+            page.screenshot(path=f'{OUT}/e2e-quick-picker.png')
+            page.locator('.qc-pop [role=menuitem][aria-label="Ellipse / circle"]').click(); page.wait_for_timeout(80)
+            el = app.els('shape')[-1]
+            assert el['shape'] == 'ellipse' and el['y'] + el['h'] < a['y'], el
+            assert app.els('connector')[-1]['end']['elementId'] == el['id']
+            assert page.locator('.qc-pop').count() == 0
+            assert app.js("() => JSON.parse(localStorage.getItem('flowsketch.prefs.v1')).recentQuickShapes")[0] == 'ellipse'
             page.screenshot(path=f'{OUT}/e2e-quick-connect.png')
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
             app.js('(v) => window.__flowsketch.setView(v)', v)

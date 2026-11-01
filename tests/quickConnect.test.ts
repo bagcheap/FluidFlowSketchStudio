@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultToolStyle, makeShape, makeText, newDocument } from '../src/model/defaults';
 import { addConnectedCopy, canQuickConnect, nextSlot, QUICK_GAP } from '../src/store/quickConnect';
+import { SHAPE_DEFAULT_SIZE } from '../src/model/defaults';
 import { wrapInContainer } from '../src/store/containers';
 import { useDoc } from '../src/store/docStore';
 import { useUI } from '../src/store/uiStore';
@@ -46,6 +47,19 @@ describe('quick-connect', () => {
     expect(Math.abs(n2.y - n1.y)).toBeGreaterThanOrEqual(80);
   });
 
+  it('can add a different shape (picked in the pop-up) in that tool\'s default style, centred on the same axis', () => {
+    const { doc, a } = setup();
+    const tool = defaultToolStyle('shape:ellipse');
+    const r = addConnectedCopy(doc, a.id, arrow, { side: 'e', make: { kind: 'ellipse', tool } })!;
+    const n = get(r.doc, r.id) as ShapeElement;
+    const [w, h] = SHAPE_DEFAULT_SIZE.ellipse!;
+    expect(n).toMatchObject({ type: 'shape', shape: 'ellipse', w, h, text: '' });
+    expect(n.style).toEqual(tool.style);
+    expect(n.x).toBe(100 + 120 + QUICK_GAP);
+    expect(n.y + h / 2).toBe(100 + 80 / 2);
+    expect((get(r.doc, r.connectorId) as ConnectorElement).end.elementId).toBe(n.id);
+  });
+
   it('places the copy where it was dropped, attaching the arrow being dragged', () => {
     const { doc, a } = setup();
     const r1 = addConnectedCopy(doc, a.id, arrow, { side: 'e' })!;
@@ -89,6 +103,16 @@ describe('quick-connect', () => {
       expect(get(d, sel[0]).y).toBe(100 + 80 + QUICK_GAP);
       useDoc.getState().undo();
       expect(useDoc.getState().doc.elements).toHaveLength(1);
+    });
+    it('remembers shapes picked in the pop-up, most recent first', () => {
+      const { a } = setup();
+      useUI.getState().updatePrefs({ recentQuickShapes: [] });
+      useDoc.getState().commit((d) => ({ ...d, elements: [a] }));
+      quickConnect('e', a.id, 'cylinder');
+      quickConnect('e', a.id, 'ellipse');
+      quickConnect('e', a.id, 'cylinder');
+      expect(useUI.getState().prefs.recentQuickShapes).toEqual(['cylinder', 'ellipse']);
+      expect(useDoc.getState().doc.elements.filter((e) => e.type === 'shape').map((e) => (e as ShapeElement).shape)).toEqual(['diamond', 'cylinder', 'ellipse', 'cylinder']);
     });
   });
 });

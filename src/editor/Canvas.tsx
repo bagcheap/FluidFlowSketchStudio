@@ -1,7 +1,7 @@
 // The live editing surface: a <canvas> showing renderDocumentAtTime() every frame,
 // plus an SVG overlay for (static, non-animated) selection handles, guides and previews.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { BoxElement, ConnectorElement, DiagramElement, Endpoint, FlowDocument, Point } from '../model/types';
+import type { BoxElement, ConnectorElement, DiagramElement, Endpoint, FlowDocument, Point, ShapeKind } from '../model/types';
 import { makeConnector, makeShape, makeText, newSeed, SHAPE_DEFAULT_SIZE, styleKey, uid } from '../model/defaults';
 import { deleteElements, getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
@@ -12,7 +12,10 @@ import { connectorPath } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, hitTest, portAnchors, portPositions } from './hitTest';
-import { addConnectedCopy, canQuickConnect, handleLocal, SIDES, type Side } from '../store/quickConnect';
+import { addConnectedCopy, canQuickConnect, handleLocal, QUICK_SHAPES, SIDES, type Side } from '../store/quickConnect';
+import { ShapeIcon } from '../ui/ShapeIcon';
+import { SHAPE_LABELS } from '../engine/shapes';
+import { Copy } from 'lucide-react';
 import { applyStyle, cloneElements, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
@@ -62,6 +65,10 @@ export function Canvas() {
   const [overlay, setOverlay] = useState<Overlay>({});
   const [spaceDown, setSpaceDown] = useState(false);
   const inter = useRef<Interaction | null>(null);
+  // quick-connect picker: opens after resting on a handle; offers a copy, recent shapes and basic shapes
+  const [qcPop, setQcPop] = useState<{ id: string; side: Side } | null>(null);
+  const qcTimer = useRef<{ key: string; t: number } | null>(null);
+  const clearQcTimer = () => { if (qcTimer.current) { clearTimeout(qcTimer.current.t); qcTimer.current = null; } };
   const pointers = useRef(new Map<number, Point>());
   const pinch = useRef<{ d: number; zoom: number; cx: number; cy: number } | null>(null);
   const redraw = useRef(true);
@@ -196,6 +203,8 @@ export function Canvas() {
   // ---- pointer handlers ------------------------------------------------------------
   const onPointerDown = (e: React.PointerEvent) => {
     if (isEditable(e.target) || (e.target as HTMLElement).closest('.no-canvas')) return;
+    clearQcTimer();
+    if (qcPop) setQcPop(null);
     const u = useUI.getState();
     if (u.editingId) { (document.activeElement as HTMLElement)?.blur?.(); }
     wrapRef.current!.setPointerCapture(e.pointerId);
@@ -405,6 +414,7 @@ export function Canvas() {
     const u = useUI.getState();
     const D = useDoc.getState();
     if (!it) {
+      if ((e.target as HTMLElement).closest?.('.qc-pop')) return; // over the quick-connect picker
       // hover feedback for connector tools
       if (u.tool === 'arrow' || u.tool === 'line') {
         const t = boxAt(D.doc, p, u.view.zoom);
@@ -418,6 +428,22 @@ export function Canvas() {
           && !hitTest(D.doc, p, u.view.zoom, (x) => x.id !== cur.id && canQuickConnect(x));
         const hov = keep ? cur!.id : (hitTest(D.doc, p, u.view.zoom, canQuickConnect)?.id ?? null);
         if (hov !== (overlay.hover ?? null)) setOverlay((o) => ({ ...o, hover: hov }));
+        // resting on a quick-connect handle opens the shape picker
+        const h = handleAt(p);
+        if (h?.kind === 'quick') {
+          const key = h.id! + h.side!;
+          if (qcTimer.current?.key !== key && !(qcPop && qcPop.id === h.id && qcPop.side === h.side)) {
+            clearQcTimer();
+            qcTimer.current = { key, t: window.setTimeout(() => { qcTimer.current = null; setQcPop({ id: h.id!, side: h.side! }); }, 350) };
+          }
+        } else {
+          clearQcTimer();
+          if (qcPop) {
+            const el = getElement(D.doc, qcPop.id) as BoxElement | undefined;
+            const hp = el && toWorld(el, STILL, handleLocal(el, qcPop.side, QC_OFF / u.view.zoom));
+            if (!hp || Math.hypot(hp.x - p.x, hp.y - p.y) * u.view.zoom > 30) setQcPop(null);
+          }
+        }
       } else if (overlay.hover) setOverlay((o) => ({ ...o, hover: null }));
       updateCursor(p);
       return;
@@ -722,6 +748,15 @@ export function Canvas() {
     return () => { el.removeEventListener('wheel', onWheel); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); };
   }, []);
 
+  // Esc closes the quick-connect picker (and then, as always, returns to Select)
+  useEffect(() => {
+    if (!qcPop) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setQcPop(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [qcPop]);
+  useEffect(() => () => clearQcTimer(), []);
+
   // Escape while an interaction is in progress cancels it and returns to Select (handled before global shortcuts)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -848,6 +883,34 @@ export function Canvas() {
       <svg className="stage-overlay" width={size.w} height={size.h} aria-hidden>
         <g transform={`scale(${z}) translate(${-view.x} ${-view.y})`}>{overlayEls}</g>
       </svg>
+      {qcPop && !editingId && !presentation && (() => {
+        const src = getElement(doc, qcPop.id);
+        if (!canQuickConnect(src)) return null;
+        const hp = toScreen(toWorld(src, STILL, handleLocal(src, qcPop.side, QC_OFF / z)));
+        const recent = useUI.getState().prefs.recentQuickShapes;
+        const kinds = [...new Set<ShapeKind>([...recent, ...QUICK_SHAPES])].slice(0, 15);
+        const W = 204, H = Math.ceil((kinds.length + 1) / 4) * 44 + 12, g = 16;
+        const at = (side: Side) => (side === 'e' ? { x: hp.x + g, y: hp.y - H / 2 } : side === 'w' ? { x: hp.x - g - W, y: hp.y - H / 2 }
+          : side === 'n' ? { x: hp.x - W / 2, y: hp.y - g - H } : { x: hp.x - W / 2, y: hp.y + g });
+        const fits = (q: Point) => q.x >= 8 && q.y >= 8 && q.x + W <= size.w - 8 && q.y + H <= size.h - 8;
+        // the side it points to, else the opposite side of the handle, else beside it: never on top of the handle
+        const order: Side[] = { e: ['e', 's', 'n', 'w'], w: ['w', 's', 'n', 'e'], n: ['n', 'e', 'w', 's'], s: ['s', 'e', 'w', 'n'] }[qcPop.side] as Side[];
+        const pos = at(order.find((sd) => fits(at(sd))) ?? qcPop.side);
+        const left = Math.max(8, Math.min(size.w - W - 8, pos.x)), top = Math.max(8, Math.min(size.h - H - 8, pos.y));
+        const pick = (kind?: ShapeKind) => { const q = qcPop; setQcPop(null); quickConnect(q.side, q.id, kind); };
+        return (
+          <div className="shape-pop qc-pop no-canvas" role="menu" aria-label="Add a connected shape" style={{ left, top }} onMouseLeave={() => setQcPop(null)}>
+            <button role="menuitem" className="shape-cell copy" title="Copy of this shape (same style)" aria-label="Copy of this shape" onClick={() => pick()}>
+              <Copy size={20} />
+            </button>
+            {kinds.map((k) => (
+              <button key={k} role="menuitem" className={`shape-cell ${recent.includes(k) ? 'recent' : ''}`} title={SHAPE_LABELS[k]} aria-label={SHAPE_LABELS[k]} onClick={() => pick(k)}>
+                <ShapeIcon kind={k} size={22} />
+              </button>
+            ))}
+          </div>
+        );
+      })()}
       {editingId && <TextEditor key={editingId} id={editingId} toScreen={toScreen} onDone={(id, text) => {
         const D = useDoc.getState();
         const el = getElement(D.doc, id);

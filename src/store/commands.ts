@@ -7,7 +7,7 @@ import { useUI } from './uiStore';
 import { contentBounds } from '../engine/render';
 import { fileToAsset } from '../engine/images';
 import { openDocumentFile, pickFile, resetFileHandle, saveDocumentFile } from '../persistence/files';
-import { DocumentError, parseDocument, serializeDocument } from '../model/schema';
+import { DocumentError, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
 import { geometryFor, SHAPE_LABELS } from '../engine/shapes';
 import { loadIconSet } from '../icons/sets';
@@ -355,12 +355,14 @@ export function addContainer() {
  * Quick-connect from the selected shape: add a connected copy of it on `side` (Cmd/Ctrl+Arrow, or a click on a
  * quick-connect handle) and select the copy, so typing (Enter) labels it. One undo step.
  */
-export function quickConnect(side: Side, srcId?: string) {
+export function quickConnect(side: Side, srcId?: string, kind?: ShapeKind) {
   const u = U();
   const id = srcId ?? (u.selection.length === 1 ? u.selection[0] : undefined);
   const doc = D().doc;
   if (!id || !canQuickConnect(getElement(doc, id))) return;
-  const r = addConnectedCopy(doc, id, u.toolStyle('arrow'), { side });
+  const make = kind ? { kind, tool: u.toolStyle(styleKey('shape', kind)) } : null;
+  const r = addConnectedCopy(doc, id, u.toolStyle('arrow'), { side, make });
+  if (kind) u.updatePrefs({ recentQuickShapes: [kind, ...u.prefs.recentQuickShapes.filter((k) => k !== kind && SHAPE_KINDS.includes(k))].slice(0, 4) });
   if (!r) return;
   D().commit(() => r.doc);
   u.setTool('select');
