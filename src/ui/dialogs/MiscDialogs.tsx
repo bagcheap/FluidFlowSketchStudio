@@ -95,6 +95,7 @@ export function HelpDialog() {
         <h3>Tips</h3>
         <ul>
           <li>Right-click for the most common actions. Select shapes and choose <b>Add container</b> to frame them: the container moves everything inside, and shapes dragged in or out join or leave it.</li>
+          <li>Quick-connect: hover a shape and click one of the small arrows around it to add a connected copy on that side (rest on the arrow to pick a different shape), or drag an arrow onto another shape to connect them (or onto empty canvas to drop a copy there). With a shape selected, <kbd>⌘/Ctrl</kbd>+arrow keys do the same.</li>
           <li>Icons: press <kbd>⇧ I</kbd> to open the Icons panel, search, then drag an icon onto the canvas or click it.</li>
           <li>Alt-drag duplicates; arrow keys nudge (<kbd>Shift</kbd> ×10); hold <kbd>Space</kbd> to pan; <kbd>⌘/Ctrl</kbd>+scroll or pinch to zoom.</li>
           <li>Format painter (<kbd>F</kbd>): click a shape to pick its style, then click others to apply it.</li>

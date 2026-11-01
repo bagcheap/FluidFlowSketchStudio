@@ -459,6 +459,60 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tswap()
 
+        @test('Quick-connect: hover handles add a connected copy (click), connect shapes or drop a copy (drag), Ctrl+Arrow')
+        def tquick():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 9000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.key('u'); app.drag((5100, 9200), (5260, 9280)); app.key('Escape'); app.key('Escape')
+            a = app.els('shape')[-1]
+            cx, cy = a['x'] + a['w'] / 2, a['y'] + a['h'] / 2
+            hover = lambda: page.mouse.move(*app.pt(cx, cy))
+            # click the right-hand handle: a copy appears to the right, joined by an arrow, and is selected
+            hover(); page.wait_for_timeout(80)
+            n = len(app.els())
+            app.click((a['x'] + a['w'] + 40, cy))
+            b = app.els('shape')[-1]
+            c = app.els('connector')[-1]
+            assert len(app.els()) == n + 2, 'expected a new shape and an arrow'
+            assert (b['shape'], round(b['w']), round(b['h'])) == (a['shape'], round(a['w']), round(a['h'])) and b['x'] > a['x'] + a['w'], b
+            assert c['start']['elementId'] == a['id'] and c['end']['elementId'] == b['id'], (c['start'], c['end'])
+            assert app.ui()['selection'] == [b['id']]
+            # drag from a's bottom handle onto b: just an arrow between them
+            app.key('Escape'); hover(); page.wait_for_timeout(80)
+            n = len(app.els())
+            app.drag((cx, a['y'] + a['h'] + 40), (b['x'] + b['w'] / 2, b['y'] + b['h'] / 2), steps=12)
+            c2 = app.els('connector')[-1]
+            assert len(app.els()) == n + 1 and c2['start']['elementId'] == a['id'] and c2['end']['elementId'] == b['id'], (c2['start'], c2['end'])
+            # drag from a's left handle to empty canvas: a copy is dropped there
+            hover(); page.wait_for_timeout(80)
+            app.drag((a['x'] - 40, cy), (4800, 9500), steps=12)
+            d = app.els('shape')[-1]
+            assert abs(d['x'] + d['w'] / 2 - 4800) < 2 and abs(d['y'] + d['h'] / 2 - 9500) < 2, (d['x'], d['y'])
+            assert app.els('connector')[-1]['end']['elementId'] == d['id']
+            # Ctrl+ArrowDown from the selected shape
+            app.key('Escape'); app.click((cx, cy)); assert app.ui()['selection'] == [a['id']]
+            app.key('Control+ArrowDown')
+            e2 = app.els('shape')[-1]
+            assert e2['y'] > a['y'] + a['h'] and abs(e2['x'] - a['x']) < 1, (e2['x'], e2['y'])
+            app.key('Control+z')
+            assert e2['id'] not in [x['id'] for x in app.els()], 'one undo removes the shape and its arrow'
+            # rest on a handle: the shape picker opens; pick an ellipse
+            app.key('Escape'); hover(); page.wait_for_timeout(80)
+            page.mouse.move(*app.pt(cx, a['y'] - 40)); page.wait_for_selector('.qc-pop', timeout=3000)
+            page.screenshot(path=f'{OUT}/e2e-quick-picker.png')
+            page.locator('.qc-pop [role=menuitem][aria-label="Ellipse / circle"]').click(); page.wait_for_timeout(80)
+            el = app.els('shape')[-1]
+            assert el['shape'] == 'ellipse' and el['y'] + el['h'] < a['y'], el
+            assert app.els('connector')[-1]['end']['elementId'] == el['id']
+            assert page.locator('.qc-pop').count() == 0
+            assert app.js("() => JSON.parse(localStorage.getItem('flowsketch.prefs.v1')).recentQuickShapes")[0] == 'ellipse'
+            page.screenshot(path=f'{OUT}/e2e-quick-connect.png')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tquick()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]
