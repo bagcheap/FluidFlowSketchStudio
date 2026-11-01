@@ -13,7 +13,7 @@ npm install
 npm run dev        # http://localhost:5173  (also builds the HTML-player bundle first)
 npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ on http://localhost:4173
-npm test           # unit tests (Vitest, 59 tests)
+npm test           # unit tests (Vitest, 62 tests)
 npm run test:e2e   # end-to-end acceptance tests (needs `npm run preview` running; see below)
 ```
 

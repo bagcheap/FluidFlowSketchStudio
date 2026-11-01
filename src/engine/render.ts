@@ -253,6 +253,19 @@ function headParts(kind: HeadKind, tip: Point, dir: Point, color: string, sw: nu
   return [{ k: 'line', pts: [tip.x + n.x, tip.y + n.y, tip.x - n.x, tip.y - n.y], color, width: sw, alpha: 1, cap: 'round', dash: null }];
 }
 
+/**
+ * Where a travelling highlight is within its cycle u (0..1): f = progress along its leg (0..1), back = on the
+ * return leg. One-way (pause null): always outward. Round trip: out during the first (1 - pause) / 2, waits at
+ * the far end for `pause`, then comes back; null while waiting.
+ */
+export function roundTripLeg(u: number, pause: number | null): { f: number; back: boolean } | null {
+  if (pause === null) return { f: u, back: false };
+  const legLen = (1 - pause) / 2;
+  if (u < legLen) return { f: u / legLen, back: false };
+  if (u < legLen + pause) return null;
+  return { f: (u - legLen - pause) / legLen, back: true };
+}
+
 function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, lookup: Lookup, flags: PreviewFlags | undefined, background: string, hideLabel: boolean, cull?: Rect): Item[] {
   const path = connectorPath(c, lookup);
   if (path.length < 1) return [];
@@ -309,14 +322,19 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
   if (anim.mode === 'travel' && speed > 0 && active) {
     const hl = Math.min(anim.highlightLength, len);
     const n = Math.max(1, anim.segments);
-    const u = fract((tt - anim.delay) * trip(speed));
+    const roundTrip = anim.direction === 'roundTrip';
+    // a round trip is one cycle (out, wait at the far end, back), so each leg moves at the one-way speed
+    const u = fract((tt - anim.delay) * trip(roundTrip ? speed / 2 : speed));
     for (let i = 0; i < n; i++) {
-      const head = fract(u + i / n) * (len + hl);
-      const [a, b] = range(head - hl, head);
-      const pts = wiggled(path, Math.max(0, a), Math.min(len - endCut * 0.6, b), st.roughness, c.seed);
+      const leg = roundTripLeg(fract(u + i / n), roundTrip ? anim.turnPause : null);
+      if (!leg) continue; // waiting at the far end
+      const head = leg.f * (len + hl);
+      const [a, b] = leg.back ? [len - head, len - head + hl] : range(head - hl, head);
+      const pts = wiggled(path, Math.max(shorten(c.startHead) * 0.6, a), Math.min(len - shorten(c.endHead) * 0.6, b), st.roughness, c.seed);
+      const color = leg.back ? anim.returnColor : anim.highlightColor;
       if (pts.length >= 4) {
-        if (anim.glow) parts.push(...halo(pts, anim.highlightColor, sw, anim.highlightOpacity));
-        parts.push({ k: 'line', pts, color: anim.highlightColor, width: sw + 1.5, alpha: anim.highlightOpacity, cap: anim.roundCaps ? 'round' : 'butt', dash: null });
+        if (anim.glow) parts.push(...halo(pts, color, sw, anim.highlightOpacity));
+        parts.push({ k: 'line', pts, color, width: sw + 1.5, alpha: anim.highlightOpacity, cap: anim.roundCaps ? 'round' : 'butt', dash: null });
       }
     }
   }

@@ -78,6 +78,7 @@ export function Inspector() {
   const connOv: Partial<ConnectorAnim> = (onSelection ? (els.find((e) => e.type === 'connector') as ConnectorElement | undefined)?.anim : ts!.connectorAnim) ?? {};
   const sa: ShapeAnim = { ...doc.animation.shape, ...shapeOv };
   const ca: ConnectorAnim = { ...doc.animation.connector, ...connOv };
+  const roundTrip = ca.mode === 'travel' && ca.direction === 'roundTrip';
   const conn = onSelection ? (els.find((e) => e.type === 'connector') as ConnectorElement | undefined) : undefined;
   const routing = conn?.routing ?? ts?.routing ?? 'curved';
   const startHead = conn?.startHead ?? ts?.startHead ?? 'none';
@@ -253,16 +254,18 @@ export function Inspector() {
               {ca.mode !== 'none' && <>
                 <Slider label="Speed" value={ca.speed} min={0.05} max={3} step={0.05} unit="/s" overridden={'speed' in connOv} onReset={() => resetConnAnimKey('speed')} onChange={(v) => setConnAnim({ speed: v })} hint="Trips (or cycles) per second, snapped to fit the loop" />
                 <Row label="Direction">
-                  <Segmented label="Direction" value={ca.direction} onChange={(v) => setConnAnim({ direction: v })} options={[{ v: 'forward', label: 'Forward →' }, { v: 'reverse', label: '← Reverse' }]} />
+                  <Segmented label="Direction" value={ca.mode !== 'travel' && ca.direction === 'roundTrip' ? 'forward' : ca.direction} onChange={(v) => setConnAnim({ direction: v })} options={[{ v: 'forward', label: 'Forward →' }, { v: 'reverse', label: '← Reverse' }, ...(ca.mode === 'travel' ? [{ v: 'roundTrip' as const, label: '⇄ Round trip' }] : [])]} />
                 </Row>
               </>}
               {(ca.mode === 'travel' || ca.mode === 'pulse') && <>
-                <ColorPicker label="Highlight colour" value={ca.highlightColor} palette={HIGHLIGHT_COLORS} onChange={(c) => setConnAnim({ highlightColor: c })} />
+                <ColorPicker label={roundTrip ? 'Outgoing colour' : 'Highlight colour'} value={ca.highlightColor} palette={HIGHLIGHT_COLORS} onChange={(c) => setConnAnim({ highlightColor: c })} />
+                {roundTrip && <ColorPicker label="Return colour" value={ca.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => setConnAnim({ returnColor: c })} />}
                 <Slider label="Opacity" value={Math.round(ca.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => setConnAnim({ highlightOpacity: v / 100 })} />
                 <Toggle label="Glow" checked={ca.glow} onChange={(v) => setConnAnim({ glow: v })} />
               </>}
               {ca.mode === 'travel' && <>
                 <Slider label="Length" value={ca.highlightLength} min={4} max={300} unit="px" overridden={'highlightLength' in connOv} onReset={() => resetConnAnimKey('highlightLength')} onChange={(v) => setConnAnim({ highlightLength: v })} />
+                {roundTrip && <Slider label="Pause at turn-around" value={Math.round(ca.turnPause * 100)} min={0} max={60} unit="%" onChange={(v) => setConnAnim({ turnPause: v / 100 })} hint="Share of each round trip spent waiting at the far end before coming back" />}
                 <Slider label="Segments" value={ca.segments} min={1} max={8} onChange={(v) => setConnAnim({ segments: v })} hint="Simultaneous moving segments, evenly spaced" />
                 <Toggle label="Rounded segment ends" checked={ca.roundCaps} onChange={(v) => setConnAnim({ roundCaps: v })} />
               </>}
