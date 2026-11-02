@@ -173,7 +173,7 @@ export function Inspector() {
               <Row label="Style">
                 <Segmented label="Fill style" value={style.fillStyle} onChange={(v) => setStyle({ fillStyle: v })} options={[{ v: 'none', label: 'None' }, { v: 'solid', label: 'Solid' }, { v: 'hachure', label: 'Hatch' }, { v: 'cross-hatch', label: 'Cross' }]} />
               </Row>
-              <Slider label="Corner radius" value={style.cornerRadius} min={0} max={80} onChange={(v) => setStyle({ cornerRadius: v })} hint="Rectangles, rounded rectangles and speech bubbles" />
+              <Slider label="Corner radius" value={style.cornerRadius} min={0} max={80} onChange={(v) => setStyle({ cornerRadius: v })} hint="Rectangles, rounded rectangles, speech bubbles and containers" />
               <Toggle label="Soft shadow" checked={style.shadow} onChange={(v) => setStyle({ shadow: v })} />
             </Section>
           )}

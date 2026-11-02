@@ -193,9 +193,8 @@ function containerItems(el: ContainerElement, m: Motion, loopLen: number | null,
   const head = Math.min(containerHeader(el), el.h);
   const sw = el.style.strokeWidth;
   const parts: Part[] = [
+    // one outline; the title sits inside at the top-left (its title bar is only a hit area, no line under it)
     { k: 'sets', sets: warpSets(roughSets(`ct${el.w.toFixed(1)}x${el.h.toFixed(1)}r${r}`, d, el.style, seed, true), f), stroke: el.style.stroke, fill: el.style.fill, sw, fillWeight: Math.max(0.6, sw / 2), dash: dashFor(el.style.strokeStyle, sw), shadow: el.style.shadow },
-    // the line under the title bar
-    { k: 'sets', sets: warpSets(roughSets(`cth${el.w.toFixed(1)}`, `M0 ${head}H${el.w}`, el.style, seed + 1, false), f), stroke: el.style.stroke, fill: 'none', sw, fillWeight: 1, dash: dashFor(el.style.strokeStyle, sw), shadow: false },
   ];
   const tf = { x: el.x + m.tx, y: el.y + m.ty, w: el.w, h: el.h, rot: m.rot };
   const items: Item[] = [{ id: el.id, opacity: el.style.opacity, tf, parts }];
