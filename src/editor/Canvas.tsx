@@ -1,8 +1,10 @@
 // The live editing surface: a <canvas> showing renderDocumentAtTime() every frame,
 // plus an SVG overlay for (static, non-animated) selection handles, guides and previews.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { BoxElement, ConnectorElement, DiagramElement, Endpoint, FlowDocument, Point, ShapeKind } from '../model/types';
-import { makeConnector, makeShape, makeText, newSeed, SHAPE_DEFAULT_SIZE, styleKey, uid } from '../model/defaults';
+import type { BoxElement, ConnectorElement, DiagramElement, Endpoint, FlowDocument, Point, ShapeKind, ToolStyle } from '../model/types';
+import { isCycleKey } from '../ui/modifiers';
+import { colorLabel } from '../ui/colorNames';
+import { cycleFill, makeConnector, makeShape, makeText, newSeed, SHAPE_DEFAULT_SIZE, styleKey, uid } from '../model/defaults';
 import { deleteElements, getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import { renderDocumentAtTime, makeLookup, boxCorners } from '../engine/render';
@@ -26,7 +28,7 @@ const HANDLES: [Handle, number, number][] = [['nw', 0, 0], ['n', 0.5, 0], ['ne',
 
 type Interaction =
   | { k: 'pan'; sx: number; sy: number; vx: number; vy: number }
-  | { k: 'create'; id: string; start: Point; moved: boolean; onExisting: boolean }
+  | { k: 'create'; id: string; start: Point; moved: boolean; onExisting: boolean; cycled?: { key: string; ts: ToolStyle } } // cycled: Cmd-drawn, fill moved to the next colour
   | { k: 'connect'; id: string; start: Point; moved: boolean }
   | { k: 'move'; ids: string[]; top: string[]; start: Point; orig: FlowDocument; moved: boolean; dupDone: boolean } // ids = top + everything inside moved containers
   | { k: 'resize'; id: string; handle: Handle; orig: BoxElement }
@@ -275,11 +277,14 @@ export function Canvas() {
       }
       case 'shape': {
         const existing = hitTest(d, p, u.view.zoom);
-        const ts = u.toolStyle(styleKey('shape', u.shapeKind));
+        const key = styleKey('shape', u.shapeKind);
+        // Cmd (Ctrl on Windows/Linux) held: this shape gets the next fill colour, remembered once it is drawn
+        const cycled = isCycleKey(e) ? { key, ts: cycleFill(u.toolStyle(key)) } : undefined;
+        const ts = cycled?.ts ?? u.toolStyle(key);
         const el = makeShape(u.shapeKind, p.x, p.y, 1, 1, ts);
         D.begin();
         D.live((dd) => ({ ...dd, elements: [...dd.elements, el] }));
-        inter.current = { k: 'create', id: el.id, start: p, moved: false, onExisting: !!existing };
+        inter.current = { k: 'create', id: el.id, start: p, moved: false, onExisting: !!existing, cycled };
         return;
       }
       case 'arrow':
@@ -608,6 +613,7 @@ export function Canvas() {
         }
         D.live((d) => updateMembership(d, [it.id])); // drawn inside a container: it joins it
         D.end();
+        if (it.cycled) { u.setToolStyle(it.cycled.key, it.cycled.ts); u.toast(`Fill: ${colorLabel(it.cycled.ts.style.fill)}`); }
         afterCreate(it.id);
         return;
       }
