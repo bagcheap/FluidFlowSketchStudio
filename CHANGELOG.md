@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Next fill colour while drawing:** hold ⌘ (Ctrl on Windows) while drawing a shape and it gets the next colour along the palette row (Pale yellow → Pale green → Pale teal …, wrapping round). The shape tool remembers it, so the next shape of that kind starts from there. Shapes with white, grey, custom or no fill start at Pale red. Hold ⌘ while choosing Add container to do the same for containers.
+
 ## [0.1.9] - 2026-11-02
 
 ### Changed

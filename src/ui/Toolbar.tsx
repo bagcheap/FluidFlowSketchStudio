@@ -15,10 +15,10 @@ const TOOLS: (T | 'sep')[] = [
   { id: 'hand', icon: <Hand size={18} />, label: 'Hand (pan)', key: 'H', tip: 'Drag to move around the canvas. Hold Space with any tool to pan temporarily' },
   { id: 'select', icon: <MousePointer2 size={18} />, label: 'Select', key: 'V', tip: 'Click to select, drag to move, drag on empty canvas to box-select. Shift-click adds to the selection' },
   'sep',
-  { id: 'shape', shape: 'rectangle', icon: <Square size={18} />, label: 'Rectangle', key: 'R', tip: 'Click to place, or drag to size. Shift keeps it square' },
-  { id: 'shape', shape: 'roundRect', icon: <RectangleHorizontal size={18} />, label: 'Rounded rectangle', key: 'U', tip: 'Click to place, or drag to size. Shift keeps it square' },
-  { id: 'shape', shape: 'ellipse', icon: <Circle size={18} />, label: 'Ellipse', key: 'O', tip: 'Click to place, or drag to size. Shift draws a circle' },
-  { id: 'shape', shape: 'diamond', icon: <Diamond size={18} />, label: 'Diamond', key: 'D', tip: 'Decision shape. Click to place, or drag to size' },
+  { id: 'shape', shape: 'rectangle', icon: <Square size={18} />, label: 'Rectangle', key: 'R', tip: 'Click to place, or drag to size. Shift keeps it square. ⌘/Ctrl: next fill colour' },
+  { id: 'shape', shape: 'roundRect', icon: <RectangleHorizontal size={18} />, label: 'Rounded rectangle', key: 'U', tip: 'Click to place, or drag to size. Shift keeps it square. ⌘/Ctrl: next fill colour' },
+  { id: 'shape', shape: 'ellipse', icon: <Circle size={18} />, label: 'Ellipse', key: 'O', tip: 'Click to place, or drag to size. Shift draws a circle. ⌘/Ctrl: next fill colour' },
+  { id: 'shape', shape: 'diamond', icon: <Diamond size={18} />, label: 'Diamond', key: 'D', tip: 'Decision shape. Click to place, or drag to size. ⌘/Ctrl: next fill colour' },
 ];
 const TOOLS2: (T | 'sep')[] = [
   { id: 'arrow', icon: <ArrowUpRight size={18} />, label: 'Arrow / connector', key: 'A', tip: 'Drag from one shape to another to connect them. The arrow follows the shapes when they move' },

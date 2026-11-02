@@ -225,6 +225,24 @@ export const HUES = {
   bold: ['#fa5252', '#fd7e14', '#fab005', '#40c057', '#12b886', '#15aabf', '#228be6', '#4c6ef5', '#7950f2', '#e64980'],
   deep: ['#c92a2a', '#d9480f', '#e67700', '#2b8a3e', '#087f5b', '#0b7285', '#1864ab', '#364fc7', '#5f3dc4', '#a61e4d'],
 };
+/**
+ * The next fill in the palette's hue order, staying in the same strength row (Pale yellow → Pale green, …,
+ * Pale pink → Pale red). Anything that isn't a palette hue (white, greys, custom colours, no fill) starts at Pale red.
+ */
+export function nextFillColor(c: string): string {
+  const lc = c.toLowerCase();
+  for (const row of Object.values(HUES)) {
+    const i = row.indexOf(lc);
+    if (i >= 0) return row[(i + 1) % row.length];
+  }
+  return HUES.tint[0];
+}
+
+/** A tool style with its fill moved to the next palette hue (and a solid fill if it had none). */
+export function cycleFill(ts: ToolStyle): ToolStyle {
+  return { ...ts, style: { ...ts.style, fill: nextFillColor(ts.style.fill), fillStyle: ts.style.fillStyle === 'none' ? 'solid' : ts.style.fillStyle } };
+}
+
 export const PALETTE_STROKE = ['#1e1e2e', '#343a40', '#495057', '#868e96', '#adb5bd', '#dee2e6', '#ffffff', '#4b5563', '#7048e8', '#c2255c', ...HUES.deep, ...HUES.bold, ...HUES.light];
 export const PALETTE_FILL = ['transparent', '#ffffff', '#f8f9fa', '#e9ecef', '#ced4da', '#868e96', '#495057', '#1e1e2e', '#e7e3ff', '#fde68a', ...HUES.tint, ...HUES.light, ...HUES.bold, ...HUES.deep];
 export const HIGHLIGHT_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];

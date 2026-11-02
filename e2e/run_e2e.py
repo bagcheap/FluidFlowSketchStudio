@@ -513,6 +513,31 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tquick()
 
+        @test('Ctrl-drawing a shape moves its fill to the next palette colour and remembers it')
+        def tcycle():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 11000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.key('r')
+            base = app.js("() => window.__flowsketch.toolStyle('shape:rectangle')")['style']['fill']
+            app.drag((5100, 11200), (5200, 11260))
+            plain = app.els('shape')[-1]['style']['fill']
+            assert plain == base, (plain, base)
+            app.drag((5300, 11200), (5400, 11260), mods=['Control'])
+            f1 = app.els('shape')[-1]['style']['fill']
+            app.drag((5500, 11200), (5600, 11260), mods=['Control'])
+            f2 = app.els('shape')[-1]['style']['fill']
+            app.drag((5700, 11200), (5800, 11260))
+            f3 = app.els('shape')[-1]['style']['fill']
+            assert f1 != base and f2 != f1 and f3 == f2, (base, f1, f2, f3)
+            assert app.js("() => window.__flowsketch.toolStyle('shape:rectangle')")['style']['fill'] == f2
+            assert page.locator('.toast', has_text='Fill:').count() >= 1
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tcycle()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]

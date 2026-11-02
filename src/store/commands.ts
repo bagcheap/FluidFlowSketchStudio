@@ -1,7 +1,7 @@
 // Editor commands shared by menus, keyboard shortcuts, toolbar and inspector.
 import type { Asset, BoxElement, ConnectorAnim, ContainerElement, DiagramElement, FlowDocument, IconAsset, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
 import { SCHEMA_VERSION } from '../model/types';
-import { DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
+import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { useUI } from './uiStore';
 import { contentBounds } from '../engine/render';
@@ -14,6 +14,8 @@ import { loadIconSet } from '../icons/sets';
 import { fitToContents, isContainer, moveElements, removeContainer, updateMembership, withMembers, wrapInContainer } from './containers';
 import { importFiles, slugName, useLibraries } from '../icons/libraries';
 import { addConnectedCopy, canQuickConnect, type Side } from './quickConnect';
+import { cycleKeyHeld } from '../ui/modifiers';
+import { colorLabel } from '../ui/colorNames';
 import { svgToIcon } from '../icons/svgToIcon';
 
 const D = () => useDoc.getState();
@@ -343,8 +345,11 @@ export function addContainer() {
   const doc = D().doc;
   const ids = U().selection.filter((id) => !getElement(doc, id)?.locked);
   if (!ids.length) { U().toast('Select the shapes to put in a container first'); return; }
-  const r = wrapInContainer(doc, ids, U().toolStyle('container'));
+  // Cmd (Ctrl on Windows/Linux) held while choosing Add container: the next fill colour, remembered
+  const ts = cycleKeyHeld() ? cycleFill(U().toolStyle('container')) : U().toolStyle('container');
+  const r = wrapInContainer(doc, ids, ts);
   if (!r) return;
+  if (cycleKeyHeld()) { U().setToolStyle('container', ts); U().toast(`Fill: ${colorLabel(ts.style.fill)}`); }
   D().commit(() => r.doc);
   U().setTool('select');
   U().select([r.id]);
