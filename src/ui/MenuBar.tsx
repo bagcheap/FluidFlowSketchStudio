@@ -2,12 +2,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
 import { useUI } from '../store/uiStore';
+import * as cmd from '../store/commands';
 
 export type MenuItem =
   | { sep: true }
   | { label: string; shortcut?: string; run?: () => void; disabled?: boolean; checked?: boolean; sub?: MenuItem[]; note?: string };
 
 export interface MenuDef { id: string; label: string; items: MenuItem[] }
+
+/** Arrange ▸ Match size and the right-click menu: resize the selection to the first selected shape. */
+export const matchSizeItems = (keepProportions: boolean): MenuItem[] => [
+  { label: 'Width', note: keepProportions ? 'keeps proportions' : undefined, run: () => cmd.matchSize('width') },
+  { label: 'Height', note: keepProportions ? 'keeps proportions' : undefined, run: () => cmd.matchSize('height') },
+  { label: 'Both', run: () => cmd.matchSize('both') },
+];
 
 export function ItemList({ items, onClose, depth = 0 }: { items: MenuItem[]; onClose: () => void; depth?: number }) {
   const ref = useRef<HTMLDivElement>(null);

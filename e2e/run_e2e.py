@@ -538,6 +538,33 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tcycle()
 
+        @test('Match size: right-click ▸ Match size ▸ Width/Both resizes the selection to the first selected shape')
+        def tmatch():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 13000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.key('r'); app.drag((5100, 13200), (5300, 13300)); app.drag((5500, 13200), (5550, 13240)); app.key('Escape')
+            a, b = app.els('shape')[-2:]
+            app.click((5200, 13250)); page.keyboard.down('Shift'); app.click((5525, 13220)); page.keyboard.up('Shift')
+            assert app.ui()['selection'] == [a['id'], b['id']], app.ui()['selection']
+            def menu(choice):
+                x, y = app.pt(5525, 13220) if choice == 'Width' else app.pt(5200, 13250)
+                page.mouse.click(x, y, button='right'); page.wait_for_selector('.ctx-menu')
+                page.locator('.ctx-menu [role=menuitem]', has_text='Match size').click()
+                page.locator('.ctx-menu .menu-pop.sub [role^=menuitem]', has_text=choice).click(); page.wait_for_timeout(80)
+            menu('Width')
+            b2 = [e for e in app.els() if e['id'] == b['id']][0]
+            assert round(b2['w']) == round(a['w']) and round(b2['h']) == round(b['h']), b2  # width only
+            app.key('Control+z')
+            menu('Both')
+            b3 = [e for e in app.els() if e['id'] == b['id']][0]
+            assert (round(b3['w']), round(b3['h'])) == (round(a['w']), round(a['h'])), b3
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.key('Escape')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tmatch()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]

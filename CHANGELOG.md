@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.12] - 2026-11-03
+
+### Added
+- **Match size:** select the shape to copy the size from first, Shift-click the others, then choose Match size (right-click or Arrange) ▸ Width, Height or Both. Width and Height change only that side (turn on "keeps each shape's proportions" in Edit ▸ Preferences to scale the other side too); Both makes them exactly the same size. Shapes keep their centre; text, arrows, containers and locked items are left alone.
+
 ## [0.1.11] - 2026-11-03
 
 ### Added
