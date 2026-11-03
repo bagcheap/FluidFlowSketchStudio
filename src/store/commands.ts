@@ -304,6 +304,39 @@ export function align(kind: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | '
   D().commit((d) => moveBoxes(d, els.map((b) => { const t = target(b); return [b.id, t.x - b.x, t.y - b.y] as const; })));
 }
 
+export type MatchSizeMode = 'width' | 'height' | 'both';
+
+/** Elements Match size resizes: shapes, icons, pictures and pen drawings (not text, arrows, containers or locked items). */
+const canMatchSize = (e: DiagramElement): e is BoxElement =>
+  !e.locked && (e.type === 'shape' || e.type === 'icon' || e.type === 'image' || e.type === 'freehand');
+
+/**
+ * Resize `ids` to the size of `refId`, each keeping its centre. Width or height keeps each element's aspect ratio
+ * (the other side scales with it); both sets width and height exactly (stretching if needed).
+ */
+export function matchSizes(doc: FlowDocument, refId: string, ids: string[], mode: MatchSizeMode): FlowDocument {
+  const ref = getElement(doc, refId);
+  if (!ref || ref.type === 'connector') return doc;
+  const targets = new Set(ids.filter((id) => id !== refId));
+  const out = mapElements(doc, [...targets], (e) => {
+    if (!canMatchSize(e) || e.w <= 0 || e.h <= 0) return e;
+    const k = mode === 'width' ? ref.w / e.w : ref.h / e.h;
+    const w = mode === 'both' ? ref.w : e.w * k, h = mode === 'both' ? ref.h : e.h * k;
+    return { ...e, x: e.x + e.w / 2 - w / 2, y: e.y + e.h / 2 - h / 2, w, h };
+  });
+  return updateMembership(out, [...targets]); // containers grow to fit bigger members
+}
+
+/** Match size: the selection takes the size of the first selected shape (the reference). One undo step. */
+export function matchSize(mode: MatchSizeMode) {
+  const doc = D().doc;
+  const sel = U().selection.map((id) => getElement(doc, id)).filter((e): e is DiagramElement => !!e && e.type !== 'connector');
+  const ref = sel[0];
+  const rest = sel.slice(1).filter(canMatchSize);
+  if (!ref || !rest.length) { U().toast('Select the shape to match first, then the shapes to resize'); return; }
+  D().commit((d) => matchSizes(d, ref.id, rest.map((e) => e.id), mode));
+}
+
 /** Move boxes by their own offsets; a container brings its contents. Then re-check container membership. */
 function moveBoxes(doc: FlowDocument, moves: (readonly [string, number, number])[]): FlowDocument {
   let out = doc;
