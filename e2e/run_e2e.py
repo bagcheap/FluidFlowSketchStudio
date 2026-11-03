@@ -555,7 +555,7 @@ def main():
                 page.locator('.ctx-menu .menu-pop.sub [role^=menuitem]', has_text=choice).click(); page.wait_for_timeout(80)
             menu('Width')
             b2 = [e for e in app.els() if e['id'] == b['id']][0]
-            assert round(b2['w']) == round(a['w']) and abs(b2['h'] / b2['w'] - b['h'] / b['w']) < 0.01, b2
+            assert round(b2['w']) == round(a['w']) and round(b2['h']) == round(b['h']), b2  # width only
             app.key('Control+z')
             menu('Both')
             b3 = [e for e in app.els() if e['id'] == b['id']][0]

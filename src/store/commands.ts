@@ -311,17 +311,18 @@ const canMatchSize = (e: DiagramElement): e is BoxElement =>
   !e.locked && (e.type === 'shape' || e.type === 'icon' || e.type === 'image' || e.type === 'freehand');
 
 /**
- * Resize `ids` to the size of `refId`, each keeping its centre. Width or height keeps each element's aspect ratio
- * (the other side scales with it); both sets width and height exactly (stretching if needed).
+ * Resize `ids` to the size of `refId`, each keeping its centre. Width or height changes only that side, unless
+ * `keepProportions` (the other side then scales with it); both sets width and height exactly.
  */
-export function matchSizes(doc: FlowDocument, refId: string, ids: string[], mode: MatchSizeMode): FlowDocument {
+export function matchSizes(doc: FlowDocument, refId: string, ids: string[], mode: MatchSizeMode, keepProportions = false): FlowDocument {
   const ref = getElement(doc, refId);
   if (!ref || ref.type === 'connector') return doc;
   const targets = new Set(ids.filter((id) => id !== refId));
   const out = mapElements(doc, [...targets], (e) => {
     if (!canMatchSize(e) || e.w <= 0 || e.h <= 0) return e;
     const k = mode === 'width' ? ref.w / e.w : ref.h / e.h;
-    const w = mode === 'both' ? ref.w : e.w * k, h = mode === 'both' ? ref.h : e.h * k;
+    const w = mode === 'both' || mode === 'width' ? ref.w : keepProportions ? e.w * k : e.w;
+    const h = mode === 'both' || mode === 'height' ? ref.h : keepProportions ? e.h * k : e.h;
     return { ...e, x: e.x + e.w / 2 - w / 2, y: e.y + e.h / 2 - h / 2, w, h };
   });
   return updateMembership(out, [...targets]); // containers grow to fit bigger members
@@ -334,7 +335,7 @@ export function matchSize(mode: MatchSizeMode) {
   const ref = sel[0];
   const rest = sel.slice(1).filter(canMatchSize);
   if (!ref || !rest.length) { U().toast('Select the shape to match first, then the shapes to resize'); return; }
-  D().commit((d) => matchSizes(d, ref.id, rest.map((e) => e.id), mode));
+  D().commit((d) => matchSizes(d, ref.id, rest.map((e) => e.id), mode, U().prefs.matchSizeKeepsProportions));
 }
 
 /** Move boxes by their own offsets; a container brings its contents. Then re-check container membership. */

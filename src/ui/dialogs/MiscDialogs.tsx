@@ -97,7 +97,7 @@ export function HelpDialog() {
           <li>Right-click for the most common actions. Select shapes and choose <b>Add container</b> to frame them: the container moves everything inside, and shapes dragged in or out join or leave it.</li>
           <li>Quick-connect: hover a shape and click one of the small arrows around it to add a connected copy on that side (rest on the arrow to pick a different shape), or drag an arrow onto another shape to connect them (or onto empty canvas to drop a copy there). With a shape selected, <kbd>⌘/Ctrl</kbd>+arrow keys do the same.</li>
           <li>Hold <kbd>⌘/Ctrl</kbd> while drawing a shape to give it the next fill colour in the palette (Pale yellow → Pale green → …); the shape tool remembers it for the next one. Hold it while choosing <b>Add container</b> to do the same for containers.</li>
-          <li>Match size: click the shape whose size you want, Shift-click the others, then right-click ▸ <b>Match size</b> ▸ Width, Height (both keep proportions) or Both (stretches).</li>
+          <li>Match size: click the shape whose size you want, Shift-click the others, then right-click ▸ <b>Match size</b> ▸ Width, Height or Both (Edit ▸ Preferences can make Width and Height keep proportions).</li>
           <li>Icons: press <kbd>⇧ I</kbd> to open the Icons panel, search, then drag an icon onto the canvas or click it.</li>
           <li>Alt-drag duplicates; arrow keys nudge (<kbd>Shift</kbd> ×10); hold <kbd>Space</kbd> to pan; <kbd>⌘/Ctrl</kbd>+scroll or pinch to zoom.</li>
           <li>Format painter (<kbd>F</kbd>): click a shape to pick its style, then click others to apply it.</li>
@@ -150,6 +150,7 @@ export function PrefsDialog() {
     <Modal title="Preferences" footer={<button className="btn primary" onClick={close}>Done</button>}>
       <Toggle label="Continuous drawing (tool stays active after drawing)" checked={p.continuousDrawing} onChange={(v) => up({ continuousDrawing: v })} />
       <Toggle label="Colours I set on selected objects also become that tool’s default" checked={p.selectionUpdatesDefaults} onChange={(v) => up({ selectionUpdatesDefaults: v })} />
+      <Toggle label="Match size ▸ Width / Height keeps each shape’s proportions" checked={p.matchSizeKeepsProportions} onChange={(v) => up({ matchSizeKeepsProportions: v })} />
       <Toggle label="Use shared style defaults for all shape tools" checked={p.sharedStyles} onChange={(v) => up({ sharedStyles: v, sharedStyle: v ? useUI.getState().toolStyle('shape:roundRect') : null })} />
       <Toggle label="Pause an object’s motion while dragging/resizing it" checked={p.suspendWhileDragging} onChange={(v) => up({ suspendWhileDragging: v })} />
       <Toggle label="Autoplay animation on open (ignored if your system asks for reduced motion)" checked={p.autoplay} onChange={(v) => up({ autoplay: v })} />

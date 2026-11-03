@@ -27,6 +27,7 @@ export interface Prefs {
   recentIcons: string[]; // "<set>:<name>", most recent first
   hiddenIconSets: string[]; // built-in icon sets switched off in Manage icon libraries
   recentQuickShapes: ShapeKind[]; // shapes picked in the quick-connect picker, most recent first
+  matchSizeKeepsProportions: boolean; // Match size ▸ Width/Height also scales the other side
 }
 
 const PREFS_KEY = 'flowsketch.prefs.v1';
@@ -49,6 +50,7 @@ const DEFAULT_PREFS: Prefs = {
   recentIcons: [],
   hiddenIconSets: [],
   recentQuickShapes: [],
+  matchSizeKeepsProportions: false,
 };
 
 function loadPrefs(): Prefs {

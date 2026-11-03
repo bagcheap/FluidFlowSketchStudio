@@ -11,10 +11,10 @@ export type MenuItem =
 export interface MenuDef { id: string; label: string; items: MenuItem[] }
 
 /** Arrange ▸ Match size and the right-click menu: resize the selection to the first selected shape. */
-export const MATCH_SIZE_ITEMS: MenuItem[] = [
-  { label: 'Width', note: 'keeps proportions', run: () => cmd.matchSize('width') },
-  { label: 'Height', note: 'keeps proportions', run: () => cmd.matchSize('height') },
-  { label: 'Both', note: 'stretches to fit', run: () => cmd.matchSize('both') },
+export const matchSizeItems = (keepProportions: boolean): MenuItem[] => [
+  { label: 'Width', note: keepProportions ? 'keeps proportions' : undefined, run: () => cmd.matchSize('width') },
+  { label: 'Height', note: keepProportions ? 'keeps proportions' : undefined, run: () => cmd.matchSize('height') },
+  { label: 'Both', run: () => cmd.matchSize('both') },
 ];
 
 export function ItemList({ items, onClose, depth = 0 }: { items: MenuItem[]; onClose: () => void; depth?: number }) {

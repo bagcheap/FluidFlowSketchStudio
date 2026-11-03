@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
-import { ItemList, MATCH_SIZE_ITEMS, type MenuItem } from './MenuBar';
+import { ItemList, matchSizeItems, type MenuItem } from './MenuBar';
 import { ALT, MOD, SHIFT } from './shortcuts';
 
 function selectionItems(): MenuItem[] {
@@ -43,7 +43,7 @@ function selectionItems(): MenuItem[] {
     ...(els.length >= 2 ? [{ label: 'Align', sub: [
       { label: 'Left', run: () => cmd.align('left') }, { label: 'Centre', run: () => cmd.align('hcenter') }, { label: 'Right', run: () => cmd.align('right') },
       { sep: true }, { label: 'Top', run: () => cmd.align('top') }, { label: 'Middle', run: () => cmd.align('vcenter') }, { label: 'Bottom', run: () => cmd.align('bottom') },
-    ] } as MenuItem, { label: 'Match size', sub: MATCH_SIZE_ITEMS } as MenuItem] : []),
+    ] } as MenuItem, { label: 'Match size', sub: matchSizeItems(ui.prefs.matchSizeKeepsProportions) } as MenuItem] : []),
     ...(els.some((e) => e.type === 'connector') ? [{ label: 'Swap direction', run: () => cmd.swapDirection() } as MenuItem] : []),
     { sep: true },
     { label: anyLocked ? 'Unlock' : 'Lock', shortcut: `${MOD}${SHIFT}L`, run: cmd.toggleLock },

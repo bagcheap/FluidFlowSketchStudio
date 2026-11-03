@@ -3,7 +3,7 @@ import { Download, Moon, Play, Redo2, Sun, Undo2, Monitor } from 'lucide-react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
-import { MATCH_SIZE_ITEMS, MenuBar, type MenuDef, type MenuItem } from './MenuBar';
+import { matchSizeItems, MenuBar, type MenuDef, type MenuItem } from './MenuBar';
 import { ALT, MOD, SHIFT } from './shortcuts';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { SHAPE_KINDS } from '../model/schema';
@@ -95,7 +95,7 @@ export function TopBar() {
         { sep: true }, { label: 'Top', run: () => cmd.align('top') }, { label: 'Middle', run: () => cmd.align('vcenter') }, { label: 'Bottom', run: () => cmd.align('bottom') },
       ], disabled: sel.length < 2 },
       { label: 'Distribute', sub: [{ label: 'Horizontally', run: () => cmd.distribute('h') }, { label: 'Vertically', run: () => cmd.distribute('v') }], disabled: sel.length < 3 },
-      { label: 'Match size', sub: MATCH_SIZE_ITEMS, disabled: sel.length < 2 },
+      { label: 'Match size', sub: matchSizeItems(prefs.matchSizeKeepsProportions), disabled: sel.length < 2 },
       { sep: true },
       { label: 'Bring to front', shortcut: `${MOD}${SHIFT}]`, run: () => cmd.reorder('front'), disabled: !hasSel },
       { label: 'Bring forward', shortcut: `${MOD}]`, run: () => cmd.reorder('forward'), disabled: !hasSel },

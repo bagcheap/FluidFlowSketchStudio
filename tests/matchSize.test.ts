@@ -15,17 +15,25 @@ function setup() {
 }
 
 describe('match size', () => {
-  it('width: matches the width and keeps each shape\'s proportions, around its centre', () => {
+  it('width: changes only the width, around each shape\'s centre', () => {
     const { doc, ref, small, tall } = setup();
     const d = matchSizes(doc, ref.id, [small.id, tall.id], 'width');
-    expect(get(d, small.id)).toMatchObject({ w: 200, h: 160, x: 425 - 100, y: 20 - 80 });
-    expect(get(d, tall.id)).toMatchObject({ w: 200, h: 800 });
+    expect(get(d, small.id)).toMatchObject({ w: 200, h: 40, x: 425 - 100, y: 0 });
+    expect(get(d, tall.id)).toMatchObject({ w: 200, h: 160 });
     expect(get(d, ref.id)).toEqual(ref);
   });
 
-  it('height: matches the height and keeps proportions', () => {
+  it('height: changes only the height', () => {
     const { doc, ref, small } = setup();
-    const s = get(matchSizes(doc, ref.id, [small.id], 'height'), small.id);
+    expect(get(matchSizes(doc, ref.id, [small.id], 'height'), small.id)).toMatchObject({ w: 50, h: 100, x: 400, y: 20 - 50 });
+  });
+
+  it('with the "keep proportions" preference, the other side scales too', () => {
+    const { doc, ref, small, tall } = setup();
+    const d = matchSizes(doc, ref.id, [small.id, tall.id], 'width', true);
+    expect(get(d, small.id)).toMatchObject({ w: 200, h: 160, x: 425 - 100, y: 20 - 80 });
+    expect(get(d, tall.id)).toMatchObject({ w: 200, h: 800 });
+    const s = get(matchSizes(doc, ref.id, [small.id], 'height', true), small.id);
     expect(s.h).toBe(100);
     expect(s.w).toBeCloseTo(125);
   });
