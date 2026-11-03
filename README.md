@@ -21,24 +21,53 @@ npm run test:e2e   # end-to-end acceptance tests (needs `npm run preview` runnin
 
 FlowSketch can also be built as a normal Mac app, `FlowSketch.app`, with [Tauri](https://tauri.app). It is the same app in its own window: no browser, no server, no npm in daily use. Save, Open and every export use the native macOS dialogs.
 
-One-time setup on the Mac:
+**One-time setup** (skip any step you have already done):
 
 ```bash
-xcode-select --install                                           # Apple's command-line tools (skip if already installed)
+xcode-select --install                                           # Apple's command-line tools
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # Rust, which Tauri uses to build the app; then open a new Terminal window
 ```
 
-Build and install:
+You also need Node 18 or later (`node --version`; install it from [nodejs.org](https://nodejs.org) if it is missing) and a copy of this repository:
+
+```bash
+git clone https://github.com/bagcheap/FluidFlowSketchStudio.git
+cd FluidFlowSketchStudio
+```
+
+**Build and install:**
 
 ```bash
 npm install
-npm run app:build    # first build takes a few minutes; later ones are quicker
+npm run app:build                            # first build takes 5–10 minutes; later ones are quicker
 open src-tauri/target/release/bundle/macos   # drag FlowSketch.app into Applications
 ```
 
-`npm run app:dev` opens the app window on top of the dev server, with live reload, for trying changes. To update the installed app, pull the new version, run `npm run app:build` again and replace the app in Applications.
+Open it from Applications, Launchpad or Spotlight. To keep it in the Dock, right-click its Dock icon ▸ Options ▸ Keep in Dock.
 
-The app keeps its own autosave, recent files, preferences and icon libraries, separate from the browser at `localhost:5173`. To bring icon libraries across, export them in the browser (Icons ▸ Manage ▸ Export) and import the `.flowsketchlib` files in the app; save open diagrams as `.flowsketch` files and open them in the app.
+**Updating to a new version:**
+
+```bash
+git checkout -- package-lock.json   # drop the lockfile changes npm install makes, so the pull isn't refused
+git checkout main && git pull
+npm install                         # only needed when a release says it adds packages; harmless otherwise
+npm run app:build
+open src-tauri/target/release/bundle/macos   # drag the new FlowSketch.app into Applications and replace the old one
+```
+
+Your diagrams, autosave, preferences and icon libraries are kept: they are stored separately from the app itself. Help ▸ About shows the version you are running.
+
+`npm run app:dev` opens the app window on top of the dev server, with live reload, for trying a branch without installing it.
+
+**Moving from the browser version:** the app keeps its own autosave, recent files, preferences and icon libraries, separate from the browser at `localhost:5173`. Export each icon library in the browser (Icons ▸ Manage ▸ Export) and import the `.flowsketchlib` files in the app; save open diagrams as `.flowsketch` files and open them in the app.
+
+**Troubleshooting:**
+
+- **`git pull` says "Your local changes would be overwritten" (`package-lock.json`):** run `git checkout -- package-lock.json` and pull again. It only throws away the copy `npm install` rewrote.
+- **`cargo` or `rustc`: command not found:** open a new Terminal window, or run `source "$HOME/.cargo/env"`.
+- **About still shows the old version:** the app was built before the update. Run `npm run app:build` again and replace the app in Applications.
+- **macOS says the app can't be opened or is from an unidentified developer:** right-click FlowSketch.app ▸ Open, then Open once. The app is built on your Mac and isn't signed with an Apple developer account.
+- **The build fails:** run `rustup update` and `npm install`, then try `npm run app:build` again. If it still fails, the last 20 lines of the Terminal output say why.
 
 Requirements: Node 18+ (tested on Node 22). The e2e suite uses Python 3 with `playwright` and `Pillow` (`pip install playwright pillow && python3 -m playwright install chromium`).
 
