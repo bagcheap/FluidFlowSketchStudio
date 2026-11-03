@@ -32,4 +32,4 @@ Imported icons are converted and stored only in your browser (IndexedDB), and in
 
 ## Other open-source components
 
-React (MIT), Vite and Vitest (MIT), Zustand (MIT), Rough.js (MIT), gifenc (MIT), fflate (MIT), idb-keyval (Apache-2.0), Lucide (ISC), Kalam and Inter fonts (SIL Open Font License 1.1). The user interface and branding are original; no Excalidraw assets are used.
+React (MIT), Vite and Vitest (MIT), Tauri and its dialog and file-system plugins (MIT or Apache-2.0; desktop app only), Zustand (MIT), Rough.js (MIT), gifenc (MIT), fflate (MIT), idb-keyval (Apache-2.0), Lucide (ISC), Kalam and Inter fonts (SIL Open Font License 1.1). The user interface and branding are original; no Excalidraw assets are used.

@@ -6,6 +6,10 @@ e2e/__pycache__/
 *.log
 .DS_Store
 
+# Desktop app (Tauri) build output
+src-tauri/target/
+src-tauri/gen/schemas/
+
 # Icon packages and libraries (vendor icons must not be committed; see THIRD_PARTY_NOTICES.md)
 *.zip
 *.flowsketchlib
