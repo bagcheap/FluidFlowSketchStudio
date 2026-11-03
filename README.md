@@ -13,9 +13,32 @@ npm install
 npm run dev        # http://localhost:5173  (also builds the HTML-player bundle first)
 npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ on http://localhost:4173
-npm test           # unit tests (Vitest, 74 tests)
+npm test           # unit tests (Vitest, 77 tests)
 npm run test:e2e   # end-to-end acceptance tests (needs `npm run preview` running; see below)
 ```
+
+### Desktop app (macOS)
+
+FlowSketch can also be built as a normal Mac app, `FlowSketch.app`, with [Tauri](https://tauri.app). It is the same app in its own window: no browser, no server, no npm in daily use. Save, Open and every export use the native macOS dialogs.
+
+One-time setup on the Mac:
+
+```bash
+xcode-select --install                                           # Apple's command-line tools (skip if already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # Rust, which Tauri uses to build the app; then open a new Terminal window
+```
+
+Build and install:
+
+```bash
+npm install
+npm run app:build    # first build takes a few minutes; later ones are quicker
+open src-tauri/target/release/bundle/macos   # drag FlowSketch.app into Applications
+```
+
+`npm run app:dev` opens the app window on top of the dev server, with live reload, for trying changes. To update the installed app, pull the new version, run `npm run app:build` again and replace the app in Applications.
+
+The app keeps its own autosave, recent files, preferences and icon libraries, separate from the browser at `localhost:5173`. To bring icon libraries across, export them in the browser (Icons ▸ Manage ▸ Export) and import the `.flowsketchlib` files in the app; save open diagrams as `.flowsketch` files and open them in the app.
 
 Requirements: Node 18+ (tested on Node 22). The e2e suite uses Python 3 with `playwright` and `Pillow` (`pip install playwright pillow && python3 -m playwright install chromium`).
 

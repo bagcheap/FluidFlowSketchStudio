@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.11] - 2026-11-03
+
+### Added
+- **FlowSketch as a Mac app:** FlowSketch can be built as `FlowSketch.app` that runs in its own window from Applications or the Dock, without a browser or Terminal. Save, Open and exports use the normal macOS dialogs, and Save writes back to the file you opened. See "Desktop app" in the README for the one-time setup.
+
 ## [0.1.10] - 2026-11-02
 
 ### Added
