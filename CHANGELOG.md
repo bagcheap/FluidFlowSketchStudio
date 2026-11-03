@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.13] - 2026-11-03
+
+### Changed
+- The README's Mac app section now covers a first install from scratch, updating to a new version, and fixes for common problems (a refused `git pull`, `cargo` not found, an old version in About, the macOS first-launch warning, a failing build).
+
 ## [0.1.12] - 2026-11-03
 
 ### Added
