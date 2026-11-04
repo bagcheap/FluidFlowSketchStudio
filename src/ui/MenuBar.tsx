@@ -11,6 +11,14 @@ export type MenuItem =
 export interface MenuDef { id: string; label: string; items: MenuItem[] }
 
 /** Arrange ▸ Match size and the right-click menu: resize the selection to the first selected shape. */
+/** Arrange ▸ Auto-layout and the right-click menus: arrange shapes in layers along their arrows. */
+export const AUTO_LAYOUT_ITEMS: MenuItem[] = [
+  { label: 'Left to right', run: () => cmd.autoLayout('LR') },
+  { label: 'Top to bottom', run: () => cmd.autoLayout('TB') },
+  { label: 'Right to left', run: () => cmd.autoLayout('RL') },
+  { label: 'Bottom to top', run: () => cmd.autoLayout('BT') },
+];
+
 export const matchSizeItems = (keepProportions: boolean): MenuItem[] => [
   { label: 'Width', note: keepProportions ? 'keeps proportions' : undefined, run: () => cmd.matchSize('width') },
   { label: 'Height', note: keepProportions ? 'keeps proportions' : undefined, run: () => cmd.matchSize('height') },
