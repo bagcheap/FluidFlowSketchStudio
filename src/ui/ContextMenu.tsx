@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
-import { ItemList, matchSizeItems, type MenuItem } from './MenuBar';
+import { AUTO_LAYOUT_ITEMS, ItemList, matchSizeItems, type MenuItem } from './MenuBar';
 import { ALT, MOD, SHIFT } from './shortcuts';
 
 function selectionItems(): MenuItem[] {
@@ -43,7 +43,7 @@ function selectionItems(): MenuItem[] {
     ...(els.length >= 2 ? [{ label: 'Align', sub: [
       { label: 'Left', run: () => cmd.align('left') }, { label: 'Centre', run: () => cmd.align('hcenter') }, { label: 'Right', run: () => cmd.align('right') },
       { sep: true }, { label: 'Top', run: () => cmd.align('top') }, { label: 'Middle', run: () => cmd.align('vcenter') }, { label: 'Bottom', run: () => cmd.align('bottom') },
-    ] } as MenuItem, { label: 'Match size', sub: matchSizeItems(ui.prefs.matchSizeKeepsProportions) } as MenuItem] : []),
+    ] } as MenuItem, { label: 'Match size', sub: matchSizeItems(ui.prefs.matchSizeKeepsProportions) }, { label: 'Auto-layout selection', sub: AUTO_LAYOUT_ITEMS } as MenuItem as MenuItem] : []),
     ...(els.some((e) => e.type === 'connector') ? [{ label: 'Swap direction', run: () => cmd.swapDirection() } as MenuItem] : []),
     { sep: true },
     { label: anyLocked ? 'Unlock' : 'Lock', shortcut: `${MOD}${SHIFT}L`, run: cmd.toggleLock },
@@ -57,6 +57,8 @@ function canvasItems(): MenuItem[] {
   return [
     { label: 'Paste', shortcut: `${MOD}V`, run: () => void cmd.paste() },
     { label: 'Select all', shortcut: `${MOD}A`, run: cmd.selectAll, disabled: !doc.elements.length },
+    { label: 'Diagram from text…', run: () => ui.openDialog('mermaid') },
+    { label: 'Auto-layout diagram', sub: AUTO_LAYOUT_ITEMS, disabled: !doc.elements.length },
     { sep: true },
     { label: 'Grid', sub: (['dots', 'lines', 'none'] as const).map((g) => ({ label: g === 'none' ? 'Plain' : g === 'dots' ? 'Dot grid' : 'Line grid', checked: doc.canvas.grid === g, run: () => setGrid(g) })) },
     { label: 'Snap to grid', checked: ui.prefs.snapToGrid, run: () => ui.updatePrefs({ snapToGrid: !ui.prefs.snapToGrid }) },

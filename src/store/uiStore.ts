@@ -3,11 +3,12 @@
 import { create } from 'zustand';
 import type { ShapeKind, ToolStyle } from '../model/types';
 import { defaultToolStyle, styleKey, type ToolId } from '../model/defaults';
+import { sanitizeToolStyle, SHAPE_KINDS } from '../model/schema';
 
 export type Theme = 'light' | 'dark' | 'system';
 export type DialogId =
   | null | 'gif' | 'image' | 'svg' | 'video' | 'animation' | 'shortcuts' | 'help' | 'templates'
-  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes' | 'whatsnew' | 'iconlibs';
+  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes' | 'whatsnew' | 'iconlibs' | 'mermaid';
 
 export interface Prefs {
   toolStyles: Record<string, ToolStyle>;
@@ -53,12 +54,42 @@ const DEFAULT_PREFS: Prefs = {
   matchSizeKeepsProportions: false,
 };
 
+const HEX_COLOR = /^#[0-9a-f]{3,8}$/i;
+const strings = (v: unknown, max: number, ok: (s: string) => boolean = () => true) =>
+  Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string' && s.length <= 200 && ok(s)).slice(0, max) : null;
+
+/**
+ * Saved preferences, validated like a file: each setting must have the right type (else its default is used),
+ * lists are trimmed, and remembered tool styles go through the same checks as styles in a diagram.
+ */
+export function sanitizePrefs(v: unknown): Prefs {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return DEFAULT_PREFS;
+  const o = v as Record<string, unknown>;
+  const out: Prefs = { ...DEFAULT_PREFS };
+  for (const k of Object.keys(DEFAULT_PREFS) as (keyof Prefs)[]) {
+    if (typeof DEFAULT_PREFS[k] === 'boolean' && typeof o[k] === 'boolean') (out as unknown as Record<string, unknown>)[k] = o[k];
+  }
+  if (o.theme === 'light' || o.theme === 'dark' || o.theme === 'system') out.theme = o.theme;
+  out.recentColors = strings(o.recentColors, 8, (s) => HEX_COLOR.test(s)) ?? [];
+  out.recentIcons = strings(o.recentIcons, 15, (s) => /^[\w.-]+:[\w.-]+$/.test(s)) ?? [];
+  out.hiddenIconSets = strings(o.hiddenIconSets, 100) ?? [];
+  out.recentQuickShapes = (strings(o.recentQuickShapes, 4, (s) => (SHAPE_KINDS as readonly string[]).includes(s)) ?? []) as ShapeKind[];
+  if (o.toolStyles && typeof o.toolStyles === 'object' && !Array.isArray(o.toolStyles)) {
+    const ts: Record<string, ToolStyle> = {};
+    for (const [key, val] of Object.entries(o.toolStyles as Record<string, unknown>).slice(0, 100)) {
+      if (/^[\w:-]{1,40}$/.test(key) && key !== '__proto__') ts[key] = sanitizeToolStyle(val, defaultToolStyle(key));
+    }
+    out.toolStyles = ts;
+  }
+  out.sharedStyle = o.sharedStyle ? sanitizeToolStyle(o.sharedStyle, defaultToolStyle('shape:rectangle')) : null;
+  return out;
+}
+
 function loadPrefs(): Prefs {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(PREFS_KEY) : null;
     if (!raw) return DEFAULT_PREFS;
-    const p = JSON.parse(raw);
-    return { ...DEFAULT_PREFS, ...(p && typeof p === 'object' ? p : {}) };
+    return sanitizePrefs(JSON.parse(raw));
   } catch { return DEFAULT_PREFS; }
 }
 

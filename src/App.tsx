@@ -21,6 +21,7 @@ import { AboutDialog, AnimationDialog, DocPropsDialog, HelpDialog, PrefsDialog, 
 import { SAMPLES, STARTER_ID } from './templates/samples';
 import { Modal } from './ui/dialogs/Modal';
 import { IconLibrariesDialog } from './ui/dialogs/IconLibrariesDialog';
+import { MermaidDialog } from './ui/dialogs/MermaidDialog';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -128,6 +129,7 @@ function Dialogs() {
     case 'about': return <AboutDialog />;
     case 'whatsnew': return <WhatsNewDialog />;
     case 'iconlibs': return <IconLibrariesDialog />;
+    case 'mermaid': return <MermaidDialog />;
     case 'prefs': return <PrefsDialog />;
     case 'docprops': return <DocPropsDialog />;
     case 'recent': return <RecentDialog />;

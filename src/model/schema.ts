@@ -1,7 +1,7 @@
 // Validation, sanitisation and migration for .flowsketch files.
 // Every imported value is coerced into a known-safe shape; nothing is executed.
 import type {
-  Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, IconAsset, IconGradient, IconPaint, IconPart, ShapeAnim, ShapeKind, Style, TextStyle,
+  Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, IconAsset, IconGradient, IconPaint, IconPart, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle,
 } from './types';
 import { SCHEMA_VERSION } from './types';
 import { DEFAULT_ANIMATION, DEFAULT_CONNECTOR_ANIM, DEFAULT_SHAPE_ANIM, DEFAULT_STYLE, DEFAULT_TEXT, newDocument, newSeed, uid } from './defaults';
@@ -188,6 +188,24 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
 const DATA_URL_RE = /^data:(image\/(png|jpeg|gif|webp));base64,[A-Za-z0-9+/=]+$/;
 
 /** A raster image (PNG, JPEG, GIF, WebP data URL); null for anything else, including SVG. */
+/**
+ * A remembered tool style (saved preferences, not a file, but still validated: it flows into every new shape).
+ * Anything missing or invalid falls back to `fallback`.
+ */
+export function sanitizeToolStyle(v: unknown, fallback: ToolStyle): ToolStyle {
+  if (!isObj(v)) return fallback;
+  const heads = ['none', 'arrow', 'triangle', 'dot', 'bar'] as const;
+  return {
+    style: isObj(v.style) ? style({ ...fallback.style, ...v.style }) : fallback.style,
+    textStyle: isObj(v.textStyle) ? textStyle({ ...fallback.textStyle, ...v.textStyle }) : fallback.textStyle,
+    ...(isObj(v.shapeAnim) ? { shapeAnim: sanitizeShapeAnim(v.shapeAnim, true) } : fallback.shapeAnim ? { shapeAnim: fallback.shapeAnim } : {}),
+    ...(isObj(v.connectorAnim) ? { connectorAnim: sanitizeConnectorAnim(v.connectorAnim, true) } : fallback.connectorAnim ? { connectorAnim: fallback.connectorAnim } : {}),
+    ...(v.routing !== undefined || fallback.routing ? { routing: oneOf(v.routing, ['straight', 'curved', 'elbow'] as const, fallback.routing ?? 'curved') } : {}),
+    ...(v.startHead !== undefined || fallback.startHead ? { startHead: oneOf(v.startHead, heads, fallback.startHead ?? 'none') } : {}),
+    ...(v.endHead !== undefined || fallback.endHead ? { endHead: oneOf(v.endHead, heads, fallback.endHead ?? 'arrow') } : {}),
+  };
+}
+
 export function sanitizeAsset(v: unknown): Asset | null {
   if (!isObj(v) || typeof v.dataUrl !== 'string') return null;
   const m = DATA_URL_RE.exec(v.dataUrl);

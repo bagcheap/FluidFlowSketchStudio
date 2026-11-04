@@ -98,6 +98,7 @@ export function HelpDialog() {
           <li>Quick-connect: hover a shape and click one of the small arrows around it to add a connected copy on that side (rest on the arrow to pick a different shape), or drag an arrow onto another shape to connect them (or onto empty canvas to drop a copy there). With a shape selected, <kbd>⌘/Ctrl</kbd>+arrow keys do the same.</li>
           <li>Hold <kbd>⌘/Ctrl</kbd> while drawing a shape to give it the next fill colour in the palette (Pale yellow → Pale green → …); the shape tool remembers it for the next one. Hold it while choosing <b>Add container</b> to do the same for containers.</li>
           <li>Match size: click the shape whose size you want, Shift-click the others, then right-click ▸ <b>Match size</b> ▸ Width, Height or Both (Edit ▸ Preferences can make Width and Height keep proportions).</li>
+          <li>Diagram from text: Insert ▸ <b>Diagram from text (Mermaid)</b>, or paste flowchart text such as <code>User --&gt; GE --&gt; MCP Server</code> onto the canvas. <b>Arrange ▸ Auto-layout</b> tidies an existing diagram along its arrows.</li>
           <li>Icons: press <kbd>⇧ I</kbd> to open the Icons panel, search, then drag an icon onto the canvas or click it.</li>
           <li>Alt-drag duplicates; arrow keys nudge (<kbd>Shift</kbd> ×10); hold <kbd>Space</kbd> to pan; <kbd>⌘/Ctrl</kbd>+scroll or pinch to zoom.</li>
           <li>Format painter (<kbd>F</kbd>): click a shape to pick its style, then click others to apply it.</li>

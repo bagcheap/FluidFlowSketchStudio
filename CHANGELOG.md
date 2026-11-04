@@ -4,6 +4,15 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Changed
+- **Safer input handling:** pasted or typed flowchart text is limited in size (500 shapes, 2,000 arrows, 20 levels of subgraphs, lines up to 2,000 characters), and hidden or direction-changing characters that can disguise text are removed from labels. Icon ZIPs that would unpack to more than 400 MB or 20,000 files are refused (protects against "zip bombs"). Saved preferences are checked when FlowSketch starts, so damaged settings fall back to defaults instead of causing problems.
+
+### Added
+- **Diagram from text:** Insert ▸ Diagram from text (Mermaid) turns a Mermaid flowchart into a laid-out, animated diagram: names become shapes (boxes, rounded boxes, pills, diamonds, circles, databases, hexagons, parallelograms), arrows become animated arrows with their labels, and subgraphs become containers. You can also paste flowchart text, even just `User --> GE --> MCP Server`, straight onto the canvas. Shapes and arrows use your default styles. Styling and click actions in the text are ignored.
+- **Auto-layout:** Arrange ▸ Auto-layout (also in the right-click menus) arranges the selected shapes, or the whole diagram, left to right, top to bottom, right to left or bottom to top along their arrows. Each container's contents are arranged inside it and the container moves as one block. One undo puts everything back.
+
 ## [0.1.13] - 2026-11-03
 
 ### Changed

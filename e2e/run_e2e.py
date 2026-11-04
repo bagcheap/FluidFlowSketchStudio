@@ -565,6 +565,42 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tmatch()
 
+        @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
+        def tmermaid():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 15000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            n0 = len(app.els())
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('flowchart TB\n  A[Start] --> B{OK?}\n  B -->|yes| C[(Store)]\n  subgraph Backend\n    C\n  end')
+            assert 'Will add 3 shapes, 2 arrows and 1 container' in page.locator('.modal .note.ok').inner_text()
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            els = app.els()[n0:]
+            kinds = sorted(e['type'] for e in els)
+            assert kinds == ['connector', 'connector', 'container', 'shape', 'shape', 'shape'], kinds
+            sh = {e['text']: e for e in els if e['type'] == 'shape'}
+            assert sh['Start']['y'] < sh['OK?']['y'] < sh['Store']['y'], [(k, s['y']) for k, s in sh.items()]
+            assert sh['OK?']['shape'] == 'diamond' and sh['Store']['shape'] == 'cylinder'
+            assert [e for e in els if e['type'] == 'connector'][1]['text'] == 'yes'
+            # one undo removes the whole inserted diagram
+            app.key('Control+z'); assert len(app.els()) == n0
+            # Auto-layout: three shapes in a row joined a -> b -> c, laid out top to bottom
+            app.key('r'); app.drag((5100, 15200), (5200, 15260)); app.drag((5400, 15200), (5500, 15260)); app.drag((5700, 15200), (5800, 15260)); app.key('Escape')
+            a, b, c = app.els('shape')[-3:]
+            for x, y in ((a, b), (b, c)):
+                app.key('a'); app.drag((x['x'] + 50, x['y'] + 30), (y['x'] + 50, y['y'] + 30)); app.key('Escape')
+            app.key('Escape')
+            page.get_by_role('menuitem', name='Arrange').click()
+            page.get_by_role('menuitem', name='Auto-layout diagram').click()
+            page.locator('.menu-pop.sub [role^=menuitem]', has_text='Top to bottom').click(); page.wait_for_timeout(100)
+            ys = [[e for e in app.els() if e['id'] == s['id']][0]['y'] for s in (a, b, c)]
+            assert ys[0] < ys[1] < ys[2], ys
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tmermaid()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]
