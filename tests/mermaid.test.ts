@@ -62,7 +62,7 @@ describe('Mermaid flowchart reader', () => {
       end
       x --> a`);
     expect(g.groups.map((gr) => [gr.title, gr.members, gr.dir])).toEqual([
-      ['Google Cloud', ['a', 'b', 'group:inner'], 'TB'],
+      ['Google Cloud', ['a', 'b', '\u0000group:inner'], 'TB'],
       ['inner', ['c'], undefined],
     ]);
   });

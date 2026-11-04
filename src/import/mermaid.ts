@@ -10,8 +10,24 @@ export interface MEdge { from: string; to: string; label: string; startHead: Hea
 export interface MGroup { id: string; title: string; members: string[]; dir?: LayoutDir; parent: string | null }
 export interface MGraph { dir: LayoutDir; hasHeader: boolean; nodes: MNode[]; edges: MEdge[]; groups: MGroup[]; warnings: string[] }
 
+// Limits that keep hostile or accidental huge input from freezing the app
 export const MAX_NODES = 500;
+export const MAX_EDGES = 2000; // "a & b & … --> x & y & …" multiplies
+export const MAX_TEXT_CHARS = 100_000;
+const MAX_LINE = 2000;
+const MAX_STATEMENTS = 5000;
+const MAX_GROUPS = 200;
+const MAX_DEPTH = 20; // subgraphs inside subgraphs
 const MAX_LABEL = 200;
+const GROUP = '\u0000group:'; // group keys can't clash with node names
+
+/**
+ * Remove characters that can hide or disguise text: control characters, zero-width spaces and joiners used for
+ * spoofing, and bidirectional overrides ("Trojan Source"). New lines and tabs stay; emoji joiners (U+200D) stay.
+ */
+export function plainText(s: string): string {
+  return s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g, '');
+}
 
 const DIRS: Record<string, LayoutDir> = { TB: 'TB', TD: 'TB', BT: 'BT', LR: 'LR', RL: 'RL' };
 const HEADER = /^\s*(?:graph|flowchart)\b\s*([A-Za-z]{2})?\s*;?\s*$/i;
@@ -32,7 +48,7 @@ const SHAPES: [string, string, ShapeKind][] = [
 
 /** Plain text from a Mermaid label: quotes off, <br> to a new line, other tags and markdown markers removed. */
 export function cleanLabel(s: string): string {
-  let t = s.trim();
+  let t = plainText(s).trim();
   if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith('`') && t.endsWith('`'))) t = t.slice(1, -1);
   t = t.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')
     .replace(/&quot;|#quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'")
@@ -42,6 +58,7 @@ export function cleanLabel(s: string): string {
 
 /** Does this text look like a Mermaid flowchart (a header, or at least one arrow between two names)? */
 export function looksLikeMermaid(text: string): boolean {
+  if (text.length > MAX_TEXT_CHARS) return false;
   const first = text.split('\n').find((l) => l.trim() && !l.trim().startsWith('%%')) ?? '';
   if (HEADER.test(first)) return true;
   const g = parseMermaid(text);
@@ -49,9 +66,11 @@ export function looksLikeMermaid(text: string): boolean {
 }
 
 /** Split into statements: lines, and ";" outside brackets and quotes. */
-function statements(text: string): { s: string; line: number }[] {
+function statements(text: string, warnings: string[]): { s: string; line: number }[] {
   const out: { s: string; line: number }[] = [];
-  text.split(/\r?\n/).forEach((raw, i) => {
+  text.slice(0, MAX_TEXT_CHARS).split(/\r?\n/).forEach((raw, i) => {
+    if (out.length >= MAX_STATEMENTS) return;
+    if (raw.length > MAX_LINE) { warnings.push(`Line ${i + 1}: too long (over ${MAX_LINE} characters)`); return; }
     const line = raw.replace(/%%.*$/, '');
     let depth = 0, quote = false, cur = '';
     for (const ch of line) {
@@ -65,9 +84,11 @@ function statements(text: string): { s: string; line: number }[] {
   return out;
 }
 
-export function parseMermaid(text: string): MGraph {
+export function parseMermaid(input: string): MGraph {
+  const text = plainText(input); // hidden and control characters out before anything else
   const g: MGraph = { dir: 'LR', hasHeader: false, nodes: [], edges: [], groups: [], warnings: [] };
   const nodes = new Map<string, MNode>();
+  let tooMany = false;
   const stack: MGroup[] = [];
   const claimed = new Set<string>(); // node/group ids already placed in a subgraph
   const inGroup = (id: string) => {
@@ -78,14 +99,16 @@ export function parseMermaid(text: string): MGraph {
     let n = nodes.get(id);
     if (!n) {
       if (nodes.size >= MAX_NODES) return null;
-      n = { id, label: (label ?? id).slice(0, MAX_LABEL), shape: shape ?? 'rectangle' };
+      n = { id, label: label ?? plainText(id).slice(0, MAX_LABEL), shape: shape ?? 'rectangle' };
       nodes.set(id, n); g.nodes.push(n);
     } else if (label !== undefined) { n.label = label; n.shape = shape ?? n.shape; }
     inGroup(id);
     return n;
   };
 
-  const list = statements(text);
+  if (text.length > MAX_TEXT_CHARS) g.warnings.push(`Only the first ${MAX_TEXT_CHARS.toLocaleString()} characters were read`);
+  const list = statements(text, g.warnings);
+  let skipDepth = 0; // subgraphs nested too deep are read as plain lists (their "end" lines are matched here)
   list.forEach(({ s, line }, idx) => {
     if (idx === 0 && HEADER.test(s)) {
       const m = HEADER.exec(s)!;
@@ -96,15 +119,23 @@ export function parseMermaid(text: string): MGraph {
     if (IGNORED.test(s)) return;
     const sub = /^subgraph\s+(.*)$/i.exec(s);
     if (sub) {
+      if (stack.length >= MAX_DEPTH || g.groups.length >= MAX_GROUPS) {
+        if (!skipDepth) g.warnings.push(`Line ${line}: too many subgraphs (or nested too deep); its shapes were kept without a container`);
+        skipDepth++;
+        return;
+      }
       const rest = sub[1].trim();
       const m = /^([^\s[\]"]+)\s*\[(.*)\]$/.exec(rest);
       const id = m ? m[1] : /^[\w.-]+$/.test(rest) ? rest : `subgraph${g.groups.length + 1}`;
-      const title = cleanLabel(m ? m[2] : rest) || id;
-      const grp: MGroup = { id: `group:${id}`, title, members: [], parent: stack[stack.length - 1]?.id ?? null };
+      const title = cleanLabel(m ? m[2] : rest) || plainText(id).slice(0, MAX_LABEL);
+      let key = GROUP + id;
+      for (let k = 2; g.groups.some((x) => x.id === key); k++) key = `${GROUP}${id}#${k}`; // repeated subgraph names
+      const grp: MGroup = { id: key, title, members: [], parent: stack[stack.length - 1]?.id ?? null };
       inGroup(grp.id);
       g.groups.push(grp); stack.push(grp);
       return;
     }
+    if (/^end$/i.test(s) && skipDepth) { skipDepth--; return; }
     if (/^end$/i.test(s)) { if (!stack.pop()) g.warnings.push(`Line ${line}: "end" without a subgraph`); return; }
     const dm = /^direction\s+([A-Za-z]{2})$/i.exec(s);
     if (dm) { const d = DIRS[dm[1].toUpperCase()]; if (d && stack.length) stack[stack.length - 1].dir = d; else if (d) g.dir = d; return; }
@@ -114,6 +145,7 @@ export function parseMermaid(text: string): MGraph {
   // a subgraph referenced by id in an arrow is a node of the same name in Mermaid terms; keep it simple: drop empty groups
   g.groups = g.groups.filter((gr) => gr.members.length);
   if (nodes.size >= MAX_NODES) g.warnings.push(`Only the first ${MAX_NODES} shapes were read`);
+  if (tooMany) g.warnings.push(`Only the first ${MAX_EDGES} arrows were read`);
   return g;
 
   // ---- one statement of nodes and links: A[x] & B --> C -->|yes| D ----------------------------
@@ -176,7 +208,10 @@ export function parseMermaid(text: string): MGraph {
       if (!right) return false;
       const stroke = line.startsWith('=') ? 'thick' : line.includes('.') ? 'dotted' : 'solid';
       const head = (h?: string): HeadKind => (h === '>' || h === '<' ? 'arrow' : h === 'o' ? 'dot' : h === 'x' ? 'bar' : 'none');
-      for (const a of left) for (const b of right) g.edges.push({ from: a, to: b, label, startHead: head(startH), endHead: head(endH), stroke });
+      for (const a of left) for (const b of right) {
+        if (g.edges.length >= MAX_EDGES) { tooMany = true; break; }
+        g.edges.push({ from: a, to: b, label, startHead: head(startH), endHead: head(endH), stroke });
+      }
       left = right;
       ws();
     }
