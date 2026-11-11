@@ -209,7 +209,7 @@ export function defaultToolStyle(key: string): ToolStyle {
   } else if (key === 'seq:reply') {
     // a sequence-diagram reply: the arrow look, dashed
     s.style = { ...s.style, fill: 'transparent', fillStyle: 'none', stroke: '#4b5563', strokeStyle: 'dashed' };
-    s.routing = 'straight'; s.endHead = 'triangle'; s.startHead = 'none';
+    s.routing = 'straight'; s.endHead = 'arrow'; s.startHead = 'none';
   } else if (key === 'seq:frame') {
     // a sequence-diagram block (loop, alt, opt…): a see-through dashed frame with a small title
     s.style = { ...s.style, stroke: '#343a40', fill: 'transparent', fillStyle: 'none', strokeWidth: 1.5, strokeStyle: 'dashed', cornerRadius: 0 };

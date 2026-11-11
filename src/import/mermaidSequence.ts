@@ -27,12 +27,12 @@ export function isSequence(text: string): boolean {
   return SEQUENCE_HEADER.test(first);
 }
 
-// longest first, so "-->>" isn't read as "-->" followed by ">"
+// longest first, so "-->>" isn't read as "-->" followed by ">". Heads are open arrows, like the arrow tool's.
 const ARROWS: [string, { endHead: HeadKind; startHead: HeadKind; dashed: boolean }][] = [
-  ['<<-->>', { endHead: 'triangle', startHead: 'triangle', dashed: true }],
-  ['<<->>', { endHead: 'triangle', startHead: 'triangle', dashed: false }],
-  ['-->>', { endHead: 'triangle', startHead: 'none', dashed: true }],
-  ['->>', { endHead: 'triangle', startHead: 'none', dashed: false }],
+  ['<<-->>', { endHead: 'arrow', startHead: 'arrow', dashed: true }],
+  ['<<->>', { endHead: 'arrow', startHead: 'arrow', dashed: false }],
+  ['-->>', { endHead: 'arrow', startHead: 'none', dashed: true }],
+  ['->>', { endHead: 'arrow', startHead: 'none', dashed: false }],
   ['--x', { endHead: 'bar', startHead: 'none', dashed: true }],
   ['-x', { endHead: 'bar', startHead: 'none', dashed: false }],
   ['--)', { endHead: 'arrow', startHead: 'none', dashed: true }],
