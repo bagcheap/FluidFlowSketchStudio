@@ -59,6 +59,7 @@ export function cleanLabel(s: string): string {
 /** Does this text look like a Mermaid flowchart (a header, or at least one arrow between two names)? */
 export function looksLikeMermaid(text: string): boolean {
   if (text.length > MAX_TEXT_CHARS) return false;
+  if (/^\s*sequenceDiagram\b/.test(text.split('\n').find((l) => l.trim() && !l.trim().startsWith('%%')) ?? '')) return true;
   const first = text.split('\n').find((l) => l.trim() && !l.trim().startsWith('%%')) ?? '';
   if (HEADER.test(first)) return true;
   const g = parseMermaid(text);

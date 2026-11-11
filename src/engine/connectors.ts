@@ -50,6 +50,10 @@ function resolveEnd(end: ConnectorElement['start'], aim: Point, lookup: Lookup, 
   if (end.anchor) {
     const lp = { x: end.anchor.x * el.w, y: end.anchor.y * el.h };
     const wp = toWorld(el, m, lp);
+    // a point outside the box (a sequence-diagram lifeline below a participant): exactly there, no gap
+    if (end.anchor.x < -0.001 || end.anchor.x > 1.001 || end.anchor.y < -0.001 || end.anchor.y > 1.001) {
+      return { p: wp, dir: norm({ x: aim.x - wp.x, y: aim.y - wp.y }) };
+    }
     const d = norm({ x: wp.x - c.x, y: wp.y - c.y });
     // snap port direction to its nearest side for nicer elbows
     const ax = end.anchor.x - 0.5, ay = end.anchor.y - 0.5;

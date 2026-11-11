@@ -29,6 +29,8 @@ interface DocActions {
   redo(): void;
   /** Drop the most recent history entry, restoring the document before it (no redo entry). */
   revertLast(): void;
+  /** Change the document without an undo step (switching pages: undo then returns to the page an edit was made on). */
+  replace(update: (d: FlowDocument) => FlowDocument): void;
   markSaved(fileName?: string | null): void;
   markAutosaved(): void;
 }
@@ -66,6 +68,11 @@ export const useDoc = create<DocState & DocActions>((set, get) => ({
       dirty: true,
       revision: s.revision + 1,
     }));
+  },
+
+  replace(update) {
+    const next = update(get().doc);
+    if (next !== get().doc) set((s) => ({ doc: next, revision: s.revision + 1 }));
   },
 
   begin() { txBase = get().doc; lastKey = undefined; },
@@ -141,10 +148,11 @@ export function deleteElements(doc: FlowDocument, ids: Set<string>): FlowDocumen
     }
     return c;
   });
-  // drop image and icon data no longer referenced
-  const used = new Set(elements.filter((e) => e.type === 'image').map((e) => (e as { assetId: string }).assetId));
+  // drop image and icon data no longer referenced on any page
+  const everywhere = [...elements, ...doc.pages.filter((p) => p.id !== doc.activePage).flatMap((p) => p.elements)];
+  const used = new Set(everywhere.filter((e) => e.type === 'image').map((e) => (e as { assetId: string }).assetId));
   const assets = Object.fromEntries(Object.entries(doc.assets).filter(([k]) => used.has(k)));
-  const usedIcons = new Set(elements.flatMap((e) => (e.type === 'icon' ? [e.iconId] : [])));
+  const usedIcons = new Set(everywhere.flatMap((e) => (e.type === 'icon' ? [e.iconId] : [])));
   const icons = Object.fromEntries(Object.entries(doc.icons).filter(([k]) => usedIcons.has(k)));
   return { ...doc, elements, assets, icons };
 }

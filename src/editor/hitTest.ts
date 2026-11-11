@@ -1,5 +1,5 @@
 // Hit testing on STATIC geometry: animation never affects what the pointer grabs.
-import type { BoxElement, ConnectorElement, DiagramElement, FlowDocument, Point } from '../model/types';
+import type { BoxElement, ConnectorElement, DiagramElement, Endpoint, FlowDocument, Point } from '../model/types';
 import { STILL } from '../engine/animation';
 import { connectorPath, pointAt, toLocal, toWorld } from '../engine/connectors';
 import { containerHeader, iconLabelLayout, makeLookup } from '../engine/render';
@@ -93,4 +93,31 @@ export function portPositions(el: BoxElement): Point[] {
 /** Port anchors in normalised coords matching portPositions */
 export function portAnchors(el: BoxElement): Point[] {
   return portPositions(el).map((w) => { const l = toLocal(el, STILL, w); return { x: l.x / Math.max(1, el.w), y: l.y / Math.max(1, el.h) }; });
+}
+
+/** Is this connector a sequence-diagram lifeline (from the bottom of a participant straight down, both ends on it)? */
+export function isLifeline(c: DiagramElement): c is ConnectorElement {
+  return c.type === 'connector' && !!c.start.elementId && c.start.elementId === c.end.elementId
+    && Math.abs((c.start.anchor?.x ?? -1) - 0.5) < 0.001 && Math.abs((c.end.anchor?.x ?? -1) - 0.5) < 0.001
+    && Math.abs((c.start.anchor?.y ?? 0) - 1) < 0.001 // starts at the box's bottom edge (a message to itself starts lower)
+    && (c.end.anchor?.y ?? 0) > 1;
+}
+
+/**
+ * A lifeline under the pointer: the endpoint that attaches to its participant at the pointer's height
+ * (static geometry). Used when an arrow end is dropped on a lifeline.
+ */
+export function lifelineAt(doc: FlowDocument, p: Point, zoom: number, excludeParticipant?: string): Endpoint | null {
+  const tol = 8 / zoom;
+  for (let i = doc.elements.length - 1; i >= 0; i--) {
+    const c = doc.elements[i];
+    if (!isLifeline(c) || c.start.elementId === excludeParticipant) continue;
+    const box = doc.elements.find((e) => e.id === c.start.elementId);
+    if (!box || box.type === 'connector' || box.rotation) continue;
+    const x = box.x + box.w / 2, y0 = box.y + box.h, y1 = box.y + (c.end.anchor?.y ?? 1) * box.h;
+    if (Math.abs(p.x - x) <= tol && p.y >= y0 && p.y <= y1 + tol) {
+      return { x: p.x, y: p.y, elementId: box.id, anchor: { x: 0.5, y: (Math.min(p.y, y1) - box.y) / Math.max(1, box.h) } };
+    }
+  }
+  return null;
 }

@@ -1,13 +1,15 @@
 // Validation, sanitisation and migration for .flowsketch files.
 // Every imported value is coerced into a known-safe shape; nothing is executed.
 import type {
-  Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, IconAsset, IconGradient, IconPaint, IconPart, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle,
+  Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, IconAsset, IconGradient, IconPaint, IconPart, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle, Page,
 } from './types';
 import { SCHEMA_VERSION } from './types';
 import { DEFAULT_ANIMATION, DEFAULT_CONNECTOR_ANIM, DEFAULT_SHAPE_ANIM, DEFAULT_STYLE, DEFAULT_TEXT, newDocument, newSeed, uid } from './defaults';
 
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
-export const MAX_ELEMENTS = 5000;
+export const MAX_ELEMENTS = 5000; // per page
+export const MAX_PAGES = 50;
+export const MAX_TOTAL_ELEMENTS = 20000; // across all pages
 export const MAX_TEXT = 5000;
 export const MAX_ASSET_BYTES = 8 * 1024 * 1024;
 
@@ -116,7 +118,8 @@ export function sanitizeConnectorAnim(v: unknown, partial: boolean): Partial<Con
 
 function endpoint(v: unknown): Endpoint {
   const o = isObj(v) ? v : {};
-  const a = isObj(o.anchor) ? { x: num(o.anchor.x, 0.5, 0, 1), y: num(o.anchor.y, 0.5, 0, 1) } : null;
+  // anchors are fractions of the shape's box; beyond it is allowed for sequence-diagram lifelines (below a participant)
+  const a = isObj(o.anchor) ? { x: num(o.anchor.x, 0.5, -50, 50), y: num(o.anchor.y, 0.5, -50, 500) } : null;
   return {
     x: num(o.x, 0), y: num(o.y, 0),
     elementId: typeof o.elementId === 'string' ? o.elementId.slice(0, 100) : null,
@@ -334,6 +337,10 @@ export function migrate(raw: Obj): Obj {
     }
     version = 6;
   }
+  if (version === 6) {
+    // v6 -> v7: pages. A single-page document keeps its elements; parseDocument wraps them in "Page 1".
+    version = 7;
+  }
   raw.schemaVersion = version;
   return raw;
 }
@@ -348,7 +355,7 @@ export function parseDocument(input: string | unknown): ParseResult {
   }
   if (!isObj(raw)) throw new DocumentError('The file does not contain a FlowSketch document.');
   if (raw.format !== undefined && raw.format !== 'flowsketch') throw new DocumentError(`Unsupported file format "${String(raw.format)}".`);
-  if (!Array.isArray(raw.elements) && !Array.isArray(raw.shapes)) throw new DocumentError('The document has no element list; it may be corrupted.');
+  if (!Array.isArray(raw.elements) && !Array.isArray(raw.shapes) && !Array.isArray(raw.pages)) throw new DocumentError('The document has no element list; it may be corrupted.');
   const o = migrate({ ...raw });
   const warnings: string[] = [];
   const warn = (m: string) => { if (warnings.length < 20) warnings.push(m); };
@@ -406,23 +413,51 @@ export function parseDocument(input: string | unknown): ParseResult {
       if (ic) doc.icons[ic.id] = ic; else warn(`Dropped an icon whose data was not valid (${k.slice(0, 60)}).`);
     }
   }
-  // elements
-  const els = (o.elements as unknown[]).slice(0, MAX_ELEMENTS);
-  if ((o.elements as unknown[]).length > MAX_ELEMENTS) warn(`Only the first ${MAX_ELEMENTS} elements were loaded.`);
+  // pages: each page's elements go through the same checks; element ids are unique across the whole document
   const seen = new Set<string>();
-  for (const raw of els) {
-    const e = element(raw, warn);
-    if (!e) continue;
-    if (seen.has(e.id)) e.id = uid();
-    seen.add(e.id);
-    if (e.type === 'image' && !doc.assets[e.assetId]) { warn('Removed an image whose data is missing.'); continue; }
-    if (e.type === 'icon' && !doc.icons[e.iconId]) { warn('Removed an icon whose data is missing.'); continue; }
-    doc.elements.push(e);
+  let total = 0;
+  const readElements = (list: unknown): DiagramElement[] => {
+    const all = Array.isArray(list) ? list : [];
+    const els = all.slice(0, Math.min(MAX_ELEMENTS, MAX_TOTAL_ELEMENTS - total));
+    if (all.length > els.length) warn(`Only the first ${els.length} elements of a page were loaded.`);
+    const out: DiagramElement[] = [];
+    for (const raw of els) {
+      const e = element(raw, warn);
+      if (!e) continue;
+      if (seen.has(e.id)) e.id = uid();
+      seen.add(e.id);
+      if (e.type === 'image' && !doc.assets[e.assetId]) { warn('Removed an image whose data is missing.'); continue; }
+      if (e.type === 'icon' && !doc.icons[e.iconId]) { warn('Removed an icon whose data is missing.'); continue; }
+      out.push(e);
+    }
+    total += out.length;
+    checkReferences(out, warn);
+    return out;
+  };
+  const rawPages = (Array.isArray(o.pages) ? o.pages : []).filter(isObj).slice(0, MAX_PAGES);
+  if (Array.isArray(o.pages) && o.pages.length > MAX_PAGES) warn(`Only the first ${MAX_PAGES} pages were loaded.`);
+  const pages: Page[] = [];
+  const pageIds = new Set<string>();
+  for (const [i, rp] of rawPages.entries()) {
+    let id = str(rp.id, '', 100) || uid('page');
+    if (pageIds.has(id)) id = uid('page');
+    pageIds.add(id);
+    pages.push({ id, name: str(rp.name, '', 60).trim() || `Page ${i + 1}`, elements: readElements(rp.elements) });
   }
+  if (!pages.length) pages.push({ id: uid('page'), name: 'Page 1', elements: readElements(o.elements) });
+  const active = pages.find((pg) => pg.id === o.activePage) ?? pages[0];
+  doc.pages = pages.map((pg) => (pg === active ? { ...pg, elements: [] } : pg));
+  doc.activePage = active.id;
+  doc.elements = active.elements;
+  return { doc, warnings };
+}
+
+/** Within one page: container members must be valid and acyclic; connectors may only attach to shapes on the page. */
+function checkReferences(elements: DiagramElement[], warn: (m: string) => void) {
   // containers: members must exist, not be the container itself, belong to one container only, and form no cycles
-  const ids = new Set(doc.elements.map((e) => e.id));
+  const ids = new Set(elements.map((e) => e.id));
   const parent = new Map<string, string>();
-  for (const e of doc.elements) {
+  for (const e of elements) {
     if (e.type !== 'container') continue;
     const kept: string[] = [];
     for (const m of e.members) {
@@ -436,16 +471,23 @@ export function parseDocument(input: string | unknown): ParseResult {
     e.members = kept;
   }
   // referential integrity: connectors may only attach to existing non-connector elements
-  const boxes = new Set(doc.elements.filter((e) => e.type !== 'connector').map((e) => e.id));
-  for (const e of doc.elements) {
+  const boxes = new Set(elements.filter((e) => e.type !== 'connector').map((e) => e.id));
+  for (const e of elements) {
     if (e.type !== 'connector') continue;
     for (const end of [e.start, e.end]) {
       if (end.elementId && !boxes.has(end.elementId)) { end.elementId = null; end.anchor = null; warn('Detached a connector from a missing shape.'); }
     }
   }
-  return { doc, warnings };
+}
+
+/** Every page with its elements (the current page's come from doc.elements). */
+export function allPages(doc: FlowDocument): Page[] {
+  return doc.pages.map((pg) => (pg.id === doc.activePage ? { ...pg, elements: doc.elements } : pg));
 }
 
 export function serializeDocument(doc: FlowDocument): string {
-  return JSON.stringify({ ...doc, format: 'flowsketch', schemaVersion: SCHEMA_VERSION, updatedAt: new Date().toISOString() }, null, 1);
+  // the elements are saved inside their pages; the top-level list isn't repeated
+  const { elements: _current, ...rest } = doc;
+  void _current;
+  return JSON.stringify({ ...rest, pages: allPages(doc), format: 'flowsketch', schemaVersion: SCHEMA_VERSION, updatedAt: new Date().toISOString() }, null, 1);
 }

@@ -50,6 +50,22 @@ function selectionItems(): MenuItem[] {
   ];
 }
 
+/** A page tab's menu. */
+function pageItems(id: string): MenuItem[] {
+  const doc = useDoc.getState().doc;
+  const i = doc.pages.findIndex((p) => p.id === id);
+  return [
+    { label: 'Rename', run: () => window.dispatchEvent(new CustomEvent('flowsketch:renamepage', { detail: id })) },
+    { label: 'Duplicate page', run: () => cmd.duplicatePage(id) },
+    { label: 'New page', run: cmd.newPage },
+    { sep: true },
+    { label: 'Move left', run: () => cmd.movePage(id, -1), disabled: i <= 0 },
+    { label: 'Move right', run: () => cmd.movePage(id, 1), disabled: i < 0 || i >= doc.pages.length - 1 },
+    { sep: true },
+    { label: 'Delete page', run: () => void cmd.deletePage(id), disabled: doc.pages.length <= 1 },
+  ];
+}
+
 function canvasItems(): MenuItem[] {
   const doc = useDoc.getState().doc;
   const ui = useUI.getState();
@@ -104,7 +120,7 @@ export function ContextMenu() {
   }, [at]);
 
   if (!at) return null;
-  const items = useUI.getState().selection.length ? selectionItems() : canvasItems();
+  const items = at.pageId ? pageItems(at.pageId) : useUI.getState().selection.length ? selectionItems() : canvasItems();
   return (
     <div ref={ref} className={`ctx-menu no-canvas ${pos?.flip ? 'flip' : ''}`} style={{ left: pos?.x ?? at.x, top: pos?.y ?? at.y, visibility: pos ? 'visible' : 'hidden' }} onContextMenu={(e) => e.preventDefault()} aria-label="Context menu">
       <ItemList items={items} onClose={close} />

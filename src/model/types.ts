@@ -201,7 +201,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 6; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight
+export const SCHEMA_VERSION = 7; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).
@@ -244,6 +244,9 @@ export interface IconAsset {
   mono: boolean; // every colour is currentColor/none: the icon can be recoloured and sketched
 }
 
+/** One page (tab) of a document. The current page's elements live in FlowDocument.elements; its entry here is kept empty. */
+export interface Page { id: string; name: string; elements: DiagramElement[] }
+
 export interface FlowDocument {
   format: 'flowsketch';
   schemaVersion: number;
@@ -253,7 +256,9 @@ export interface FlowDocument {
   updatedAt: string;
   canvas: CanvasSettings;
   animation: AnimationSettings;
-  elements: DiagramElement[]; // array order = z-order (last on top)
+  elements: DiagramElement[]; // the current page's elements; array order = z-order (last on top)
+  pages: Page[]; // every page in tab order (the current page's `elements` are in FlowDocument.elements)
+  activePage: string; // id of the current page
   assets: Record<string, Asset>;
   icons: Record<string, IconAsset>; // vector data of the icons used in this document
   toolDefaults?: Record<string, ToolStyle>;

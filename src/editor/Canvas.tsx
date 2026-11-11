@@ -13,7 +13,7 @@ import { imageMap, onImageLoaded } from '../engine/images';
 import { connectorPath } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
-import { boxAt, hitTest, portAnchors, portPositions } from './hitTest';
+import { boxAt, hitTest, isLifeline, lifelineAt, portAnchors, portPositions } from './hitTest';
 import { addConnectedCopy, canQuickConnect, handleLocal, QUICK_SHAPES, SIDES, type Side } from '../store/quickConnect';
 import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
@@ -291,7 +291,7 @@ export function Canvas() {
       case 'line': {
         const ts = u.toolStyle(u.tool);
         const target = boxAt(d, p, u.view.zoom);
-        const start: Endpoint = target ? attachEndpoint(target, p, null) : { x: p.x, y: p.y, elementId: null, anchor: null };
+        const start: Endpoint = target ? attachEndpoint(target, p, null) : lifelineAt(d, p, u.view.zoom) ?? { x: p.x, y: p.y, elementId: null, anchor: null };
         const el = makeConnector(start, { x: p.x, y: p.y, elementId: null, anchor: null }, ts);
         D.begin();
         D.live((dd) => ({ ...dd, elements: [...dd.elements, el] }));
@@ -422,8 +422,8 @@ export function Canvas() {
       if ((e.target as HTMLElement).closest?.('.qc-pop')) return; // over the quick-connect picker
       // hover feedback for connector tools
       if (u.tool === 'arrow' || u.tool === 'line') {
-        const t = boxAt(D.doc, p, u.view.zoom);
-        if ((t?.id ?? null) !== (overlay.target ?? null)) setOverlay((o) => ({ ...o, target: t?.id ?? null }));
+        const t = boxAt(D.doc, p, u.view.zoom)?.id ?? lifelineAt(D.doc, p, u.view.zoom)?.elementId ?? null;
+        if (t !== (overlay.target ?? null)) setOverlay((o) => ({ ...o, target: t }));
       } else if (overlay.target) setOverlay((o) => ({ ...o, target: null }));
       if (u.tool === 'select' && !u.editingId) {
         // keep the hovered shape while the pointer is near it, so its handles (just outside it) can be reached
@@ -476,8 +476,8 @@ export function Canvas() {
         let q = p;
         if (e.shiftKey && !c.start.elementId) q = snapAngle(c.start, p);
         const target = boxAt(D.doc, q, u.view.zoom, c.start.elementId ?? undefined);
-        const end: Endpoint = target ? attachEndpoint(target, q, null) : { x: q.x, y: q.y, elementId: null, anchor: null };
-        setOverlay((o) => ({ ...o, target: target?.id ?? null }));
+        const end: Endpoint = target ? attachEndpoint(target, q, null) : lifelineAt(D.doc, q, u.view.zoom, c.start.elementId ?? undefined) ?? { x: q.x, y: q.y, elementId: null, anchor: null };
+        setOverlay((o) => ({ ...o, target: end.elementId }));
         D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), end })));
         return;
       }
@@ -497,10 +497,18 @@ export function Canvas() {
       }
       case 'endpoint': {
         const c = getElement(D.doc, it.id) as ConnectorElement;
+        const owner = isLifeline(c) && it.which === 'end' ? getElement(D.doc, c.start.elementId!) : null;
+        if (owner && owner.type !== 'connector') {
+          // a lifeline's bottom end: drag to lengthen or shorten it; it stays under its participant
+          const y = Math.max(owner.y + owner.h + 20, p.y);
+          D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), end: { x: owner.x + owner.w / 2, y, elementId: owner.id, anchor: { x: 0.5, y: (y - owner.y) / Math.max(1, owner.h) } } })));
+          return;
+        }
         const otherId = (it.which === 'start' ? c.end : c.start).elementId ?? undefined;
         const target = e.altKey ? null : boxAt(D.doc, p, u.view.zoom, otherId);
-        const ep: Endpoint = target ? attachEndpoint(target, p, null) : { x: p.x, y: p.y, elementId: null, anchor: null };
-        setOverlay((o) => ({ ...o, target: target?.id ?? null }));
+        const onLifeline = !target && !e.altKey ? lifelineAt(D.doc, p, u.view.zoom) : null; // a sequence-diagram lifeline: attach at this height
+        const ep: Endpoint = target ? attachEndpoint(target, p, null) : onLifeline ?? { x: p.x, y: p.y, elementId: null, anchor: null };
+        setOverlay((o) => ({ ...o, target: ep.elementId }));
         D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), [it.which]: ep })));
         return;
       }
