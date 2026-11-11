@@ -77,6 +77,11 @@ class App:
         self.p.keyboard.press(k)
         self.p.wait_for_timeout(40)
 
+    def tool(self, k):
+        """Pick a tool by its letter. Esc first: with a shape selected, letters type into it."""
+        self.key('Escape')
+        self.key(k)
+
     def els(self, t=None):
         return [e for e in self.doc()['elements'] if t is None or e['type'] == t]
 
@@ -119,7 +124,7 @@ def main():
         @test('1 · Continuous drawing: tool persists, 3 rectangles share defaults')
         def t1():
             app.reset_view()
-            app.key('r')
+            app.tool('r')
             page.get_by_label('Stroke colour #1864ab').click()
             page.get_by_label('Fill colour #fff3bf').click()
             page.get_by_label('Width value').fill('3')
@@ -136,14 +141,14 @@ def main():
 
         @test('2 · Remembered per-tool defaults (red diamond survives switching tools)')
         def t2():
-            app.key('d')
+            app.tool('d')
             page.get_by_label('Stroke colour #c92a2a').click()
-            app.key('r')
+            app.tool('r')
             app.drag((100, 330), (260, 420))
             app.drag((320, 330), (480, 420))
             last2 = app.els('shape')[-2:]
             assert all(e['style']['stroke'] == '#1864ab' for e in last2), [e['style']['stroke'] for e in last2]
-            app.key('d')
+            app.tool('d')
             assert app.js("() => window.__flowsketch.toolStyle('shape:diamond').style.stroke") == '#c92a2a'
             app.drag((560, 320), (720, 440))
             d = app.els('shape')[-1]
@@ -155,10 +160,10 @@ def main():
         @test('9 · Undo / redo (create, resize, recolour)')
         def t9():
             app.key('Escape')
-            app.key('u')
+            app.tool('u')
             app.drag((900, 150), (1040, 230))
             sid = app.els('shape')[-1]['id']
-            app.key('v')
+            app.tool('v')
             app.click((970, 190))
             assert app.ui()['selection'] == [sid]
             # resize via the south-east handle
@@ -183,12 +188,12 @@ def main():
 
         @test('4 · Smart connector stays attached after move + resize')
         def t4():
-            app.key('a')
+            app.tool('a')
             app.drag((190, 200), (410, 200))  # rect 1 centre -> rect 2 centre
             c = app.els('connector')[-1]
             s0, s1 = app.els('shape')[0], app.els('shape')[1]
             assert c['start']['elementId'] == s0['id'] and c['end']['elementId'] == s1['id'], (c['start'], c['end'])
-            app.key('v')
+            app.tool('v')
             app.drag((150, 175), (150, 105))  # move rect 1 up 70
             app.click((420, 160)); app.drag((500, 250), (580, 330))  # resize rect 2
             s0 = [e for e in app.els() if e['id'] == s0['id']][0]
@@ -220,10 +225,10 @@ def main():
             app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
             n0 = len(app.els())
             h0 = app.js('() => window.__flowsketch.history()')['past']
-            app.key('t'); app.click((5300, 5200)); page.wait_for_timeout(100)
+            app.tool('t'); app.click((5300, 5200)); page.wait_for_timeout(100)
             app.key('Escape'); page.wait_for_timeout(100)
             assert len(app.els()) == n0 and app.js('() => window.__flowsketch.history()')['past'] == h0, 'empty text box left history'
-            app.key('t'); app.click((5300, 5300))
+            app.tool('t'); app.click((5300, 5300))
             page.wait_for_selector('.text-editor')
             page.keyboard.type('Typed'); page.keyboard.press('Escape'); page.wait_for_timeout(100)
             assert [e['text'] for e in app.els('text')][-1:] == ['Typed'], [e['text'] for e in app.els('text')]
@@ -231,7 +236,7 @@ def main():
             app.key('Escape'); app.key('Control+z'); page.wait_for_timeout(100)
             assert len(app.els()) == n0, 'undo left an element behind'
             # clicking elsewhere while typing keeps the text and the next box is typeable
-            app.key('t'); app.click((5300, 5200)); page.wait_for_selector('.text-editor')
+            app.tool('t'); app.click((5300, 5200)); page.wait_for_selector('.text-editor')
             page.keyboard.type('One'); app.click((5300, 5400)); page.wait_for_timeout(100)
             page.keyboard.type('Two'); page.keyboard.press('Escape'); page.wait_for_timeout(100)
             assert [e['text'] for e in app.els('text')][-2:] == ['One', 'Two'], [e['text'] for e in app.els('text')]
@@ -246,7 +251,7 @@ def main():
             v = app.ui()['view']
             app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
             n0 = len(app.els())
-            app.key('a')
+            app.tool('a')
             x, y = app.pt(5200, 5200)
             page.mouse.move(x, y); page.mouse.down(); page.mouse.move(x + 120, y + 30, steps=4)
             page.keyboard.press('Escape'); page.mouse.up(); page.wait_for_timeout(60)
@@ -260,7 +265,7 @@ def main():
             app.key('Escape')
             v = app.ui()['view']
             app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
-            app.key('Shift+I')
+            app.tool('Shift+I')
             page.wait_for_selector('.icon-cell')
             page.get_by_label('Search icons').fill('database')
             cell = page.locator('.icon-cell[data-icon="tabler:database"]')
@@ -285,13 +290,13 @@ def main():
             app.click((5500, 5200), count=2); page.wait_for_selector('.text-editor')
             page.keyboard.type('Orders DB'); page.keyboard.press('Escape'); page.wait_for_timeout(80)
             assert [e for e in app.els('icon') if e['id'] == db['id']][0]['text'] == 'Orders DB'
-            app.key('a'); app.drag((srv['x'] + 28, srv['y'] + 28), (5500, 5200)); app.key('Escape')
+            app.tool('a'); app.drag((srv['x'] + 28, srv['y'] + 28), (5500, 5200)); app.key('Escape')
             c = app.els('connector')[-1]
             assert c['start']['elementId'] == srv['id'] and c['end']['elementId'] == db['id'], (c['start'], c['end'])
             # the icons stay (later save/export tests then cover them); the arrow is undone so tests that use "the last arrow" are unaffected
             app.key('Control+z'); page.wait_for_timeout(80)
             assert not [e for e in app.els('connector') if e['id'] == c['id']]
-            app.key('Shift+I')
+            app.tool('Shift+I')
             assert page.locator('.icons-panel').count() == 0, 'Shift+I should close the panel'
             app.js('(v) => window.__flowsketch.setView(v)', v)
         ticons()
@@ -301,7 +306,7 @@ def main():
             app.key('Escape')
             v = app.ui()['view']
             app.js('() => window.__flowsketch.setView({x: 5000, y: 6000, zoom: 1})')  # empty area
-            app.key('Shift+I'); page.wait_for_selector('.icon-cell')
+            app.tool('Shift+I'); page.wait_for_selector('.icon-cell')
             stage = page.get_by_test_id('stage')
             box = stage.bounding_box()
             def at(wx, wy):
@@ -343,7 +348,7 @@ def main():
             stage.dispatch_event('drop', {'dataTransfer': dt, 'clientX': x, 'clientY': y})
             page.wait_for_timeout(200)
             assert app.els('icon')[-1]['iconId'].startswith('file:dropped'), app.els('icon')[-1]['iconId']
-            app.key('Shift+I')
+            app.tool('Shift+I')
             app.js('(v) => window.__flowsketch.setView(v)', v)
         ticonlibs()
 
@@ -361,7 +366,7 @@ def main():
                     z.writestr(f'{base}/Arch_Compute/{size}/Arch_AWS-Lambda_{size}.svg', svg('#ed7100'))
                     z.writestr(f'{base}/Arch_Storage/{size}/Arch_Amazon-Simple-Storage-Service_{size}.svg', svg('#7aa116'))
                 z.writestr('__MACOSX/._x.svg', 'junk')
-            app.key('Shift+I'); page.wait_for_selector('.icon-cell')
+            app.tool('Shift+I'); page.wait_for_selector('.icon-cell')
             page.get_by_role('button', name='Add icons').click()
             row = page.locator('.iconlibs li', has_text='AWS Architecture Icons').first
             with page.expect_file_chooser() as fc:
@@ -379,7 +384,7 @@ def main():
             page.wait_for_timeout(100)
             assert app.els('icon')[-1]['iconId'].endswith(':aws-lambda')
             assert 'AWS terms' in page.locator('.inspector .insp-tip').first.inner_text()
-            app.key('Shift+I')
+            app.tool('Shift+I')
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tziplib()
 
@@ -388,7 +393,7 @@ def main():
             app.key('Escape')
             v = app.ui()['view']
             app.js('() => window.__flowsketch.setView({x: 5000, y: 8000, zoom: 1})')  # empty area
-            app.key('u'); app.drag((5100, 8200), (5240, 8280)); app.drag((5400, 8200), (5540, 8280)); app.key('Escape')
+            app.tool('u'); app.drag((5100, 8200), (5240, 8280)); app.drag((5400, 8200), (5540, 8280)); app.key('Escape')
             a, b = app.els('shape')[-2:]
             app.drag((5060, 8160), (5600, 8320))  # selection box around both
             assert set(app.ui()['selection']) == {a['id'], b['id']}, app.ui()['selection']
@@ -427,9 +432,9 @@ def main():
             v = app.ui()['view']
             app.js('() => window.__flowsketch.setView({x: 5000, y: 5000, zoom: 1})')  # empty area
             h0 = app.js('() => window.__flowsketch.history()')['past']
-            app.key('u'); app.drag((5100, 5200), (5260, 5280)); app.drag((5500, 5200), (5660, 5280))
+            app.tool('u'); app.drag((5100, 5200), (5260, 5280)); app.drag((5500, 5200), (5660, 5280))
             ids = [e['id'] for e in app.els('shape')[-2:]]
-            app.key('a'); app.drag((5180, 5240), (5580, 5240)); app.key('Escape')
+            app.tool('a'); app.drag((5180, 5240), (5580, 5240)); app.key('Escape')
             c = app.els('connector')[-1]
             assert c['start']['elementId'] == ids[0] and c['end']['elementId'] == ids[1], (c['start'], c['end'])
             app.click((5380, 5240))
@@ -465,7 +470,7 @@ def main():
             v = app.ui()['view']
             app.js('() => window.__flowsketch.setView({x: 5000, y: 9000, zoom: 1})')  # empty area
             h0 = app.js('() => window.__flowsketch.history()')['past']
-            app.key('u'); app.drag((5100, 9200), (5260, 9280)); app.key('Escape'); app.key('Escape')
+            app.tool('u'); app.drag((5100, 9200), (5260, 9280)); app.key('Escape'); app.key('Escape')
             a = app.els('shape')[-1]
             cx, cy = a['x'] + a['w'] / 2, a['y'] + a['h'] / 2
             hover = lambda: page.mouse.move(*app.pt(cx, cy))
@@ -519,7 +524,7 @@ def main():
             v = app.ui()['view']
             app.js('() => window.__flowsketch.setView({x: 5000, y: 11000, zoom: 1})')  # empty area
             h0 = app.js('() => window.__flowsketch.history()')['past']
-            app.key('r')
+            app.tool('r')
             base = app.js("() => window.__flowsketch.toolStyle('shape:rectangle')")['style']['fill']
             app.drag((5100, 11200), (5200, 11260))
             plain = app.els('shape')[-1]['style']['fill']
@@ -544,7 +549,7 @@ def main():
             v = app.ui()['view']
             app.js('() => window.__flowsketch.setView({x: 5000, y: 13000, zoom: 1})')  # empty area
             h0 = app.js('() => window.__flowsketch.history()')['past']
-            app.key('r'); app.drag((5100, 13200), (5300, 13300)); app.drag((5500, 13200), (5550, 13240)); app.key('Escape')
+            app.tool('r'); app.drag((5100, 13200), (5300, 13300)); app.drag((5500, 13200), (5550, 13240)); app.key('Escape')
             a, b = app.els('shape')[-2:]
             app.click((5200, 13250)); page.keyboard.down('Shift'); app.click((5525, 13220)); page.keyboard.up('Shift')
             assert app.ui()['selection'] == [a['id'], b['id']], app.ui()['selection']
@@ -587,10 +592,10 @@ def main():
             # one undo removes the whole inserted diagram
             app.key('Control+z'); assert len(app.els()) == n0
             # Auto-layout: three shapes in a row joined a -> b -> c, laid out top to bottom
-            app.key('r'); app.drag((5100, 15200), (5200, 15260)); app.drag((5400, 15200), (5500, 15260)); app.drag((5700, 15200), (5800, 15260)); app.key('Escape')
+            app.tool('r'); app.drag((5100, 15200), (5200, 15260)); app.drag((5400, 15200), (5500, 15260)); app.drag((5700, 15200), (5800, 15260)); app.key('Escape')
             a, b, c = app.els('shape')[-3:]
             for x, y in ((a, b), (b, c)):
-                app.key('a'); app.drag((x['x'] + 50, x['y'] + 30), (y['x'] + 50, y['y'] + 30)); app.key('Escape')
+                app.tool('a'); app.drag((x['x'] + 50, x['y'] + 30), (y['x'] + 50, y['y'] + 30)); app.key('Escape')
             app.key('Escape')
             page.get_by_role('menuitem', name='Arrange').click()
             page.get_by_role('menuitem', name='Auto-layout diagram').click()
@@ -600,6 +605,36 @@ def main():
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tmermaid()
+
+        @test('Draw then type: a new shape or arrow is selected (tool stays), the Inspector shows it, typing labels it')
+        def tdrawtype():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 17000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('r'); app.drag((5100, 17200), (5260, 17280))
+            r = app.els('shape')[-1]
+            ui = app.ui()
+            assert ui['tool'] == 'shape' and ui['selection'] == [r['id']], ui
+            assert 'Defaults for the next shapes' not in page.locator('.inspector').inner_text(), 'Inspector should show the new shape'
+            page.keyboard.type('Hello'); page.wait_for_selector('.text-editor')
+            page.keyboard.press('Escape'); page.wait_for_timeout(80)
+            assert [e for e in app.els() if e['id'] == r['id']][0]['text'] == 'Hello'
+            # an arrow: drawn, selected, typed label
+            app.tool('r'); app.drag((5500, 17200), (5660, 17280))
+            app.tool('a'); app.drag((5180, 17240), (5580, 17240))
+            c = app.els('connector')[-1]
+            assert app.ui()['selection'] == [c['id']] and app.ui()['tool'] == 'arrow'
+            page.keyboard.type('yes'); page.keyboard.press('Escape'); page.wait_for_timeout(80)
+            assert [e for e in app.els() if e['id'] == c['id']][0]['text'] == 'yes'
+            # Esc from a drawing tool also clears the selection, so letter shortcuts work again
+            app.tool('r'); app.drag((5100, 17400), (5200, 17460))
+            app.key('Escape'); assert app.ui()['tool'] == 'select' and app.ui()['selection'] == []
+            app.key('o'); assert app.ui()['tool'] == 'shape' and app.ui()['shapeKind'] == 'ellipse'
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tdrawtype()
 
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():

@@ -3,7 +3,11 @@ import { useEffect } from 'react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
-import type { ShapeKind } from '../model/types';
+import type { DiagramElement, ShapeKind } from '../model/types';
+
+/** Elements whose text can be edited by Enter or by typing. */
+const labelable = (el: DiagramElement | undefined): el is DiagramElement =>
+  !!el && !el.locked && (el.type === 'shape' || el.type === 'text' || el.type === 'connector' || el.type === 'container' || el.type === 'icon');
 
 export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 export const MOD = isMac ? '⌘' : 'Ctrl+';
@@ -12,7 +16,7 @@ export const ALT = isMac ? '⌥' : 'Alt+';
 
 export const SHORTCUTS: { group: string; items: [string, string][] }[] = [
   { group: 'Tools', items: [['Select', 'V'], ['Hand / pan', 'H'], ['Rectangle', 'R'], ['Rounded rectangle', 'U'], ['Ellipse', 'O'], ['Diamond', 'D'], ['Arrow / connector', 'A'], ['Line', 'L'], ['Freehand pen', 'P'], ['Highlighter', 'M'], ['Text', 'T'], ['Image', 'I'], ['Icons panel', 'Shift+I'], ['Eraser', 'E'], ['Format painter', 'F'], ['Shape library', 'S'], ['Draw a shape in the next fill colour', `${isMac ? '⌘' : 'Ctrl'}-drag`]] },
-  { group: 'Edit', items: [['Undo', `${MOD}Z`], ['Redo', `${MOD}${SHIFT}Z`], ['Cut / Copy / Paste', `${MOD}X / C / V`], ['Copy / paste style', `${MOD}${ALT}C / V`], ['Duplicate', `${MOD}D`], ['Delete', 'Delete / Backspace'], ['Select all', `${MOD}A`], ['Edit text of selection', 'Enter'], ['Nudge (×10 with Shift)', 'Arrow keys'], ['Add a connected shape in that direction', `${MOD}Arrow keys`]] },
+  { group: 'Edit', items: [['Undo', `${MOD}Z`], ['Redo', `${MOD}${SHIFT}Z`], ['Cut / Copy / Paste', `${MOD}X / C / V`], ['Copy / paste style', `${MOD}${ALT}C / V`], ['Duplicate', `${MOD}D`], ['Delete', 'Delete / Backspace'], ['Select all', `${MOD}A`], ['Edit text of selection', 'Enter, or just start typing'], ['Nudge (×10 with Shift)', 'Arrow keys'], ['Add a connected shape in that direction', `${MOD}Arrow keys`]] },
   { group: 'Arrange', items: [['Group / ungroup', `${MOD}G / ${MOD}${SHIFT}G`], ['Bring forward / to front', `${MOD}] / ${MOD}${SHIFT}]`], ['Send backward / to back', `${MOD}[ / ${MOD}${SHIFT}[`], ['Lock / unlock', `${MOD}${SHIFT}L`]] },
   { group: 'View & play', items: [['Play / pause', 'K  (or Shift+Space)'], ['Restart animation', `${SHIFT}K`], ['Zoom in / out', `${MOD}+ / ${MOD}-`], ['Reset zoom', `${MOD}0`], ['Fit diagram', `${SHIFT}1`], ['Zoom to selection', `${SHIFT}2`], ['Temporary pan', 'Space + drag'], ['Presentation mode', `${MOD}${SHIFT}P`], ['Cancel / back to select', 'Esc'], ['Right-click menu', 'Shift+F10']] },
   { group: 'File', items: [['Save', `${MOD}S`], ['Save as', `${MOD}${SHIFT}S`], ['Open', `${MOD}O`], ['New diagram', `${ALT}N`], ['Export animated GIF', `${MOD}${SHIFT}E`], ['Keyboard shortcuts', '?']] },
@@ -74,14 +78,20 @@ export function useShortcuts() {
       if (e.key === 'Escape') {
         if (u.hint) u.setHint(null);
         if (u.tool === 'painter') { u.setCopiedStyle(null); }
-        if (u.tool !== 'select') return run(() => u.setTool('select'));
+        if (u.tool !== 'select') return run(() => { u.setTool('select'); u.select([]); }); // so letter shortcuts work again straight away
         if (u.selection.length) return run(() => u.select([]));
         return;
       }
       if (e.key === 'Delete' || e.key === 'Backspace') return run(cmd.deleteSelection);
       if (e.key === 'Enter' && u.selection.length === 1) {
         const el = D.doc.elements.find((x) => x.id === u.selection[0]);
-        if (el && !el.locked && (el.type === 'shape' || el.type === 'text' || el.type === 'connector')) return run(() => u.setEditing(el.id));
+        if (labelable(el)) return run(() => u.setEditing(el.id));
+      }
+      // typing with one shape, arrow, text, container or icon selected starts its label (letter shortcuts then need
+      // Esc first; ⌘ shortcuts, Delete and arrow keys still work)
+      if (u.selection.length === 1 && !e.altKey && e.key.length === 1 && e.key !== ' ' && !e.isComposing) {
+        const el = D.doc.elements.find((x) => x.id === u.selection[0]);
+        if (labelable(el)) return run(() => u.setEditing(el.id, e.key));
       }
       if (e.key.startsWith('Arrow') && u.selection.length) {
         const s = e.shiftKey ? 10 : 1;

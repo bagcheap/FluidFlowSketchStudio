@@ -12,12 +12,20 @@ export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p:
   const doc = useDoc((s) => s.doc);
   const view = useUI((s) => s.view);
   const el = getElement(doc, id);
-  const [text, setText] = useState(el?.text ?? '');
+  // started by typing on a selected shape: the typed text replaces the label (as Enter + typing would)
+  const seed = useRef(useUI.getState().editSeed);
+  const [text, setText] = useState(seed.current ?? el?.text ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
   const done = useRef(false);
   const [lines, setLines] = useState(1);
 
-  useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
+  useEffect(() => {
+    const t = ref.current;
+    if (!t) return;
+    t.focus();
+    if (seed.current !== null) t.setSelectionRange(t.value.length, t.value.length); // keep typing after the first letter
+    else t.select();
+  }, []);
   useLayoutEffect(() => { setLines(Math.max(1, text.split('\n').length)); }, [text]);
 
   if (!el) return null;
