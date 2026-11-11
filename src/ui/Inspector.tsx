@@ -284,6 +284,15 @@ export function Inspector() {
               {ca.mode !== 'none' && <>
                 <Slider label="Delay" value={ca.delay} min={0} max={Math.max(1, doc.animation.duration)} step={0.1} unit="s" onChange={(v) => setConnAnim({ delay: v })} />
                 <Toggle label="Pulse arrowhead" checked={ca.arrowPulse} onChange={(v) => setConnAnim({ arrowPulse: v })} />
+                {conn?.anim?.window && (() => {
+                  // message-by-message playback: which step this arrow is
+                  const [a, b] = conn.anim.window;
+                  const steps = Math.max(1, Math.round(0.85 / (b - a)));
+                  const step = Math.min(steps, Math.round(a * steps) + 1);
+                  return (
+                    <p className="note">Plays as step {step} of {steps}, one after another. <button className="btn small" onClick={cmd.playArrowsTogether}>Play together</button></p>
+                  );
+                })()}
               </>}
             </Section>
           )}

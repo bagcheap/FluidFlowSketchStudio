@@ -87,6 +87,13 @@ export function sanitizeShapeAnim(v: unknown, partial: boolean): Partial<ShapeAn
   return out;
 }
 
+/** A play window: two fractions of the loop, 0 ≤ start < end ≤ 1. */
+function playWindow(v: unknown): [number, number] | null {
+  if (!Array.isArray(v) || v.length !== 2) return null;
+  const a = num(v[0], -1, 0, 1), b = num(v[1], -1, 0, 1);
+  return a >= 0 && b > a ? [a, b] : null;
+}
+
 export function sanitizeConnectorAnim(v: unknown, partial: true): Partial<ConnectorAnim>;
 export function sanitizeConnectorAnim(v: unknown, partial: false): ConnectorAnim;
 export function sanitizeConnectorAnim(v: unknown, partial: boolean): Partial<ConnectorAnim> | ConnectorAnim {
@@ -109,6 +116,7 @@ export function sanitizeConnectorAnim(v: unknown, partial: boolean): Partial<Con
     erase: bool(o.erase, d.erase),
     delay: num(o.delay, d.delay, 0, 600),
     arrowPulse: bool(o.arrowPulse, d.arrowPulse),
+    ...(playWindow(o.window) ? { window: playWindow(o.window)! } : {}),
   };
   if (!partial) return full;
   const out: Partial<ConnectorAnim> = {};
@@ -345,6 +353,10 @@ export function migrate(raw: Obj): Obj {
   if (version === 7) {
     // v7 -> v8: arrows may be sequence-diagram activation bars (bar: true); nothing to convert
     version = 8;
+  }
+  if (version === 8) {
+    // v8 -> v9: arrow animations may have a play window (message-by-message playback); nothing to convert
+    version = 9;
   }
   raw.schemaVersion = version;
   return raw;

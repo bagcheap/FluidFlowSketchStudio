@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isSequence, parseSequence, MAX_PARTICIPANTS } from '../src/import/mermaidSequence';
-import { buildSequence } from '../src/import/sequenceBuild';
+import { buildSequence, rectColor } from '../src/import/sequenceBuild';
 import { isLifeline, lifelineAt } from '../src/editor/hitTest';
 import { looksLikeMermaid } from '../src/import/mermaid';
 import { connectorPath } from '../src/engine/connectors';
@@ -165,5 +165,24 @@ describe('building a sequence diagram', () => {
     const r = buildSequence(newDocument(), parseSequence('sequenceDiagram\nA->>+B: x\nB-->>-A: y'), tools, { x: 0, y: 0 });
     const again = parseDocument(serializeDocument(r.doc)).doc;
     expect(again.elements.filter((e) => e.type === 'connector' && e.bar)).toHaveLength(1);
+  });
+
+  it('keeps angle-bracket placeholders in labels but drops HTML tags', () => {
+    const g = parseSequence('sequenceDiagram\nA->>B: Bearer <Entra_Token><br/>Body: <b>x</b> <span style="color:red">y</span>');
+    expect((g.steps[0] as { text: string }).text).toBe('Bearer <Entra_Token>\nBody: x y');
+  });
+
+  it('rect rgb(...) is a tinted band with no title or border', () => {
+    expect(rectColor('rgb(240, 248, 255)')).toBe('#f0f8ff');
+    expect(rectColor('#abc')).toBe('#aabbcc');
+    expect(rectColor('rgba(0, 0, 0, 0.5)')).toBe('#808080');
+    expect(rectColor('Highlight')).toBeNull();
+    const r = buildSequence(newDocument(), parseSequence('sequenceDiagram\nrect rgb(255, 240, 245)\nA->>B: x\nend\nrect Plain\nA->>B: y\nend'), tools, { x: 0, y: 0 });
+    const [band, plain] = r.doc.elements.filter((e): e is ContainerElement => e.type === 'container').sort((a, b) => a.y - b.y);
+    expect(band.text).toBe('');
+    expect(band.style.fill).toBe('#fff0f5');
+    expect(band.style.stroke).toBe('transparent');
+    expect(plain.text).toBe('rect · Plain');
+    expect(parseDocument(serializeDocument(r.doc)).doc.elements.find((e) => e.id === band.id)!.style.fill).toBe('#fff0f5');
   });
 });

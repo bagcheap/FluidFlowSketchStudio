@@ -46,11 +46,15 @@ const SHAPES: [string, string, ShapeKind][] = [
   ['(', ')', 'roundRect'], ['[', ']', 'rectangle'], ['{', '}', 'diamond'], ['>', ']', 'document'],
 ];
 
-/** Plain text from a Mermaid label: quotes off, <br> to a new line, other tags and markdown markers removed. */
+// HTML formatting tags people put in Mermaid labels (<b>, <i>, <span style…>…) are dropped. Other angle-bracket text,
+// such as "Bearer <Entra_Token>", is kept: labels are only ever drawn as plain text (canvas, escaped SVG), never as HTML.
+const HTML_TAG = /<\/?(?:a|abbr|b|big|blockquote|br|center|code|del|div|em|font|h[1-6]|hr|i|img|ins|kbd|li|mark|ol|p|pre|q|s|samp|script|small|span|strike|strong|style|sub|sup|tt|u|ul|var)(?=[\s/>])[^>]*>/gi;
+
+/** Plain text from a Mermaid label: quotes off, <br> to a new line, HTML tags and markdown markers removed. */
 export function cleanLabel(s: string): string {
   let t = plainText(s).trim();
   if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith('`') && t.endsWith('`'))) t = t.slice(1, -1);
-  t = t.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')
+  t = t.replace(/<br\s*\/?>/gi, '\n').replace(HTML_TAG, '')
     .replace(/&quot;|#quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'")
     .replace(/\*\*(.+?)\*\*/g, '$1');
   return t.split('\n').map((l) => l.trim()).join('\n').trim().slice(0, MAX_LABEL);

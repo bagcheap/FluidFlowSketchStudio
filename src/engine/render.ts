@@ -277,6 +277,15 @@ function barParts(path: ConnectorPath, st: ConnectorElement['style']): Part[] {
   return [{ k: 'line', pts: [a.x + nx, a.y + ny, b.x + nx, b.y + ny, b.x - nx, b.y - ny, a.x - nx, a.y - ny], color: st.stroke, width: st.strokeWidth, alpha: 1, cap: 'butt', dash: null, closed: true, fill }];
 }
 
+/**
+ * Progress (0..1) through a play window [a, b] (fractions of a loop of length `loop`) at time t, or null outside it.
+ * At both edges of the window the highlight is off the arrow, so the motion stays continuous.
+ */
+export function playPhase(t: number, loop: number, [a, b]: [number, number]): number | null {
+  const p = fract(t / Math.max(1e-6, loop));
+  return p >= a && p < b ? (p - a) / (b - a) : null;
+}
+
 function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, lookup: Lookup, flags: PreviewFlags | undefined, background: string, hideLabel: boolean, cull?: Rect): Item[] {
   const path = connectorPath(c, lookup);
   if (path.length < 1) return [];
@@ -331,12 +340,14 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
     if (st.roughness >= 2) parts.push({ k: 'line', pts: wiggled(path, va + startCut, vb - endCut, st.roughness * 0.6, c.seed + 99), color: st.stroke, width: Math.max(0.6, sw * 0.55), alpha: 0.7, cap: 'round', dash });
   }
 
-  if (anim.mode === 'travel' && speed > 0 && active) {
+  // with a play window (sequence-diagram steps) the highlight travels once, only during its part of the loop
+  const win = anim.window ? playPhase(tt, L ?? settings.duration, anim.window) : undefined;
+  if (anim.mode === 'travel' && (anim.window ? win !== null : speed > 0 && active)) {
     const hl = Math.min(anim.highlightLength, len);
-    const n = Math.max(1, anim.segments);
+    const n = win !== undefined ? 1 : Math.max(1, anim.segments);
     const roundTrip = anim.direction === 'roundTrip';
     // a round trip is one cycle (out, wait at the far end, back), so each leg moves at the one-way speed
-    const u = fract((tt - anim.delay) * trip(roundTrip ? speed / 2 : speed));
+    const u = win ?? fract((tt - anim.delay) * trip(roundTrip ? speed / 2 : speed));
     for (let i = 0; i < n; i++) {
       const leg = roundTripLeg(fract(u + i / n), roundTrip ? anim.turnPause : null);
       if (!leg) continue; // waiting at the far end

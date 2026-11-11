@@ -751,6 +751,43 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tseqtools()
 
+        @test('Message-by-message playback: an imported sequence diagram lights up one message at a time; Play together undoes it')
+        def tplayback():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 23000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            n0 = len(app.els())
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('sequenceDiagram\n  A->>B: one\n  B->>C: two\n  C-->>A: three')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            new = app.els()[n0:]
+            msgs = sorted([e for e in new if e['type'] == 'connector' and e.get('anim', {}).get('window')], key=lambda e: e['anim']['window'][0])
+            assert [m['text'] for m in msgs] == ['one', 'two', 'three'], [m.get('text') for m in msgs]
+            L = app.doc()['animation']['duration']
+            def lit(t):
+                f = app.js('(t) => window.__flowsketch.frame(t)', t)
+                out = []
+                for m in msgs:
+                    it = [x for x in f['items'] if x['id'] == m['id']][0]
+                    out.append(any(p['k'] == 'line' and p.get('color') == '#3b82f6' for p in it['parts']))
+                return out
+            assert lit(L * 0.15) == [True, False, False], lit(L * 0.15)
+            assert lit(L * 0.48) == [False, True, False], lit(L * 0.48)
+            assert lit(L * 0.80) == [False, False, True], lit(L * 0.80)
+            # right-click a message: Play arrows together
+            app.key('Escape')
+            m = [e for e in app.els() if e['id'] == msgs[0]['id']][0]
+            ends = app.js('(id) => window.__flowsketch.connectorEnds(id)', m['id'])
+            x, y = app.pt((ends['s']['x'] + ends['e']['x']) / 2, ends['s']['y'])
+            page.mouse.click(x, y, button='right'); page.wait_for_selector('.ctx-menu')
+            page.locator('.ctx-menu [role=menuitem]', has_text='Play arrows together').click(); page.wait_for_timeout(80)
+            assert not [e for e in app.els() if e['id'] == m['id']][0].get('anim', {}).get('window')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tplayback()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]
@@ -834,7 +871,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 8
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 9
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()
