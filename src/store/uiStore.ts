@@ -2,7 +2,7 @@
 // Preferences (including remembered per-tool styles) persist in localStorage.
 import { create } from 'zustand';
 import type { ShapeKind, ToolStyle } from '../model/types';
-import { defaultToolStyle, styleKey, type ToolId } from '../model/defaults';
+import { defaultToolStyle, styleKey, type SeqKind, type ToolId } from '../model/defaults';
 import { sanitizeToolStyle, SHAPE_KINDS } from '../model/schema';
 
 export type Theme = 'light' | 'dark' | 'system';
@@ -100,6 +100,7 @@ export interface Toast { id: number; kind: 'info' | 'error' | 'success'; text: s
 interface UIState {
   tool: ToolId;
   shapeKind: ShapeKind;
+  seqKind: SeqKind; // which sequence-diagram tool is picked while tool is 'seq'
   selection: string[];
   view: Viewport;
   editingId: string | null;
@@ -121,7 +122,7 @@ interface UIState {
 }
 
 interface UIActions {
-  setTool(tool: ToolId, shape?: ShapeKind): void;
+  setTool(tool: ToolId, shape?: ShapeKind, seq?: SeqKind): void;
   select(ids: string[]): void;
   setView(v: Partial<Viewport>): void;
   setEditing(id: string | null, seed?: string): void;
@@ -149,6 +150,7 @@ let toastId = 0;
 export const useUI = create<UIState & UIActions>((set, get) => ({
   tool: 'select',
   shapeKind: 'roundRect',
+  seqKind: 'participant',
   selection: [],
   view: { x: -80, y: -60, zoom: 1 },
   editingId: null,
@@ -167,7 +169,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   contextMenu: null,
   reducedMotionOS: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
 
-  setTool(tool, shape) { set((s) => ({ tool, shapeKind: shape ?? s.shapeKind, selection: tool === 'select' ? s.selection : [], editingId: null, welcomeDismissed: s.welcomeDismissed || (tool !== 'select' && tool !== 'hand') })); },
+  setTool(tool, shape, seq) { set((s) => ({ tool, shapeKind: shape ?? s.shapeKind, seqKind: seq ?? s.seqKind, selection: tool === 'select' ? s.selection : [], editingId: null, welcomeDismissed: s.welcomeDismissed || (tool !== 'select' && tool !== 'hand') })); },
   select(ids) { set({ selection: [...new Set(ids)] }); },
   setView(v) { set((s) => ({ view: { ...s.view, ...v, zoom: Math.min(8, Math.max(0.1, v.zoom ?? s.view.zoom)) } })); },
   setEditing(id, seed) { set({ editingId: id, editSeed: id ? seed ?? null : null }); },
@@ -183,7 +185,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   },
   toolStyle(key) {
     const s = get();
-    const k = key ?? styleKey(s.tool, s.shapeKind);
+    const k = key ?? styleKey(s.tool, s.shapeKind, s.seqKind);
     const own = s.prefs.toolStyles[k] ?? defaultToolStyle(k);
     if (s.prefs.sharedStyles && s.prefs.sharedStyle && (k.startsWith('shape:') || k === 'text')) {
       return { ...own, style: { ...s.prefs.sharedStyle.style }, textStyle: { ...s.prefs.sharedStyle.textStyle } };
@@ -217,4 +219,4 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   },
 }));
 
-export const currentStyleKey = () => { const s = useUI.getState(); return styleKey(s.tool, s.shapeKind); };
+export const currentStyleKey = () => { const s = useUI.getState(); return styleKey(s.tool, s.shapeKind, s.seqKind); };

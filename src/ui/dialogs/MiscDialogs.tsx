@@ -101,7 +101,7 @@ export function HelpDialog() {
           <li>Diagram from text: Insert ▸ <b>Diagram from text (Mermaid)</b>, or paste flowchart text such as <code>User --&gt; GE --&gt; MCP Server</code> onto the canvas. <b>Arrange ▸ Auto-layout</b> tidies an existing diagram along its arrows.</li>
           <li>A shape you draw stays selected, so the Inspector shows it: just start typing to label it (or press Enter). One-letter tool shortcuts work when nothing is selected, so press <kbd>Esc</kbd> first.</li>
           <li>Pages: the tabs at the bottom hold several diagrams in one file. <b>+</b> adds a page; double-click a tab to rename it; right-click for duplicate, move and delete.</li>
-          <li>Sequence diagrams: paste a Mermaid <code>sequenceDiagram</code> onto the canvas. Drop an arrow end on a lifeline to attach it at that height.</li>
+          <li>Sequence diagrams: use the <b>Sequence</b> button on the toolbar (participants, actors, messages, replies, notes and frames), or paste a Mermaid <code>sequenceDiagram</code> onto the canvas. Drop an arrow end on a lifeline to attach it at that height.</li>
           <li>Icons: press <kbd>⇧ I</kbd> to open the Icons panel, search, then drag an icon onto the canvas or click it.</li>
           <li>Alt-drag duplicates; arrow keys nudge (<kbd>Shift</kbd> ×10); hold <kbd>Space</kbd> to pan; <kbd>⌘/Ctrl</kbd>+scroll or pinch to zoom.</li>
           <li>Format painter (<kbd>F</kbd>): click a shape to pick its style, then click others to apply it.</li>

@@ -1,8 +1,8 @@
 // Floating drawing toolbar. Tools stay active after drawing (continuous mode, lock icon).
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, LayoutGrid, Circle, Diamond, Eraser, Hand, Highlighter, ImagePlus, Lock, LockOpen, Minus, MousePointer2, Paintbrush, Pencil, Shapes, Square, RectangleHorizontal, Type } from 'lucide-react';
+import { ArrowUpRight, LayoutGrid, Circle, Diamond, Eraser, Hand, Highlighter, ImagePlus, Lock, LockOpen, Minus, MousePointer2, MoveRight, Paintbrush, Pencil, Repeat2, Reply, Shapes, Square, SquareDashed, StickyNote, RectangleHorizontal, Type, User, Workflow } from 'lucide-react';
 import type { ShapeKind } from '../model/types';
-import type { ToolId } from '../model/defaults';
+import type { SeqKind, ToolId } from '../model/defaults';
 import { useUI } from '../store/uiStore';
 import { insertImage } from '../store/commands';
 import { ShapeIcon } from './ShapeIcon';
@@ -32,19 +32,32 @@ const TOOLS2: (T | 'sep')[] = [
 ];
 const BASIC = new Set<ShapeKind>(['rectangle', 'roundRect', 'ellipse', 'diamond']);
 
+/** Toolbar ▸ Sequence: the sequence-diagram tools. Note is the sticky-note shape tool. */
+const SEQ_TOOLS: { k: SeqKind | 'note'; icon: ReactNode; label: string; tip: string }[] = [
+  { k: 'participant', icon: <RectangleHorizontal size={16} />, label: 'Participant', tip: 'Click to add a box with a lifeline, in line with the others' },
+  { k: 'actor', icon: <User size={16} />, label: 'Actor', tip: 'Click to add a person (a pill) with a lifeline' },
+  { k: 'message', icon: <MoveRight size={16} />, label: 'Message', tip: 'Drag from one lifeline to another; click a lifeline for a message to itself' },
+  { k: 'reply', icon: <Reply size={16} />, label: 'Reply', tip: 'A dashed return message: drag from one lifeline to another' },
+  { k: 'self', icon: <Repeat2 size={16} />, label: 'Message to itself', tip: 'Click a lifeline to add a loop back to it' },
+  { k: 'note', icon: <StickyNote size={16} />, label: 'Note', tip: 'Click or drag to add a sticky note' },
+  { k: 'frame', icon: <SquareDashed size={16} />, label: 'Frame', tip: 'Drag around messages for a loop / alt / opt frame, then type its title' },
+];
+
 export function Toolbar() {
   const tool = useUI((s) => s.tool);
   const shapeKind = useUI((s) => s.shapeKind);
   const continuous = useUI((s) => s.prefs.continuousDrawing);
   const iconsOpen = useUI((s) => s.prefs.showIconPanel);
   const [more, setMore] = useState(false);
+  const [seqOpen, setSeqOpen] = useState(false);
+  const seqKind = useUI((s) => s.seqKind);
   // Esc closes the shape pop-up (the global Esc handler then returns to Select)
   useEffect(() => {
-    if (!more) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMore(false); };
+    if (!more && !seqOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMore(false); setSeqOpen(false); } };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [more]);
+  }, [more, seqOpen]);
   const ui = useUI.getState();
   const btn = (t: T | 'sep', i: number) => {
     if (t === 'sep') return <span key={'s' + i} className="tb-sep" aria-hidden />;
@@ -83,6 +96,22 @@ export function Toolbar() {
               </button>
             ))}
             <button className="shape-cell wide" onClick={() => { setMore(false); ui.openDialog('shapes'); }}>Search library…</button>
+          </div>
+        )}
+      </div>
+      <div className="tb-more-wrap">
+        <button className={`tb-btn ${tool === 'seq' ? 'active' : ''}`} aria-haspopup="true" aria-expanded={seqOpen} aria-label="Sequence diagram tools" data-tool="seq"
+          title={'Sequence diagram\nParticipants with lifelines, messages, replies, notes and frames'} onClick={() => setSeqOpen(!seqOpen)}>
+          {tool === 'seq' ? SEQ_TOOLS.find((t) => t.k === seqKind)?.icon : <Workflow size={18} />}
+        </button>
+        {seqOpen && (
+          <div className="seq-pop" role="menu" aria-label="Sequence diagram tools" onMouseLeave={() => setSeqOpen(false)}>
+            {SEQ_TOOLS.map((t) => (
+              <button key={t.k} role="menuitem" className={`seq-cell ${(t.k === 'note' ? tool === 'shape' && shapeKind === 'sticky' : tool === 'seq' && seqKind === t.k) ? 'on' : ''}`} title={t.tip}
+                onClick={() => { if (t.k === 'note') ui.setTool('shape', 'sticky'); else ui.setTool('seq', undefined, t.k); setSeqOpen(false); }}>
+                {t.icon}<span>{t.label}</span>
+              </button>
+            ))}
           </div>
         )}
       </div>

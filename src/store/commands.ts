@@ -234,7 +234,7 @@ export function applySelectionStyleToDefaults() {
 }
 
 /** "shape:roundRect" → "rounded rectangle", "arrow" → "arrow" */
-export const toolName = (key: string) => (key.startsWith('shape:') ? (SHAPE_LABELS[key.slice(6) as ShapeKind] ?? key.slice(6)).toLowerCase() : key);
+export const toolName = (key: string) => (key.startsWith('shape:') ? (SHAPE_LABELS[key.slice(6) as ShapeKind] ?? key.slice(6)).toLowerCase() : key.startsWith('seq:') ? `sequence ${key.slice(4)}` : key);
 
 /** Forget a tool's remembered style, so new drawings use the original style again. */
 export function resetToolStyle(key: string) {
