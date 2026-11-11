@@ -173,8 +173,9 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
       return {
         ...base, type,
         start: endpoint(v.start), end: endpoint(v.end), bends,
-        routing: oneOf(v.routing, ['straight', 'curved', 'elbow'] as const, 'curved'),
+        routing: oneOf(v.routing, ['straight', 'curved', 'elbow'] as const, 'straight'),
         curvature: num(v.curvature, 0, -1, 1),
+        elbowRadius: num(v.elbowRadius, 0, 0, 500),
         startHead: oneOf(v.startHead, heads, 'none'),
         endHead: oneOf(v.endHead, heads, 'arrow'),
         labelPos: num(v.labelPos, 0.5, 0, 1),
@@ -200,7 +201,9 @@ export function sanitizeToolStyle(v: unknown, fallback: ToolStyle): ToolStyle {
     textStyle: isObj(v.textStyle) ? textStyle({ ...fallback.textStyle, ...v.textStyle }) : fallback.textStyle,
     ...(isObj(v.shapeAnim) ? { shapeAnim: sanitizeShapeAnim(v.shapeAnim, true) } : fallback.shapeAnim ? { shapeAnim: fallback.shapeAnim } : {}),
     ...(isObj(v.connectorAnim) ? { connectorAnim: sanitizeConnectorAnim(v.connectorAnim, true) } : fallback.connectorAnim ? { connectorAnim: fallback.connectorAnim } : {}),
-    ...(v.routing !== undefined || fallback.routing ? { routing: oneOf(v.routing, ['straight', 'curved', 'elbow'] as const, fallback.routing ?? 'curved') } : {}),
+    ...(v.routing !== undefined || fallback.routing ? { routing: oneOf(v.routing, ['straight', 'curved', 'elbow'] as const, fallback.routing ?? 'straight') } : {}),
+    ...(v.curvature !== undefined ? { curvature: num(v.curvature, 0, -1, 1) } : {}),
+    ...(v.elbowRadius !== undefined ? { elbowRadius: num(v.elbowRadius, 0, 0, 500) } : {}),
     ...(v.startHead !== undefined || fallback.startHead ? { startHead: oneOf(v.startHead, heads, fallback.startHead ?? 'none') } : {}),
     ...(v.endHead !== undefined || fallback.endHead ? { endHead: oneOf(v.endHead, heads, fallback.endHead ?? 'arrow') } : {}),
   };
@@ -317,6 +320,19 @@ export function migrate(raw: Obj): Obj {
   if (version === 4) {
     // v4 -> v5: arrows may use the round-trip highlight (direction 'roundTrip', returnColor, turnPause); nothing to convert
     version = 5;
+  }
+  if (version === 5) {
+    // v5 -> v6: elbow arrows may have rounded corners (elbowRadius, default 0 = as before). "Curved" arrows with no
+    // curve and no bends drew straight; they are now labelled straight (same look), since curved really curves.
+    if (Array.isArray(raw.elements)) {
+      for (const e of raw.elements as unknown[]) {
+        if (!isObj(e) || e.type !== 'connector') continue;
+        const noBends = !Array.isArray(e.bends) || e.bends.length === 0;
+        const flat = typeof e.curvature !== 'number' || Math.abs(e.curvature) <= 0.001;
+        if ((e.routing === 'curved' || e.routing === undefined) && noBends && flat) e.routing = 'straight';
+      }
+    }
+    version = 6;
   }
   raw.schemaVersion = version;
   return raw;

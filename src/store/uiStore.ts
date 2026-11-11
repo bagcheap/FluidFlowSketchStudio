@@ -103,6 +103,8 @@ interface UIState {
   selection: string[];
   view: Viewport;
   editingId: string | null;
+  /** Text that replaces the label when editing starts by typing on a selected shape (null: edit the existing label). */
+  editSeed: string | null;
   playing: boolean;
   time: number;
   dialog: DialogId;
@@ -122,7 +124,7 @@ interface UIActions {
   setTool(tool: ToolId, shape?: ShapeKind): void;
   select(ids: string[]): void;
   setView(v: Partial<Viewport>): void;
-  setEditing(id: string | null): void;
+  setEditing(id: string | null, seed?: string): void;
   setPlaying(p: boolean): void;
   setTime(t: number): void;
   openDialog(d: DialogId): void;
@@ -150,6 +152,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   selection: [],
   view: { x: -80, y: -60, zoom: 1 },
   editingId: null,
+  editSeed: null,
   playing: false,
   time: 0,
   dialog: null,
@@ -167,7 +170,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   setTool(tool, shape) { set((s) => ({ tool, shapeKind: shape ?? s.shapeKind, selection: tool === 'select' ? s.selection : [], editingId: null, welcomeDismissed: s.welcomeDismissed || (tool !== 'select' && tool !== 'hand') })); },
   select(ids) { set({ selection: [...new Set(ids)] }); },
   setView(v) { set((s) => ({ view: { ...s.view, ...v, zoom: Math.min(8, Math.max(0.1, v.zoom ?? s.view.zoom)) } })); },
-  setEditing(id) { set({ editingId: id }); },
+  setEditing(id, seed) { set({ editingId: id, editSeed: id ? seed ?? null : null }); },
   setPlaying(p) { set({ playing: p }); },
   setTime(t) { set({ time: t }); },
   openDialog(d) { set({ dialog: d, menuOpen: null }); },

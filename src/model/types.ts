@@ -150,6 +150,7 @@ export interface ConnectorElement extends ElementBase {
   bends: Point[]; // world-space user control points
   routing: Routing;
   curvature: number; // for curved routing without bends (-1..1)
+  elbowRadius: number; // elbow routing: corner rounding in px (0 = sharp 90° corners)
   startHead: HeadKind;
   endHead: HeadKind;
   labelPos: number; // 0..1 along path
@@ -200,7 +201,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 5; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights
+export const SCHEMA_VERSION = 6; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).
@@ -266,6 +267,8 @@ export interface ToolStyle {
   shapeAnim?: Partial<ShapeAnim>;
   connectorAnim?: Partial<ConnectorAnim>;
   routing?: Routing;
+  curvature?: number; // connector tools: curve of new curved arrows
+  elbowRadius?: number; // connector tools: corner rounding of new elbow arrows
   startHead?: HeadKind;
   endHead?: HeadKind;
 }

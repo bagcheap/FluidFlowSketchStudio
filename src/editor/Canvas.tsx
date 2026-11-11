@@ -667,9 +667,11 @@ export function Canvas() {
     }
   };
 
+  /** A new shape or arrow is selected (the Inspector shows it, typing labels it); the tool stays unless continuous drawing is off. */
   function afterCreate(id: string) {
     const u = useUI.getState();
-    if (!u.prefs.continuousDrawing) { u.setTool('select'); u.select([id]); }
+    if (!u.prefs.continuousDrawing) u.setTool('select');
+    u.select([id]);
   }
 
   function snapPt(p: Point): Point {

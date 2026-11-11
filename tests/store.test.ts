@@ -144,7 +144,7 @@ describe('swap arrow direction', () => {
     const a = makeShape('roundRect', 0, 0, 100, 50, defaultToolStyle('shape:roundRect'));
     const b = makeShape('roundRect', 400, 200, 100, 50, defaultToolStyle('shape:roundRect'));
     const c = makeConnector({ x: 0, y: 0, elementId: a.id }, { x: 0, y: 0, elementId: b.id }, defaultToolStyle('arrow'));
-    c.curvature = 0.4; c.labelPos = 0.3; c.labelOffset = 18; c.text = 'Request';
+    c.routing = 'curved'; c.curvature = 0.4; c.labelPos = 0.3; c.labelOffset = 18; c.text = 'Request';
     D().load({ ...newDocument(), elements: [a, b, c] });
     return c;
   };

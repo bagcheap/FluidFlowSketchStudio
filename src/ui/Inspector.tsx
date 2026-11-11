@@ -80,7 +80,11 @@ export function Inspector() {
   const ca: ConnectorAnim = { ...doc.animation.connector, ...connOv };
   const roundTrip = ca.mode === 'travel' && ca.direction === 'roundTrip';
   const conn = onSelection ? (els.find((e) => e.type === 'connector') as ConnectorElement | undefined) : undefined;
-  const routing = conn?.routing ?? ts?.routing ?? 'curved';
+  const routing = conn?.routing ?? ts?.routing ?? 'straight';
+  const curvature = conn ? conn.curvature : ts?.curvature ?? 0;
+  const elbowRadius = conn ? conn.elbowRadius ?? 0 : ts?.elbowRadius ?? 0;
+  // picking Curved on a straight arrow gives it a gentle curve straight away (a curve of 0 would look straight)
+  const setRouting = (r: 'straight' | 'curved' | 'elbow') => setConn(r === 'curved' && Math.abs(curvature) < 0.001 && !conn?.bends.length ? { routing: r, curvature: 0.3 } : { routing: r });
   const startHead = conn?.startHead ?? ts?.startHead ?? 'none';
   const endHead = conn?.endHead ?? ts?.endHead ?? 'arrow';
   const hasBox = kinds.has('shape') || kinds.has('text') || kinds.has('image') || kinds.has('freehand');
@@ -186,7 +190,7 @@ export function Inspector() {
             <Section title="Connector">
               {onSelection && <button className="btn small" title="Start and end trade places, so the arrow points the other way" onClick={() => cmd.swapDirection(ids)}><ArrowRightLeft size={13} /> Swap direction</button>}
               <Row label="Routing">
-                <Segmented label="Routing" value={routing} onChange={(v) => setConn({ routing: v })} options={[{ v: 'straight', label: 'Straight' }, { v: 'curved', label: 'Curved' }, { v: 'elbow', label: 'Elbow' }]} />
+                <Segmented label="Routing" value={routing} onChange={setRouting} options={[{ v: 'straight', label: 'Straight' }, { v: 'curved', label: 'Curved' }, { v: 'elbow', label: 'Elbow' }]} />
               </Row>
               <Row label="Start">
                 <Select label="Start arrowhead" value={startHead} onChange={(v) => setConn({ startHead: v })} options={HEADS} />
@@ -194,7 +198,8 @@ export function Inspector() {
               <Row label="End">
                 <Select label="End arrowhead" value={endHead} onChange={(v) => setConn({ endHead: v })} options={HEADS} />
               </Row>
-              {conn && routing === 'curved' && conn.bends.length === 0 && <Slider label="Curvature" value={conn.curvature} min={-1} max={1} step={0.05} onChange={(v) => setConn({ curvature: v })} />}
+              {routing === 'curved' && !conn?.bends.length && <Slider label="Curvature" value={curvature} min={-1} max={1} step={0.05} onChange={(v) => setConn({ curvature: v })} hint="How far the arrow bows out; negative bends the other way" />}
+              {routing === 'elbow' && <Slider label="Corner radius" value={elbowRadius} min={0} max={80} unit="px" onChange={(v) => setConn({ elbowRadius: v })} hint="0 = sharp right-angle corners; larger values round the elbows" />}
               {conn && conn.bends.length > 0 && <button className="btn small" onClick={() => setConn({ bends: [] })}>Remove {conn.bends.length} bend point{conn.bends.length > 1 ? 's' : ''}</button>}
               {conn && <Slider label="Label position" value={conn.labelPos} min={0} max={1} step={0.01} onChange={(v) => setConn({ labelPos: v })} />}
               {conn && <Slider label="Label offset" value={conn.labelOffset} min={-80} max={80} unit="px" onChange={(v) => setConn({ labelOffset: v })} />}
