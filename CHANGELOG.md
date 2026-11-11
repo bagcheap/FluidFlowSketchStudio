@@ -6,7 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- **Rounded elbows:** arrows and lines with Elbow routing have a Corner radius in the Inspector. 0 keeps sharp right-angle corners; larger values round each bend. The arrow tool remembers it for new arrows.
+
+### Fixed
+- **Curved arrows now curve.** Choosing Curved used to look the same as Straight until you moved the Curvature slider; now it gives a gentle curve straight away, and Curvature (also when setting the tool's default) adjusts it. Existing arrows that were "curved" but drawn straight are now shown as Straight, so they look exactly as before. New arrows are straight by default.
+
 ### Changed
+- Files now use format version 6. Older files open as before, but files saved with this version need this version of FlowSketch or later.
 - **A new shape or arrow is selected as soon as you draw it,** while the drawing tool stays active for the next one. The Inspector shows its properties straight away, and you can just start typing to label it.
 - **Type to label:** with one shape, arrow, text, container or icon selected, typing starts its label (like pressing Enter and typing). One-letter tool shortcuts (R, A, T, …) work when nothing is selected: press Esc first. Esc from a drawing tool now also clears the selection, so one Esc is enough.
 

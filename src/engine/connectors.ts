@@ -136,6 +136,32 @@ function elbowRoute(s: End, e: End, bends: Point[]): Point[] {
   return out.filter((p, i) => i === 0 || Math.hypot(p.x - out[i - 1].x, p.y - out[i - 1].y) > 0.01);
 }
 
+/**
+ * Round the corners of an elbow route: each corner becomes a smooth turn of radius up to `r`, never more than
+ * half a segment shared with another corner (or the whole end segment), so short segments still look right.
+ */
+export function roundCorners(pts: Point[], r: number): Point[] {
+  if (r <= 0.01 || pts.length < 3) return pts;
+  const out: Point[] = [pts[0]];
+  const last = pts.length - 2;
+  for (let i = 1; i <= last; i++) {
+    const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+    const la = Math.hypot(b.x - a.x, b.y - a.y), lc = Math.hypot(c.x - b.x, c.y - b.y);
+    const rr = Math.min(r, i === 1 ? la : la / 2, i === last ? lc : lc / 2);
+    if (rr < 0.5 || la < 0.01 || lc < 0.01) { out.push(b); continue; }
+    const p1 = { x: b.x + ((a.x - b.x) / la) * rr, y: b.y + ((a.y - b.y) / la) * rr };
+    const p2 = { x: b.x + ((c.x - b.x) / lc) * rr, y: b.y + ((c.y - b.y) / lc) * rr };
+    out.push(p1);
+    const steps = Math.max(4, Math.min(16, Math.round(rr / 3)));
+    for (let k = 1; k <= steps; k++) {
+      const t = k / steps, u = 1 - t; // quadratic curve with the corner as control point: a near-circular quarter turn
+      out.push({ x: u * u * p1.x + 2 * u * t * b.x + t * t * p2.x, y: u * u * p1.y + 2 * u * t * b.y + t * t * p2.y });
+    }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
 export function connectorPath(c: ConnectorElement, lookup: Lookup): ConnectorPath {
   const elbow = c.routing === 'elbow';
   const sRef = refPoint(c.start, lookup), eRef = refPoint(c.end, lookup);
@@ -147,7 +173,7 @@ export function connectorPath(c: ConnectorElement, lookup: Lookup): ConnectorPat
   let pts: Point[];
   if (elbow) {
     control = elbowRoute(s, e, c.bends);
-    pts = densify(control);
+    pts = densify(roundCorners(control, c.elbowRadius ?? 0));
   } else if (c.routing === 'curved' && (c.bends.length || Math.abs(c.curvature) > 0.001)) {
     if (c.bends.length) control = [s.p, ...c.bends, e.p];
     else {

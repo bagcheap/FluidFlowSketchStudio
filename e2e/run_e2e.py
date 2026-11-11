@@ -636,6 +636,32 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tdrawtype()
 
+        @test('Arrow routing: Curved really curves, Elbow corners round with a corner radius')
+        def trouting():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 19000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('r'); app.drag((5100, 19200), (5200, 19260)); app.drag((5500, 19400), (5600, 19460))
+            app.tool('a'); app.drag((5150, 19230), (5550, 19430))
+            c = app.els('connector')[-1]
+            assert c['routing'] == 'straight', c['routing']
+            routing = page.get_by_role('radiogroup', name='Routing')
+            routing.get_by_role('radio', name='Curved').click(); page.wait_for_timeout(80)
+            c2 = [e for e in app.els() if e['id'] == c['id']][0]
+            assert c2['routing'] == 'curved' and abs(c2['curvature']) > 0.1, (c2['routing'], c2['curvature'])
+            routing.get_by_role('radio', name='Elbow').click(); page.wait_for_timeout(80)
+            page.get_by_label('Corner radius value').fill('24'); page.wait_for_timeout(80)
+            c3 = [e for e in app.els() if e['id'] == c['id']][0]
+            assert c3['routing'] == 'elbow' and c3['elbowRadius'] == 24, (c3['routing'], c3['elbowRadius'])
+            app.js('() => window.__flowsketch.pause(0)'); page.wait_for_timeout(150)
+            page.screenshot(path=f'{OUT}/e2e-rounded-elbow.png')
+            page.get_by_test_id('play').click()  # resume playback for the tests that follow
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        trouting()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]
@@ -698,7 +724,7 @@ def main():
         @test('11 · Pointer accuracy at 200% zoom while animation plays')
         def t11():
             app.js('() => window.__flowsketch.setView({x: 50, y: 50, zoom: 2})')
-            page.get_by_label('Play').click() if app.ui()['playing'] is False else None
+            page.get_by_test_id('play').click() if app.ui()['playing'] is False else None
             s = app.els('shape')[1]
             app.key('Escape'); app.key('Escape')
             app.click((s['x'] + 20, s['y'] + 20))
@@ -719,7 +745,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 5
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 6
             assert len(data['elements']) == len(app.els())
         t7()
 

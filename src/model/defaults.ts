@@ -151,7 +151,7 @@ export function makeConnector(start: Endpoint, end: Endpoint, tool: ToolStyle): 
   return {
     ...baseFields(tool), type: 'connector', x: 0, y: 0, w: 0, h: 0,
     style: { ...tool.style, fillStyle: 'none' },
-    start, end, bends: [], routing: tool.routing ?? 'curved', curvature: 0,
+    start, end, bends: [], routing: tool.routing ?? 'straight', curvature: tool.curvature ?? 0, elbowRadius: tool.elbowRadius ?? 0,
     startHead: tool.startHead ?? 'none', endHead: tool.endHead ?? 'arrow',
     labelPos: 0.5, labelOffset: 0,
     textStyle: { ...tool.textStyle, fontSize: Math.max(12, tool.textStyle.fontSize - 4), padding: 4 },
@@ -185,7 +185,7 @@ export function defaultToolStyle(key: string): ToolStyle {
   const s: ToolStyle = { style: { ...DEFAULT_STYLE }, textStyle: { ...DEFAULT_TEXT } };
   if (key === 'arrow') {
     s.style = { ...s.style, fill: 'transparent', fillStyle: 'none', stroke: '#4b5563' };
-    s.routing = 'curved'; s.endHead = 'arrow'; s.startHead = 'none';
+    s.routing = 'straight'; s.endHead = 'arrow'; s.startHead = 'none';
   } else if (key === 'line') {
     s.style = { ...s.style, fill: 'transparent', fillStyle: 'none' };
     s.routing = 'straight'; s.endHead = 'none'; s.startHead = 'none';
