@@ -24,6 +24,21 @@ const FIRST_ROW = 44; // first message below the boxes
 const ROW = 52; // between messages
 const FRAME_MIN_W = 180;
 
+/** The colour of a Mermaid "rect" block (rgb(), rgba() or #hex) as #rrggbb; a translucent colour is mixed with white. */
+export function rectColor(text: string): string | null {
+  const t = text.trim();
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(t);
+  if (hex) {
+    const h = hex[1].length === 3 ? [...hex[1]].map((c) => c + c).join('') : hex[1];
+    return '#' + h.toLowerCase();
+  }
+  const m = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(t);
+  if (!m) return null;
+  const a = m[4] === undefined ? 1 : Math.min(1, Math.max(0, Number(m[4]) || 0));
+  const ch = (v: string) => Math.round(255 - (255 - Math.min(255, Number(v))) * a).toString(16).padStart(2, '0');
+  return '#' + ch(m[1]) + ch(m[2]) + ch(m[3]);
+}
+
 export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at: Point): { doc: FlowDocument; ids: string[]; participants: number; messages: number; messageIds: string[] } {
   // participants, left to right
   const boxes = new Map<string, BoxElement>();
@@ -40,7 +55,7 @@ export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at:
   const on = (id: string, y: number): Endpoint => ({ x: 0, y: 0, elementId: boxes.get(id)!.id, anchor: { x: 0.5, y: y / boxes.get(id)!.h } });
 
   const messages: ConnectorElement[] = [], notes: BoxElement[] = [], frames: ContainerElement[] = [];
-  const stack: { titles: string[]; y0: number; minX: number; maxX: number }[] = [];
+  const stack: { titles: string[]; fill: string | null; y0: number; minX: number; maxX: number }[] = [];
   const widen = (a: number, b: number) => { for (const f of stack) { f.minX = Math.min(f.minX, a); f.maxX = Math.max(f.maxX, b); } };
   let y = H + FIRST_ROW, n = 0;
   // activation bars: an open stack per participant (nested bars stack to the right)
@@ -95,7 +110,10 @@ export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at:
       widen(nx, nx + w);
       y += el.h + 22;
     } else if (s.k === 'open') {
-      stack.push({ titles: [s.text ? `${s.kind} · ${s.text}` : s.kind], y0: y - 22, minX: Infinity, maxX: -Infinity }); // clear of a frame just above
+      // "rect rgb(…)" is Mermaid's coloured background band: tinted, with no title or border
+      const fill = s.kind === 'rect' ? rectColor(s.text) : null;
+      const titles = fill ? [] : [s.text ? `${s.kind} · ${s.text}` : s.kind];
+      stack.push({ titles, fill, y0: y - 22, minX: Infinity, maxX: -Infinity }); // clear of a frame just above
       y += 30;
     } else if (s.k === 'else') {
       stack[stack.length - 1]?.titles.push(s.text ? `${s.kind} · ${s.text}` : s.kind);
@@ -111,7 +129,10 @@ export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at:
       const fr: ContainerElement = {
         ...baseFields(tools.container), type: 'container', x: minX - 34, y: f.y0, w: maxX - minX + 68, h: y - f.y0 - 10,
         text: f.titles.join(' / '), members: [], anim: { mode: 'off' },
-        style: { ...tools.container.style, fill: 'transparent', fillStyle: 'none' }, textStyle: { ...tools.container.textStyle, fontSize: 14 },
+        style: f.fill
+          ? { ...tools.container.style, fill: f.fill, fillStyle: 'solid', stroke: 'transparent', strokeStyle: 'solid' }
+          : { ...tools.container.style, fill: 'transparent', fillStyle: 'none' },
+        textStyle: { ...tools.container.textStyle, fontSize: 14 },
       };
       frames.push(fr);
       widen(fr.x, fr.x + fr.w); // an outer block covers the inner one

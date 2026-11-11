@@ -14,6 +14,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 - Sequence-diagram messages always flow the way their arrow points. Before, if the arrow tool was set to the round-trip highlight, messages lit up out and back again. Messages already in a diagram become one-way when you choose Animation ▸ Play messages in order.
+- Mermaid labels keep text in angle brackets, such as `Bearer <Entra_Token>`; before, it was removed as if it were an HTML tag. Real formatting tags such as `<b>` are still removed.
+- A Mermaid `rect rgb(…)` block in a sequence diagram is now a tinted background band in that colour, as in Mermaid, instead of a frame titled "rect · rgb(…)".
 
 ## [0.1.18] - 2026-11-11
 
