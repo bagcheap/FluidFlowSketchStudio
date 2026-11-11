@@ -57,6 +57,23 @@ function field(el: DiagramElement, m: Motion, loopLen: number | null): DeformFie
   return { amp: m.deform, seed: el.seed, t: m.tt, hz: m.deformHz, wavelength: m.wavelength, loopLen };
 }
 
+export const MIN_LABEL_W = 40;
+
+/**
+ * The size of an arrow's label box. With no labelWidth it fits the text on its lines (no wrapping); with one, the box is
+ * that wide, the text wraps inside it, and the height follows the number of lines.
+ */
+export function connectorLabelSize(c: ConnectorElement): { w: number; h: number } {
+  const ts = c.textStyle, pad = ts.padding;
+  if (c.labelWidth) {
+    const w = Math.max(MIN_LABEL_W, c.labelWidth);
+    const lay = layoutText(c.text, ts, Math.max(8, w - pad * 2) + 1); // the same wrap width labelParts uses
+    return { w, h: lay.height + pad * 2 };
+  }
+  const lay = layoutText(c.text, ts, null);
+  return { w: lay.width + pad * 2 + 4, h: lay.height + pad * 2 };
+}
+
 function labelParts(el: BoxElement | ConnectorElement, box: { x: number; y: number; w: number; h: number }, wrap: boolean): Part[] {
   if (!el.text) return [];
   const ts = el.textStyle;
@@ -391,16 +408,14 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
   if (c.text && !hideLabel) {
     const { pt, tan } = pointAt(path, c.labelPos * len);
     const center = { x: pt.x - tan.y * c.labelOffset, y: pt.y + tan.x * c.labelOffset };
-    const ts = c.textStyle;
-    const lay = layoutText(c.text, ts, null);
-    const w = lay.width + ts.padding * 2 + 4, h = lay.height + ts.padding * 2;
+    const { w, h } = connectorLabelSize(c);
     const box = { x: center.x - w / 2, y: center.y - h / 2, w, h };
     const r = 6;
     const bg: Part = {
       k: 'line', color: background, width: 1, alpha: 0.92, cap: 'round', dash: null, closed: true, fill: background,
       pts: [box.x + r, box.y, box.x + w - r, box.y, box.x + w, box.y + r, box.x + w, box.y + h - r, box.x + w - r, box.y + h, box.x + r, box.y + h, box.x, box.y + h - r, box.x, box.y + r],
     };
-    items.push({ id: c.id + ':label', opacity: st.opacity, tf: null, parts: [bg, ...labelParts(c, box, false)] });
+    items.push({ id: c.id + ':label', opacity: st.opacity, tf: null, parts: [bg, ...labelParts(c, box, !!c.labelWidth)] });
   }
   return items;
 }

@@ -157,6 +157,7 @@ export interface ConnectorElement extends ElementBase {
   endHead: HeadKind;
   labelPos: number; // 0..1 along path
   labelOffset: number; // px perpendicular
+  labelWidth?: number; // px; the label wraps to this width (its height follows the text). Unset = fits the text
   anim?: Partial<ConnectorAnim>;
 }
 
@@ -203,7 +204,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 9; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback)
+export const SCHEMA_VERSION = 10; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth)
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).

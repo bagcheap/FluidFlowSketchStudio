@@ -2,9 +2,8 @@
 import type { BoxElement, ConnectorElement, DiagramElement, Endpoint, FlowDocument, Point } from '../model/types';
 import { STILL } from '../engine/animation';
 import { connectorPath, pointAt, toLocal, toWorld } from '../engine/connectors';
-import { containerHeader, iconLabelLayout, makeLookup } from '../engine/render';
+import { containerHeader, iconLabelLayout, connectorLabelSize, makeLookup } from '../engine/render';
 import { distToPolyline, geometryFor, pointInPolygon } from '../engine/shapes';
-import { layoutText } from '../engine/text';
 
 export function hitBox(el: BoxElement, p: Point, tol: number): boolean {
   const l = toLocal(el, STILL, p);
@@ -34,8 +33,7 @@ export function connectorLabelBox(doc: FlowDocument, c: ConnectorElement) {
   if (!c.text) return null;
   const path = connectorPath(c, makeLookup(doc, null));
   const { pt: a, tan } = pointAt(path, c.labelPos * path.length);
-  const lay = layoutText(c.text, c.textStyle, null);
-  const w = lay.width + c.textStyle.padding * 2 + 4, h = lay.height + c.textStyle.padding * 2;
+  const { w, h } = connectorLabelSize(c);
   const cx = a.x - tan.y * c.labelOffset, cy = a.y + tan.x * c.labelOffset;
   return { x: cx - w / 2, y: cy - h / 2, w, h };
 }

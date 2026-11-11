@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 - **Move arrow labels by dragging them:** press on an arrow's label and drag it out of the way; the arrow itself stays put. The label keeps its place relative to the arrow when you move the connected shapes. Drag it back close to the line and it snaps onto the line again. One drag is one undo step. The Label offset slider in the Inspector now reaches further (±200 px).
+- **Set an arrow label's width:** a selected arrow's label shows a dashed box with a handle on each side. Drag a handle to make the label narrower or wider; the text wraps onto more lines and the box grows downwards to fit. The Inspector has a Label width slider and **Fit label to its text** to go back to a single line.
+
+### Changed
+- Files now use format version 10. Older files open as before, but files saved with this version need this version of FlowSketch or later.
 
 ## [0.1.19] - 2026-11-11
 

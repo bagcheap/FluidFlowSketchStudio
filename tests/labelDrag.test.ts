@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { connectorPath, labelPlacement, pointAt } from '../src/engine/connectors';
-import { makeLookup } from '../src/engine/render';
+import { connectorLabelSize, makeLookup, renderDocumentAtTime } from '../src/engine/render';
+import { parseDocument, serializeDocument } from '../src/model/schema';
 import { connectorLabelBox } from '../src/editor/hitTest';
 import { defaultToolStyle, makeConnector, newDocument } from '../src/model/defaults';
 import type { FlowDocument, Point } from '../src/model/types';
@@ -39,5 +40,34 @@ describe('dragging arrow labels', () => {
     expect(labelPlacement(path, on).labelOffset).toBeCloseTo(0);
     expect(labelPlacement(path, on).labelPos).toBeCloseTo(0.6);
     expect(Math.abs(labelPlacement(path, { x: 5000, y: -5000 }).labelOffset)).toBeLessThanOrEqual(500);
+  });
+
+  it('a label width wraps the text: the width stays, the height follows the text', () => {
+    const { c } = arrow({ x: 0, y: 0 }, { x: 400, y: 0 });
+    const long = { ...c, text: 'POST /chat with the prompt and the session id in the body' };
+    const auto = connectorLabelSize(long);
+    const sized = connectorLabelSize({ ...long, labelWidth: 120 });
+    expect(sized.w).toBe(120);
+    expect(sized.h).toBeGreaterThan(auto.h * 2);
+    expect(connectorLabelSize({ ...long, labelWidth: 5 }).w).toBe(40); // never narrower than the minimum
+    // drawn as several lines, inside the box
+    const doc: FlowDocument = { ...newDocument(), elements: [{ ...long, labelWidth: 120 }] };
+    const text = renderDocumentAtTime(doc, 0).items.find((i) => i.id === c.id + ':label')!.parts.find((p) => p.k === 'text') as { lines: unknown[] };
+    expect(text.lines.length).toBeGreaterThan(2);
+    expect(connectorLabelBox(doc, doc.elements[0] as typeof c)!.w).toBe(120);
+  });
+
+  it('label width is saved, checked on load, and absent in older files', () => {
+    const { c } = arrow({ x: 0, y: 0 }, { x: 400, y: 0 });
+    const doc: FlowDocument = { ...newDocument(), elements: [{ ...c, labelWidth: 150 }] };
+    const again = parseDocument(serializeDocument(doc)).doc.elements[0] as typeof c;
+    expect(again.labelWidth).toBe(150);
+    const raw = JSON.parse(serializeDocument(doc));
+    raw.pages[0].elements[0].labelWidth = 1e9;
+    expect((parseDocument(JSON.stringify(raw)).doc.elements[0] as typeof c).labelWidth).toBe(2000);
+    raw.pages[0].elements[0].labelWidth = 'wide';
+    expect((parseDocument(JSON.stringify(raw)).doc.elements[0] as typeof c).labelWidth).toBeUndefined();
+    raw.schemaVersion = 9; delete raw.pages[0].elements[0].labelWidth;
+    expect((parseDocument(JSON.stringify(raw)).doc.elements[0] as typeof c).labelWidth).toBeUndefined();
   });
 });

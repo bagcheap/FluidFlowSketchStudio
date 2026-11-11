@@ -7,7 +7,7 @@ import { colorLabel } from '../ui/colorNames';
 import { cycleFill, makeConnector, makeShape, makeText, newSeed, seqStyleKey, SHAPE_DEFAULT_SIZE, styleKey, uid } from '../model/defaults';
 import { deleteElements, getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
-import { renderDocumentAtTime, makeLookup, boxCorners } from '../engine/render';
+import { renderDocumentAtTime, makeLookup, boxCorners, MIN_LABEL_W } from '../engine/render';
 import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
 import { connectorPath, labelPlacement } from '../engine/connectors';
@@ -39,6 +39,7 @@ type Interaction =
   | { k: 'endpoint'; id: string; which: 'start' | 'end' }
   | { k: 'bend'; id: string; index: number }
   | { k: 'label'; id: string; start: Point; center: Point; orig: FlowDocument; moved: boolean } // dragging an arrow's label
+  | { k: 'labelWidth'; id: string; cx: number; side: number } // a label's side handle: its width (symmetric about its centre)
   | { k: 'freehand'; id: string; pts: Point[] }
   | { k: 'erase'; ids: Set<string> }
   | { k: 'quick'; src: string; side: Side; start: Point; connId: string | null } // dragging from a quick-connect handle
@@ -175,7 +176,16 @@ export function Canvas() {
   })();
   const quickHandles = (el: BoxElement) => SIDES.map((side) => ({ side, p: toWorld(el, STILL, handleLocal(el, side, QC_OFF / view.zoom)) }));
 
-  function handleAt(p: Point): { kind: 'resize' | 'rotate' | 'endpoint' | 'bend' | 'addBend' | 'multi' | 'quick'; handle?: Handle; which?: 'start' | 'end'; index?: number; side?: Side; id?: string } | null {
+  /** A selected arrow's label box and its two side handles (width), or null when it has no label or is being edited. */
+  function labelHandles(c: ConnectorElement): { box: { x: number; y: number; w: number; h: number }; handles: [number, Point][] } | null {
+    if (!c.text || editingId === c.id) return null;
+    const box = connectorLabelBox(doc, c);
+    if (!box) return null;
+    const cy = box.y + box.h / 2;
+    return { box, handles: [[-1, { x: box.x, y: cy }], [1, { x: box.x + box.w, y: cy }]] };
+  }
+
+  function handleAt(p: Point): { kind: 'resize' | 'rotate' | 'endpoint' | 'bend' | 'addBend' | 'multi' | 'quick' | 'labelWidth'; handle?: Handle; which?: 'start' | 'end'; index?: number; side?: Side; id?: string } | null {
     const r = 9 / view.zoom;
     const near = (q: Point) => Math.hypot(q.x - p.x, q.y - p.y) < r;
     if (singleBox && !singleBox.locked) {
@@ -188,8 +198,16 @@ export function Canvas() {
     for (const el of quickEls) for (const q of quickHandles(el)) if (near(q.p)) return { kind: 'quick', side: q.side, id: el.id };
     if (singleConn && !singleConn.locked) {
       const path = connectorPath(singleConn, makeLookup(doc, null));
-      if (near(path.pts[path.pts.length - 1])) return { kind: 'endpoint', which: 'end' };
-      if (near(path.pts[0])) return { kind: 'endpoint', which: 'start' };
+      // ends and the label's side handles (index -1 = left, 1 = right) can overlap on a short arrow: take the nearest
+      const lb = labelHandles(singleConn);
+      const cands: [Point, NonNullable<ReturnType<typeof handleAt>>][] = [
+        [path.pts[path.pts.length - 1], { kind: 'endpoint', which: 'end' }],
+        [path.pts[0], { kind: 'endpoint', which: 'start' }],
+        ...(lb ? lb.handles.map(([side, q]) => [q, { kind: 'labelWidth', index: side }] as [Point, NonNullable<ReturnType<typeof handleAt>>]) : []),
+      ];
+      let best: NonNullable<ReturnType<typeof handleAt>> | null = null, bd = r;
+      for (const [q, h] of cands) { const dd = Math.hypot(q.x - p.x, q.y - p.y); if (dd < bd) { bd = dd; best = h; } }
+      if (best) return best;
       for (let i = 0; i < singleConn.bends.length; i++) if (near(singleConn.bends[i])) return { kind: 'bend', index: i };
       const ctrl = [path.pts[0], ...singleConn.bends, path.pts[path.pts.length - 1]];
       for (let i = 0; i < ctrl.length - 1; i++) {
@@ -251,6 +269,10 @@ export function Canvas() {
           else if (h.kind === 'multi' && multiBox) inter.current = { k: 'resizeMulti', ids: selection, handle: h.handle!, box: multiBox, orig: d };
           else if (h.kind === 'endpoint' && singleConn) inter.current = { k: 'endpoint', id: singleConn.id, which: h.which! };
           else if (h.kind === 'bend' && singleConn) inter.current = { k: 'bend', id: singleConn.id, index: h.index! };
+          else if (h.kind === 'labelWidth' && singleConn) {
+            const lb = connectorLabelBox(d, singleConn)!;
+            inter.current = { k: 'labelWidth', id: singleConn.id, cx: lb.x + lb.w / 2, side: h.index! };
+          }
           else if (h.kind === 'addBend' && singleConn) {
             D.live((dd) => mapElements(dd, [singleConn.id], (c) => { const cc = c as ConnectorElement; const b = [...cc.bends]; b.splice(h.index!, 0, p); return { ...cc, bends: b }; }));
             inter.current = { k: 'bend', id: singleConn.id, index: h.index! };
@@ -606,6 +628,11 @@ export function Canvas() {
         D.live((d) => mapElements(d, [it.id], (el) => { const c = el as ConnectorElement; const b = [...c.bends]; b[it.index] = snapPt(p); return { ...c, bends: b }; }));
         return;
       }
+      case 'labelWidth': {
+        const w = Math.round(Math.max(MIN_LABEL_W, 2 * (p.x - it.cx) * it.side));
+        D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), labelWidth: w })));
+        return;
+      }
       case 'label': {
         const dx = p.x - it.start.x, dy = p.y - it.start.y;
         if (!it.moved && Math.hypot(dx, dy) * u.view.zoom < 3) return;
@@ -874,6 +901,7 @@ export function Canvas() {
       const h = handleAt(p);
       if (h?.kind === 'rotate') c = 'grab';
       else if (h?.kind === 'quick') c = 'pointer';
+      else if (h?.kind === 'labelWidth') c = 'ew-resize';
       else if (h?.kind === 'resize' || h?.kind === 'multi') c = ({ n: 'ns', s: 'ns', e: 'ew', w: 'ew', nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw' } as const)[h.handle!] + '-resize';
       else if (h) c = 'crosshair';
       else if (hitTest(useDoc.getState().doc, p, u.view.zoom)) c = 'move';
@@ -982,6 +1010,11 @@ export function Canvas() {
       for (let i = 0; i < ctrl.length - 1; i++) {
         const m = { x: (ctrl[i].x + ctrl[i + 1].x) / 2, y: (ctrl[i].y + ctrl[i + 1].y) / 2 };
         overlayEls.push(<circle key={'mid' + i} cx={m.x} cy={m.y} r={hs * 0.45} fill={accent} fillOpacity={0.35} stroke="none" />);
+      }
+      const lh = labelHandles(singleConn);
+      if (lh) {
+        overlayEls.push(<rect key="lbox" x={lh.box.x} y={lh.box.y} width={lh.box.w} height={lh.box.h} rx={4 / z} fill="none" stroke={accent} strokeDasharray={`${3 / z} ${3 / z}`} strokeWidth={1 / z} />);
+        for (const [side, q] of lh.handles) overlayEls.push(<rect key={'lw' + side} x={q.x - hs * 0.3} y={q.y - hs * 0.6} width={hs * 0.6} height={hs * 1.2} rx={2 / z} fill="var(--panel)" stroke={accent} strokeWidth={1.5 / z} />);
       }
       singleConn.bends.forEach((b, i) => overlayEls.push(<circle key={'b' + i} cx={b.x} cy={b.y} r={hs * 0.55} fill="var(--panel)" stroke={accent} strokeWidth={1.5 / z} />));
       ends.forEach((p, i) => {

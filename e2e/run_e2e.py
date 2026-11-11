@@ -494,6 +494,24 @@ def main():
             app.key('Control+z'); app.key('Control+z')
             s = [e for e in app.els('connector') if e['id'] == c['id']][0]
             assert s['labelOffset'] == 0 and s['labelPos'] == 0.5, 'undo did not restore the label'
+            # the label's side handles set its width; the text wraps and the box grows downwards
+            app.click((5290, 7240)); page.keyboard.type('one two three four five six seven'); app.key('Escape')
+            app.click((5290, 7240))
+            def lbox():
+                pts = app.js('(id) => window.__flowsketch.frame(0).items.find((i) => i.id === id + ":label").parts[0].pts', c['id'])
+                xs, ys = pts[0::2], pts[1::2]
+                return min(xs), min(ys), max(xs), max(ys)
+            x0, y0, x1, y1 = lbox()
+            app.drag((x1, (y0 + y1) / 2), ((x0 + x1) / 2 + 45, (y0 + y1) / 2))
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert s.get('labelWidth') and abs(s['labelWidth'] - 90) <= 2, s.get('labelWidth')
+            nx0, ny0, nx1, ny1 = lbox()
+            assert abs((nx1 - nx0) - s['labelWidth']) < 1 and (ny1 - ny0) > (y1 - y0) * 2, ((x0, y0, x1, y1), (nx0, ny0, nx1, ny1))
+            assert s['start'] == c['start'] and s['end'] == c['end'], 'the arrow moved'
+            page.screenshot(path=f'{OUT}/label-width.png')
+            page.get_by_role('button', name='Fit label to its text').click(); page.wait_for_timeout(60)
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert 'labelWidth' not in s or s['labelWidth'] is None, s.get('labelWidth')
             app.key('Escape')
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
             app.js('(v) => window.__flowsketch.setView(v)', v)
@@ -906,7 +924,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 9
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 10
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()
