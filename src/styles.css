@@ -51,7 +51,7 @@ code { font-size: 12px; }
 .small { font-size: 12px; }
 
 /* ---------- layout ---------- */
-.app { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); height: 100%; width: 100%; overflow: hidden; }
+.app { display: grid; grid-template-rows: auto 1fr auto auto; grid-template-columns: minmax(0, 1fr); height: 100%; width: 100%; overflow: hidden; }
 .workspace { position: relative; overflow: hidden; }
 .app.presenting { grid-template-rows: 1fr; }
 
@@ -363,3 +363,13 @@ code { font-size: 12px; }
 .mermaid-text { width: 100%; min-height: 200px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.5; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); margin: 10px 0; }
 .mermaid-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .note code { font-size: 11.5px; background: var(--panel-2); padding: 0 3px; border-radius: 3px; }
+
+/* Page tabs (above the timeline) */
+.page-tabs { display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px; background: var(--panel-2); border-top: 1px solid var(--line); z-index: 20; min-width: 0; }
+.page-tablist { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; height: 100%; align-items: flex-end; }
+.page-tablist::-webkit-scrollbar { display: none; }
+.page-tab { flex: none; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: 26px; padding: 0 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; background: none; color: var(--fg-2); font-size: 12.5px; }
+.page-tab:hover { background: var(--panel); color: var(--fg); }
+.page-tab.on { background: var(--panel); color: var(--fg); border-color: var(--line); font-weight: 600; box-shadow: 0 1px 0 var(--panel); }
+.page-tab.renaming { width: 140px; font: inherit; font-size: 12.5px; border-color: var(--accent); background: var(--panel); outline: none; }
+.page-add { flex: none; }

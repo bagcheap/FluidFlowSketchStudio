@@ -7,7 +7,7 @@ import { useUI } from './uiStore';
 import { contentBounds } from '../engine/render';
 import { fileToAsset } from '../engine/images';
 import { openDocumentFile, pickFile, resetFileHandle, saveDocumentFile } from '../persistence/files';
-import { DocumentError, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
+import { DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
 import { geometryFor, SHAPE_LABELS } from '../engine/shapes';
 import { loadIconSet } from '../icons/sets';
@@ -15,8 +15,11 @@ import { fitToContents, isContainer, moveElements, removeContainer, updateMember
 import { importFiles, slugName, useLibraries } from '../icons/libraries';
 import { addConnectedCopy, canQuickConnect, type Side } from './quickConnect';
 import { cycleKeyHeld } from '../ui/modifiers';
+import * as pages from './pages';
 import { looksLikeMermaid, parseMermaid } from '../import/mermaid';
 import { buildMermaid } from '../import/mermaidBuild';
+import { isSequence, parseSequence } from '../import/mermaidSequence';
+import { buildSequence } from '../import/sequenceBuild';
 import { autoLayout as layoutDoc } from '../layout/autoLayout';
 import type { LayoutDir } from '../layout/layered';
 import { colorLabel } from '../ui/colorNames';
@@ -348,6 +351,7 @@ export function matchSize(mode: MatchSizeMode) {
  * centred in the view, as one undo step. Returns false if nothing could be read.
  */
 export function importMermaid(text: string, dir?: LayoutDir): boolean {
+  if (isSequence(text)) return importSequence(text);
   const g = parseMermaid(text.slice(0, 200_000));
   if (!g.nodes.length) { U().toast('No flowchart found in that text', 'error'); return false; }
   const u = U();
@@ -362,6 +366,25 @@ export function importMermaid(text: string, dir?: LayoutDir): boolean {
   const b = selectionBounds(D().doc, r.ids);
   if (b && (b.w * u.view.zoom > stage.w - 380 || b.h * u.view.zoom > stage.h - 160)) fitRect(b, 60, u.view.zoom);
   const what = `Added ${r.shapes} shape${r.shapes === 1 ? '' : 's'} and ${r.arrows} arrow${r.arrows === 1 ? '' : 's'}`;
+  u.toast(g.warnings.length ? `${what}. Skipped: ${g.warnings.slice(0, 2).join('; ')}${g.warnings.length > 2 ? ' …' : ''}` : what);
+  return true;
+}
+
+/** A Mermaid sequence diagram: participants with lifelines, messages, notes and block frames. One undo step. */
+function importSequence(text: string): boolean {
+  const g = parseSequence(text.slice(0, 200_000));
+  if (!g.participants.length) { U().toast('No participants found in that sequence diagram', 'error'); return false; }
+  const u = U();
+  const r = buildSequence(D().doc, g, {
+    shape: (k) => u.toolStyle(styleKey('shape', k)), arrow: u.toolStyle('arrow'), line: u.toolStyle('line'),
+    container: u.toolStyle('container'), fit: fitShapeToText,
+  }, screenToWorld(stage.w / 2, stage.h / 2));
+  D().commit(() => r.doc);
+  u.setTool('select');
+  u.select(r.ids);
+  const b = selectionBounds(D().doc, r.ids);
+  if (b && (b.w * u.view.zoom > stage.w - 380 || b.h * u.view.zoom > stage.h - 160)) fitRect(b, 60, u.view.zoom);
+  const what = `Added ${r.participants} participant${r.participants === 1 ? '' : 's'} and ${r.messages} message${r.messages === 1 ? '' : 's'}`;
   u.toast(g.warnings.length ? `${what}. Skipped: ${g.warnings.slice(0, 2).join('; ')}${g.warnings.length > 2 ? ' …' : ''}` : what);
   return true;
 }
@@ -712,3 +735,48 @@ export function duplicateDocument() {
   D().load(copy, { dirty: true });
   U().toast('Duplicated into a new document');
 }
+
+// ---- pages (tabs) ----------------------------------------------------------------------------------------------
+
+/** Each page remembers where you were looking (this session only). */
+const pageViews = new Map<string, { x: number; y: number; zoom: number }>();
+
+/** Run a page change: remember this page's view, apply `change` (undoable or not), restore or fit the new page's view. */
+function changePage(change: (d: FlowDocument) => FlowDocument, undoable: boolean) {
+  const u = U();
+  const before = D().doc;
+  pageViews.set(before.activePage, { ...u.view });
+  if (undoable) D().commit(change); else D().replace(change);
+  const after = D().doc;
+  if (after.activePage === before.activePage) return;
+  u.setEditing(null);
+  u.select([]);
+  const v = pageViews.get(after.activePage);
+  if (v) u.setView(v);
+  else if (after.elements.length) zoomToFit();
+  else u.setView({ x: -stage.w / 2 + 300, y: -stage.h / 2 + 200, zoom: 1 });
+}
+
+export const goToPage = (id: string) => changePage((d) => pages.switchPage(d, id), false);
+export const nextPage = (by: 1 | -1) => {
+  const d = D().doc, i = d.pages.findIndex((p) => p.id === d.activePage);
+  const p = d.pages[(i + by + d.pages.length) % d.pages.length];
+  if (p) goToPage(p.id);
+};
+export function newPage() {
+  if (D().doc.pages.length >= MAX_PAGES) { U().toast(`A document can have up to ${MAX_PAGES} pages`); return; }
+  changePage((d) => pages.addPage(d), true);
+}
+export function duplicatePage(id = D().doc.activePage) {
+  if (D().doc.pages.length >= MAX_PAGES) { U().toast(`A document can have up to ${MAX_PAGES} pages`); return; }
+  changePage((d) => pages.duplicatePage(d, id, (els) => cloneElements(d, els, 0, 0)), true);
+}
+export async function deletePage(id = D().doc.activePage) {
+  const d = D().doc;
+  const p = pages.allPages(d).find((x) => x.id === id);
+  if (!p || d.pages.length <= 1) return;
+  if (p.elements.length && !(await U().ask(`Delete the page "${p.name}" and everything on it?`, 'Delete page'))) return;
+  changePage((doc) => pages.deletePage(doc, id), true);
+}
+export const renamePage = (id: string, name: string) => D().commit((d) => pages.renamePage(d, id, name));
+export const movePage = (id: string, by: -1 | 1) => D().commit((d) => pages.movePage(d, id, by));

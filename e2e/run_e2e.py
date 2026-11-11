@@ -662,6 +662,47 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         trouting()
 
+        @test('Pages: add, rename, switch (each page keeps its own shapes), delete; sequence diagram pasted on a page')
+        def tpages():
+            app.key('Escape')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            n0 = len(app.els())
+            first = app.doc()['activePage']
+            page.get_by_role('button', name='Add page').click(); page.wait_for_timeout(100)
+            d = app.doc()
+            assert len(d['pages']) == 2 and d['activePage'] != first and app.els() == [], d['pages']
+            tab = page.get_by_role('tab', name='Page 2')
+            tab.dblclick(); page.get_by_label('Page name').fill('Flows'); page.keyboard.press('Enter'); page.wait_for_timeout(80)
+            assert [p['name'] for p in app.doc()['pages']][1] == 'Flows'
+            # a sequence diagram from text, on this page
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('sequenceDiagram\n  participant A as Client\n  participant B as API\n  A->>B: GET /orders\n  B-->>A: 200 OK')
+            assert 'will add 2 participants and 2 messages' in page.locator('.modal .note.ok').inner_text()
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            kinds = sorted(e['type'] for e in app.els())
+            assert kinds == ['connector'] * 4 + ['shape'] * 2, kinds  # 2 lifelines + 2 messages
+            # an arrow drawn from lifeline to lifeline attaches to both participants
+            a, b = [e for e in app.els() if e['type'] == 'shape']
+            y = a['y'] + a['h'] + 160
+            app.tool('a'); app.drag((a['x'] + a['w'] / 2, y), (b['x'] + b['w'] / 2, y)); app.key('Escape')
+            c = app.els('connector')[-1]
+            assert c['start']['elementId'] == a['id'] and c['end']['elementId'] == b['id'], (c['start'], c['end'])
+            # switch back: page 1 is as it was; switch again: the sequence diagram is still there
+            page.get_by_role('tab', name='Page 1').click(); page.wait_for_timeout(80)
+            assert len(app.els()) == n0 and app.doc()['activePage'] == first
+            page.get_by_role('tab', name='Flows').click(); page.wait_for_timeout(80)
+            assert len(app.els()) == 7
+            page.screenshot(path=f'{OUT}/e2e-pages-sequence.png')
+            # delete the page (it asks first, since it has shapes)
+            page.get_by_role('tab', name='Flows').click(button='right'); page.wait_for_selector('.ctx-menu')
+            page.locator('.ctx-menu [role=menuitem]', has_text='Delete page').click()
+            page.get_by_test_id('confirm-ok').click(); page.wait_for_timeout(100)
+            assert len(app.doc()['pages']) == 1 and app.doc()['activePage'] == first and len(app.els()) == n0
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            assert len(app.doc()['pages']) == 1
+        tpages()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]
@@ -745,8 +786,9 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 6
-            assert len(data['elements']) == len(app.els())
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 7
+            page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
+            assert len(page_els) == len(app.els())
         t7()
 
         before = app.doc()

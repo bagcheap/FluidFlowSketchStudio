@@ -72,9 +72,10 @@ describe('containers', () => {
     const { doc, c, a, b } = setup();
     expect(parseDocument(serializeDocument(doc)).doc.elements.find((e) => e.id === c.id)).toEqual(c);
     const raw = JSON.parse(serializeDocument(doc));
-    const other = { ...raw.elements.find((e: { id: string }) => e.id === c.id), id: 'other', members: [a.id, c.id, 'missing'] };
-    raw.elements.push(other);
-    raw.elements.find((e: { id: string }) => e.id === c.id).members.push('other', c.id);
+    const els = raw.pages[0].elements; // saved files keep elements inside their pages
+    const other = { ...els.find((e: { id: string }) => e.id === c.id), id: 'other', members: [a.id, c.id, 'missing'] };
+    els.push(other);
+    els.find((e: { id: string }) => e.id === c.id).members.push('other', c.id);
     const fixed = parseDocument(raw).doc;
     expect((fixed.elements.find((e) => e.id === c.id) as ContainerElement).members).toEqual([a.id, b.id, 'other']);
     expect((fixed.elements.find((e) => e.id === 'other') as ContainerElement).members).toEqual([]); // a: already taken; c: a loop; missing: gone

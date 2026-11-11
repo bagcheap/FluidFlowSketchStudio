@@ -7,6 +7,7 @@ import { Inspector } from './ui/Inspector';
 import { IconsPanel } from './ui/IconsPanel';
 import { ContextMenu } from './ui/ContextMenu';
 import { Timeline } from './ui/Timeline';
+import { PageTabs } from './ui/PageTabs';
 import { useShortcuts } from './ui/shortcuts';
 import { useDoc } from './store/docStore';
 import { useUI } from './store/uiStore';
@@ -198,6 +199,7 @@ export function App() {
             </button>
           )}
         </main>
+        {!presentation && <PageTabs />}
         {!presentation && showTimeline && <Timeline />}
         <Toasts />
         <Dialogs />

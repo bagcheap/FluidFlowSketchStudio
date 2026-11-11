@@ -117,7 +117,7 @@ interface UIState {
   reducedMotionOS: boolean;
   confirmReq: { message: string; ok: string; resolve: (v: boolean) => void } | null;
   welcomeDismissed: boolean;
-  contextMenu: { x: number; y: number } | null; // right-click menu position (screen px)
+  contextMenu: { x: number; y: number; pageId?: string } | null; // right-click menu position (screen px); pageId: a page tab's menu
 }
 
 interface UIActions {
@@ -139,7 +139,7 @@ interface UIActions {
   dismissToast(id: number): void;
   setHint(h: string | null): void;
   setMenuOpen(m: string | null): void;
-  setContextMenu(at: { x: number; y: number } | null): void;
+  setContextMenu(at: { x: number; y: number; pageId?: string } | null): void;
   /** In-app confirmation (native confirm() is unavailable in sandboxed hosts). */
   ask(message: string, ok?: string): Promise<boolean>;
 }

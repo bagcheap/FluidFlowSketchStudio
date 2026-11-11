@@ -4,6 +4,15 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.16] - 2026-11-11
+
+### Added
+- **Pages:** one file can now hold several diagrams, as tabs along the bottom. Click + (or Insert ▸ New page) to add a page, click a tab to switch, double-click to rename, and right-click a tab to duplicate, move or delete it. Each page keeps its own shapes and remembers where you were looking; icons, pictures and animation settings are shared. Exports (GIF, video, PNG, SVG, HTML player) export the current page.
+- **Sequence diagrams:** paste or type a Mermaid `sequenceDiagram` (Insert ▸ Diagram from text, or straight onto the canvas). Participants and actors become boxes with dashed lifelines, messages become animated arrows (solid, dashed replies, async and "lost" messages, messages to itself), with `autonumber` numbering, notes as sticky notes, and loop / alt / else / opt / par / critical / break blocks as titled frames. Moving a participant moves its lifeline and messages with it, an arrow dropped on a lifeline attaches there at that height, and dragging the bottom of a lifeline makes it longer or shorter.
+
+### Changed
+- Files now use format version 7. Older files open as before (as a single page), but files saved with this version need FlowSketch 0.1.16 or later.
+
 ## [0.1.15] - 2026-11-11
 
 ### Added

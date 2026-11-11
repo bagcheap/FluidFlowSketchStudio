@@ -104,6 +104,7 @@ export const SHAPE_DEFAULT_SIZE: Partial<Record<ShapeKind, [number, number]>> = 
 
 export function newDocument(title = 'Untitled diagram'): FlowDocument {
   const now = new Date().toISOString();
+  const page = uid('page');
   return {
     format: 'flowsketch',
     schemaVersion: SCHEMA_VERSION,
@@ -114,6 +115,8 @@ export function newDocument(title = 'Untitled diagram'): FlowDocument {
     canvas: { background: '#fbfaf7', grid: 'dots', gridSize: 20 },
     animation: structuredClone(DEFAULT_ANIMATION),
     elements: [],
+    pages: [{ id: page, name: 'Page 1', elements: [] }],
+    activePage: page,
     assets: {},
     icons: {},
     exportPrefs: { gifWidth: 1280, gifFps: 15, padding: 40 },
