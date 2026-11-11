@@ -10,10 +10,10 @@ import { useUI } from '../store/uiStore';
 import { renderDocumentAtTime, makeLookup, boxCorners } from '../engine/render';
 import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
-import { connectorPath } from '../engine/connectors';
+import { connectorPath, labelPlacement } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
-import { boxAt, hitTest, isLifeline, lifelineAt, portAnchors, portPositions } from './hitTest';
+import { boxAt, connectorLabelBox, hitTest, isLifeline, lifelineAt, portAnchors, portPositions } from './hitTest';
 import { addConnectedCopy, canQuickConnect, handleLocal, QUICK_SHAPES, SIDES, type Side } from '../store/quickConnect';
 import { activeLevel, addBar, addFrameBehind, addParticipant, addSelfMessage, asMessage, columnAt, extendLifelines, makeBar, makeFrame, messageEnd, MIN_BAR, nextBarLevel, onLifeline } from '../store/sequence';
 import { ShapeIcon } from '../ui/ShapeIcon';
@@ -38,9 +38,9 @@ type Interaction =
   | { k: 'marquee'; start: Point; cur: Point; additive: string[] }
   | { k: 'endpoint'; id: string; which: 'start' | 'end' }
   | { k: 'bend'; id: string; index: number }
+  | { k: 'label'; id: string; start: Point; center: Point; orig: FlowDocument; moved: boolean } // dragging an arrow's label
   | { k: 'freehand'; id: string; pts: Point[] }
   | { k: 'erase'; ids: Set<string> }
-  | { k: 'label'; id: string }
   | { k: 'quick'; src: string; side: Side; start: Point; connId: string | null } // dragging from a quick-connect handle
   | { k: 'seqmsg'; id: string; from: string; y: number; start: Point; moved: boolean } // Sequence ▸ Message / Reply: lifeline to lifeline, level
   | { k: 'seqframe'; id: string; start: Point; moved: boolean } // Sequence ▸ Frame: drag out a loop/alt frame
@@ -258,6 +258,16 @@ export function Canvas() {
           return;
         }
         const hit = hitTest(d, p, u.view.zoom);
+        // pressing on an arrow's label drags just the label (Visio-style); the arrow stays where it is
+        if (hit?.type === 'connector' && !hit.locked && !e.shiftKey && !(u.selection.length > 1 && u.selection.includes(hit.id)) && expandGroups(d, [hit.id]).length === 1) {
+          const lb = connectorLabelBox(d, hit);
+          if (lb && p.x >= lb.x && p.x <= lb.x + lb.w && p.y >= lb.y && p.y <= lb.y + lb.h) {
+            u.select([hit.id]);
+            D.begin();
+            inter.current = { k: 'label', id: hit.id, start: p, center: { x: lb.x + lb.w / 2, y: lb.y + lb.h / 2 }, orig: d, moved: false };
+            return;
+          }
+        }
         if (hit) {
           let ids = expandGroups(d, [hit.id]);
           if (e.shiftKey) {
@@ -596,6 +606,16 @@ export function Canvas() {
         D.live((d) => mapElements(d, [it.id], (el) => { const c = el as ConnectorElement; const b = [...c.bends]; b[it.index] = snapPt(p); return { ...c, bends: b }; }));
         return;
       }
+      case 'label': {
+        const dx = p.x - it.start.x, dy = p.y - it.start.y;
+        if (!it.moved && Math.hypot(dx, dy) * u.view.zoom < 3) return;
+        it.moved = true;
+        const c = getElement(it.orig, it.id) as ConnectorElement;
+        const place = labelPlacement(connectorPath(c, makeLookup(it.orig, null)), { x: it.center.x + dx, y: it.center.y + dy });
+        if (Math.abs(place.labelOffset) * u.view.zoom < 6) place.labelOffset = 0; // snaps back onto the line
+        D.live(() => mapElements(it.orig, [it.id], (el) => ({ ...(el as ConnectorElement), ...place })));
+        return;
+      }
       case 'move': {
         let dx = p.x - it.start.x, dy = p.y - it.start.y;
         if (!it.moved && Math.hypot(dx, dy) * u.view.zoom < 3) return;
@@ -782,6 +802,9 @@ export function Canvas() {
         // dropped shapes join the container they land in, or leave the one they were dragged out of
         D.live((d) => updateMembership(d, it.top));
         D.end();
+        return;
+      case 'label':
+        if (it.moved) D.end(); else D.cancel();
         return;
       case 'marquee': return;
       case 'pan': return;

@@ -204,7 +204,7 @@ export function Inspector() {
               {routing === 'elbow' && <Slider label="Corner radius" value={elbowRadius} min={0} max={80} unit="px" onChange={(v) => setConn({ elbowRadius: v })} hint="0 = sharp right-angle corners; larger values round the elbows" />}
               {conn && conn.bends.length > 0 && <button className="btn small" onClick={() => setConn({ bends: [] })}>Remove {conn.bends.length} bend point{conn.bends.length > 1 ? 's' : ''}</button>}
               {conn && <Slider label="Label position" value={conn.labelPos} min={0} max={1} step={0.01} onChange={(v) => setConn({ labelPos: v })} />}
-              {conn && <Slider label="Label offset" value={conn.labelOffset} min={-80} max={80} unit="px" onChange={(v) => setConn({ labelOffset: v })} />}
+              {conn && <Slider label="Label offset" value={conn.labelOffset} min={-200} max={200} unit="px" onChange={(v) => setConn({ labelOffset: v })} />}
               <p className="insp-tip">Drag an end onto a shape to attach (snaps to side ports). Drag the faint mid-dots to add bends; Alt-drag an end to detach.</p>
             </Section>
           )}

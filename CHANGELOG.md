@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Move arrow labels by dragging them:** press on an arrow's label and drag it out of the way; the arrow itself stays put. The label keeps its place relative to the arrow when you move the connected shapes. Drag it back close to the line and it snaps onto the line again. One drag is one undo step. The Label offset slider in the Inspector now reaches further (±200 px).
+
 ## [0.1.19] - 2026-11-11
 
 ### Added
