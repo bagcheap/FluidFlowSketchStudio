@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.14] - 2026-11-11
 
 ### Changed
 - **Safer input handling:** pasted or typed flowchart text is limited in size (500 shapes, 2,000 arrows, 20 levels of subgraphs, lines up to 2,000 characters), and hidden or direction-changing characters that can disguise text are removed from labels. Icon ZIPs that would unpack to more than 400 MB or 20,000 files are refused (protects against "zip bombs"). Saved preferences are checked when FlowSketch starts, so damaged settings fall back to defaults instead of causing problems.
