@@ -15,6 +15,10 @@ import { fitToContents, isContainer, moveElements, removeContainer, updateMember
 import { importFiles, slugName, useLibraries } from '../icons/libraries';
 import { addConnectedCopy, canQuickConnect, type Side } from './quickConnect';
 import { cycleKeyHeld } from '../ui/modifiers';
+import { looksLikeMermaid, parseMermaid } from '../import/mermaid';
+import { buildMermaid } from '../import/mermaidBuild';
+import { autoLayout as layoutDoc } from '../layout/autoLayout';
+import type { LayoutDir } from '../layout/layered';
 import { colorLabel } from '../ui/colorNames';
 import { svgToIcon } from '../icons/svgToIcon';
 
@@ -143,6 +147,7 @@ export async function paste(text?: string) {
 }
 
 function pastePlainText(t: string) {
+  if (looksLikeMermaid(t) && importMermaid(t)) return; // flowchart text becomes a diagram
   const c = screenToWorld(stage.w / 2, stage.h / 2);
   const ts = U().toolStyle('text');
   const lay = layoutText(t.slice(0, 2000), ts.textStyle, null);
@@ -336,6 +341,39 @@ export function matchSize(mode: MatchSizeMode) {
   const rest = sel.slice(1).filter(canMatchSize);
   if (!ref || !rest.length) { U().toast('Select the shape to match first, then the shapes to resize'); return; }
   D().commit((d) => matchSizes(d, ref.id, rest.map((e) => e.id), mode, U().prefs.matchSizeKeepsProportions));
+}
+
+/**
+ * Text to diagram: read a Mermaid flowchart and add it, laid out (in `dir`, else the text's own direction) and
+ * centred in the view, as one undo step. Returns false if nothing could be read.
+ */
+export function importMermaid(text: string, dir?: LayoutDir): boolean {
+  const g = parseMermaid(text.slice(0, 200_000));
+  if (!g.nodes.length) { U().toast('No flowchart found in that text', 'error'); return false; }
+  const u = U();
+  const r = buildMermaid(D().doc, g, {
+    shape: (k) => u.toolStyle(styleKey('shape', k)), arrow: u.toolStyle('arrow'), line: u.toolStyle('line'),
+    container: u.toolStyle('container'), fit: fitShapeToText,
+  }, dir ?? g.dir, screenToWorld(stage.w / 2, stage.h / 2));
+  D().commit(() => r.doc);
+  u.setTool('select');
+  u.select(r.ids);
+  // a diagram bigger than the view: zoom out (never in) so all of it shows
+  const b = selectionBounds(D().doc, r.ids);
+  if (b && (b.w * u.view.zoom > stage.w - 380 || b.h * u.view.zoom > stage.h - 160)) fitRect(b, 60, u.view.zoom);
+  const what = `Added ${r.shapes} shape${r.shapes === 1 ? '' : 's'} and ${r.arrows} arrow${r.arrows === 1 ? '' : 's'}`;
+  u.toast(g.warnings.length ? `${what}. Skipped: ${g.warnings.slice(0, 2).join('; ')}${g.warnings.length > 2 ? ' …' : ''}` : what);
+  return true;
+}
+
+/** Auto-layout the selection (2+ items), or the whole diagram, in one direction. One undo step. */
+export function autoLayout(dir: LayoutDir) {
+  const doc = D().doc;
+  const sel = U().selection.filter((id) => getElement(doc, id)?.type !== 'connector');
+  const ids = sel.length >= 2 ? withMembers(doc, sel) : undefined;
+  const next = layoutDoc(doc, dir, ids);
+  if (next === doc) { U().toast('Nothing to lay out: add some shapes first'); return; }
+  D().commit(() => next);
 }
 
 /** Move boxes by their own offsets; a container brings its contents. Then re-check container membership. */

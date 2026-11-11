@@ -14,6 +14,9 @@ export const VENDORS: Record<Vendor, { name: string; library: string; terms: str
 
 const MAX_ZIP_BYTES = 300 * 1024 * 1024;
 const MAX_SVG_BYTES = 2 * 1024 * 1024;
+// a "zip bomb" (a small ZIP that unpacks to gigabytes) is stopped by a budget over everything read, nested ZIPs included
+export const MAX_UNPACKED_BYTES = 400 * 1024 * 1024;
+export const MAX_ZIP_ENTRIES = 20_000;
 
 /** Which provider a package comes from, judged from its file name and folder layout. */
 export function detectVendor(paths: string[], zipName: string): Vendor | null {
@@ -62,11 +65,20 @@ export function planPack(paths: string[]): PackPick[] {
 /** Read the SVG entries of a ZIP (and of ZIPs inside it, one level deep). */
 export function readZipSvgs(data: Uint8Array): Map<string, string> {
   const out = new Map<string, string>();
+  let bytes = 0, count = 0, over = false;
   const read = (buf: Uint8Array, prefix: string, depth: number) => {
     let files: Unzipped;
     try {
-      files = unzipSync(buf, { filter: (f) => (/\.svg$/i.test(f.name) && f.originalSize <= MAX_SVG_BYTES) || (depth === 0 && /\.zip$/i.test(f.name) && f.originalSize <= MAX_ZIP_BYTES) });
+      files = unzipSync(buf, {
+        filter: (f) => {
+          const wanted = (/\.svg$/i.test(f.name) && f.originalSize <= MAX_SVG_BYTES) || (depth === 0 && /\.zip$/i.test(f.name) && f.originalSize <= MAX_ZIP_BYTES);
+          if (!wanted || over) return false;
+          if (++count > MAX_ZIP_ENTRIES || (bytes += f.originalSize) > MAX_UNPACKED_BYTES) { over = true; return false; }
+          return true;
+        },
+      });
     } catch { throw new Error('this ZIP file could not be read'); }
+    if (over) throw new Error(`this ZIP unpacks to more than ${MAX_UNPACKED_BYTES / 1024 / 1024} MB or ${MAX_ZIP_ENTRIES.toLocaleString()} files; split it into smaller ZIPs`);
     const decoder = new TextDecoder();
     for (const [name, bytes] of Object.entries(files)) {
       if (/\.zip$/i.test(name)) read(bytes, `${prefix}${name.replace(/\.zip$/i, '')}/`, depth + 1);

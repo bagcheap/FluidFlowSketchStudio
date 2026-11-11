@@ -3,7 +3,7 @@ import { Download, Moon, Play, Redo2, Sun, Undo2, Monitor } from 'lucide-react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
-import { matchSizeItems, MenuBar, type MenuDef, type MenuItem } from './MenuBar';
+import { AUTO_LAYOUT_ITEMS, matchSizeItems, MenuBar, type MenuDef, type MenuItem } from './MenuBar';
 import { ALT, MOD, SHIFT } from './shortcuts';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { SHAPE_KINDS } from '../model/schema';
@@ -82,6 +82,7 @@ export function TopBar() {
       { label: 'Text', shortcut: 'T', run: () => ui.setTool('text') },
       { label: 'Image…', shortcut: 'I', run: () => void cmd.insertImage() },
       { label: 'Icons…', shortcut: `${SHIFT}I`, run: () => ui.updatePrefs({ showIconPanel: true }) },
+      { label: 'Diagram from text (Mermaid)…', run: () => ui.openDialog('mermaid') },
       { label: 'Container around selection', run: cmd.addContainer, disabled: !hasSel },
       { label: 'Group selection', shortcut: `${MOD}G`, run: cmd.groupSelection, disabled: sel.length < 2 },
       { label: 'Template…', run: () => ui.openDialog('templates') },
@@ -96,6 +97,7 @@ export function TopBar() {
       ], disabled: sel.length < 2 },
       { label: 'Distribute', sub: [{ label: 'Horizontally', run: () => cmd.distribute('h') }, { label: 'Vertically', run: () => cmd.distribute('v') }], disabled: sel.length < 3 },
       { label: 'Match size', sub: matchSizeItems(prefs.matchSizeKeepsProportions), disabled: sel.length < 2 },
+      { label: sel.length >= 2 ? 'Auto-layout selection' : 'Auto-layout diagram', sub: AUTO_LAYOUT_ITEMS },
       { sep: true },
       { label: 'Bring to front', shortcut: `${MOD}${SHIFT}]`, run: () => cmd.reorder('front'), disabled: !hasSel },
       { label: 'Bring forward', shortcut: `${MOD}]`, run: () => cmd.reorder('forward'), disabled: !hasSel },
