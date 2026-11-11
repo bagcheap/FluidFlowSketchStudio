@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BoxElement, ConnectorElement, DiagramElement, Endpoint, FlowDocument, Point, ShapeKind, ToolStyle } from '../model/types';
 import { isCycleKey } from '../ui/modifiers';
 import { colorLabel } from '../ui/colorNames';
-import { cycleFill, makeConnector, makeShape, makeText, newSeed, SHAPE_DEFAULT_SIZE, styleKey, uid } from '../model/defaults';
+import { cycleFill, makeConnector, makeShape, makeText, newSeed, seqStyleKey, SHAPE_DEFAULT_SIZE, styleKey, uid } from '../model/defaults';
 import { deleteElements, getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import { renderDocumentAtTime, makeLookup, boxCorners } from '../engine/render';
@@ -15,6 +15,7 @@ import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, hitTest, isLifeline, lifelineAt, portAnchors, portPositions } from './hitTest';
 import { addConnectedCopy, canQuickConnect, handleLocal, QUICK_SHAPES, SIDES, type Side } from '../store/quickConnect';
+import { addFrameBehind, addParticipant, addSelfMessage, asMessage, columnAt, extendLifelines, makeFrame, onLifeline } from '../store/sequence';
 import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { Copy } from 'lucide-react';
@@ -40,7 +41,9 @@ type Interaction =
   | { k: 'freehand'; id: string; pts: Point[] }
   | { k: 'erase'; ids: Set<string> }
   | { k: 'label'; id: string }
-  | { k: 'quick'; src: string; side: Side; start: Point; connId: string | null }; // dragging from a quick-connect handle
+  | { k: 'quick'; src: string; side: Side; start: Point; connId: string | null } // dragging from a quick-connect handle
+  | { k: 'seqmsg'; id: string; from: string; y: number; start: Point; moved: boolean } // Sequence ▸ Message / Reply: lifeline to lifeline, level
+  | { k: 'seqframe'; id: string; start: Point; moved: boolean }; // Sequence ▸ Frame: drag out a loop/alt frame
 
 /** Distance (screen px) of the quick-connect handles from a shape's sides. */
 const QC_OFF = 40;
@@ -298,6 +301,36 @@ export function Canvas() {
         inter.current = { k: 'connect', id: el.id, start: p, moved: false };
         return;
       }
+      case 'seq': {
+        const ts = u.toolStyle(seqStyleKey(u.seqKind));
+        if (u.seqKind === 'participant' || u.seqKind === 'actor') {
+          const r = addParticipant(d, p, u.seqKind === 'actor', ts, u.toolStyle('line'));
+          D.commit(() => r.doc);
+          afterCreate(r.id); // selected: type its name
+          return;
+        }
+        if (u.seqKind === 'frame') {
+          const f = makeFrame(p.x, p.y, 1, 1, ts);
+          D.begin();
+          D.live((dd) => addFrameBehind({ ...dd, elements: [...dd.elements, f] }, f));
+          inter.current = { k: 'seqframe', id: f.id, start: p, moved: false };
+          return;
+        }
+        const col = columnAt(d, p, u.view.zoom);
+        if (!col) { u.setHint('Start on a lifeline (the dashed line under a participant). Add participants first if there are none.'); return; }
+        if (u.seqKind === 'self') {
+          const r = addSelfMessage(d, col.box, p.y, ts);
+          D.commit(() => r.doc);
+          afterCreate(r.id);
+          return;
+        }
+        // message or reply: a live arrow from this lifeline, kept level
+        const c = asMessage(makeConnector(onLifeline(col.box, p.y), { x: p.x, y: p.y, elementId: null, anchor: null }, ts), col.box, col.box);
+        D.begin();
+        D.live((dd) => ({ ...dd, elements: [...dd.elements, { ...c, routing: 'straight', curvature: 0 }] }));
+        inter.current = { k: 'seqmsg', id: c.id, from: col.box.id, y: p.y, start: p, moved: false };
+        return;
+      }
       case 'freehand':
       case 'highlighter': {
         const ts = u.toolStyle(u.tool);
@@ -481,6 +514,25 @@ export function Canvas() {
         D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), end })));
         return;
       }
+      case 'seqmsg': {
+        if (!it.moved && Math.hypot(p.x - it.start.x, p.y - it.start.y) * u.view.zoom < 4) return;
+        it.moved = true;
+        const to = columnAt(D.doc, { x: p.x, y: it.y }, u.view.zoom, it.from);
+        const from = getElement(D.doc, it.from) as BoxElement;
+        setOverlay((o) => ({ ...o, target: to?.box.id ?? null }));
+        D.live((d) => mapElements(d, [it.id], (el) => {
+          const c = el as ConnectorElement;
+          return to ? asMessage({ ...c, end: onLifeline(to.box, it.y) }, from, to.box) : { ...c, end: { x: p.x, y: it.y, elementId: null, anchor: null } };
+        }));
+        return;
+      }
+      case 'seqframe': {
+        if (!it.moved && Math.hypot(p.x - it.start.x, p.y - it.start.y) * u.view.zoom < 4) return;
+        it.moved = true;
+        const x = Math.min(it.start.x, p.x), y = Math.min(it.start.y, p.y);
+        D.live((d) => mapElements(d, [it.id], (el) => ({ ...el, x, y, w: Math.max(40, Math.abs(p.x - it.start.x)), h: Math.max(30, Math.abs(p.y - it.start.y)) })));
+        return;
+      }
       case 'quick': {
         if (!it.connId) {
           if (Math.hypot(p.x - it.start.x, p.y - it.start.y) * u.view.zoom < 6) return;
@@ -623,6 +675,28 @@ export function Canvas() {
         D.end();
         if (it.cycled) { u.setToolStyle(it.cycled.key, it.cycled.ts); u.toast(`Fill: ${colorLabel(it.cycled.ts.style.fill)}`); }
         afterCreate(it.id);
+        return;
+      }
+      case 'seqmsg': {
+        const c = getElement(D.doc, it.id) as ConnectorElement | undefined;
+        if (!it.moved || !c) {
+          // a click on a lifeline with Message: a message to itself
+          D.cancel();
+          const box = getElement(D.doc, it.from) as BoxElement | undefined;
+          if (box) { const r = addSelfMessage(D.doc, box, it.y, u.toolStyle(seqStyleKey(u.seqKind))); D.commit(() => r.doc); afterCreate(r.id); }
+          return;
+        }
+        if (!c.end.elementId) { D.cancel(); u.setHint('Drop the message on another lifeline'); return; }
+        D.live((d) => extendLifelines(d, [it.from, c.end.elementId!], it.y));
+        D.end();
+        afterCreate(it.id); // selected: type its text
+        return;
+      }
+      case 'seqframe': {
+        if (!it.moved) D.live((d) => mapElements(d, [it.id], (el) => ({ ...el, x: it.start.x, y: it.start.y, w: 320, h: 160 })));
+        D.end();
+        u.select([it.id]);
+        u.setEditing(it.id); // type the title (loop, alt, opt…)
         return;
       }
       case 'quick': {

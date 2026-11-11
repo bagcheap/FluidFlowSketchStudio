@@ -30,12 +30,13 @@ export function Inspector() {
   const els = selection.map((id) => getElement(doc, id)).filter(Boolean) as DiagramElement[];
 
   // ---- target abstraction ---------------------------------------------------------------
-  const toolKey = tool === 'shape' || tool === 'arrow' || tool === 'line' || tool === 'freehand' || tool === 'highlighter' || tool === 'text' ? styleKey(tool, shapeKind) : null;
+  const seqKind = useUI((s) => s.seqKind);
+  const toolKey = tool === 'shape' || tool === 'arrow' || tool === 'line' || tool === 'freehand' || tool === 'highlighter' || tool === 'text' || tool === 'seq' ? styleKey(tool, shapeKind, seqKind) : null;
   const onSelection = els.length > 0;
   if (!onSelection && !toolKey) return <CanvasPanel />;
   const ts: ToolStyle | null = toolKey ? ui.toolStyle(toolKey) : null;
   const first = els[0];
-  const kinds = new Set<Kind>(onSelection ? els.map((e) => e.type) : [toolKey === 'arrow' || toolKey === 'line' ? 'connector' : toolKey === 'text' ? 'text' : toolKey === 'freehand' || toolKey === 'highlighter' ? 'freehand' : 'shape']);
+  const kinds = new Set<Kind>(onSelection ? els.map((e) => e.type) : [toolKey === 'arrow' || toolKey === 'line' || toolKey === 'seq:reply' ? 'connector' : toolKey === 'text' ? 'text' : toolKey === 'freehand' || toolKey === 'highlighter' ? 'freehand' : toolKey === 'seq:frame' ? 'container' : 'shape']);
   const style: Style = onSelection ? first.style : ts!.style;
   const text: TextStyle = onSelection ? first.textStyle : ts!.textStyle;
   const anyLocked = els.some((e) => e.locked);
@@ -101,6 +102,7 @@ export function Inspector() {
 
   const heading = onSelection
     ? els.length === 1 ? `${first.type === 'shape' ? SHAPE_LABELS[first.shape] : first.type === 'connector' ? (first.endHead === 'none' && first.startHead === 'none' ? 'Line' : 'Arrow') : first.type === 'icon' ? `Icon · ${iconTitle(doc.icons[first.iconId]?.name ?? 'missing')}` : first.type === 'container' ? `Container · ${first.text || 'untitled'}` : first.type[0].toUpperCase() + first.type.slice(1)}` : `${els.length} objects`
+    : tool === 'seq' ? `New ${seqKind === 'self' ? 'message to itself' : seqKind} (sequence)`
     : `New ${toolKey!.startsWith('shape:') ? SHAPE_LABELS[toolKey!.slice(6) as ShapeKind].toLowerCase() : toolKey}`;
 
   return (

@@ -373,3 +373,10 @@ code { font-size: 12px; }
 .page-tab.on { background: var(--panel); color: var(--fg); border-color: var(--line); font-weight: 600; box-shadow: 0 1px 0 var(--panel); }
 .page-tab.renaming { width: 140px; font: inherit; font-size: 12.5px; border-color: var(--accent); background: var(--panel); outline: none; }
 .page-add { flex: none; }
+
+/* Toolbar ▸ Sequence pop-up */
+.seq-pop { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 2px; padding: 6px; min-width: 190px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 50; }
+.seq-cell { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: none; color: var(--fg-2); font-size: 13px; text-align: left; }
+.seq-cell:hover { background: var(--panel-2); color: var(--fg); }
+.seq-cell.on { background: var(--accent-soft); color: var(--accent); }
+@media (max-width: 720px) { .seq-pop { position: fixed; top: auto; bottom: 120px; } }

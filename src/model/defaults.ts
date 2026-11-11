@@ -177,11 +177,19 @@ export const isConnector = (e: DiagramElement): e is ConnectorElement => e.type 
 
 export type ToolId =
   | 'select' | 'hand' | 'shape' | 'arrow' | 'line' | 'freehand' | 'highlighter'
-  | 'text' | 'image' | 'eraser' | 'painter';
+  | 'text' | 'image' | 'eraser' | 'painter' | 'seq';
+
+/** The sequence-diagram tools (toolbar ▸ Sequence). Notes use the sticky-note shape tool. */
+export type SeqKind = 'participant' | 'actor' | 'message' | 'reply' | 'self' | 'frame';
+
+/** The remembered style each sequence tool draws with: participants and actors share the box tools' styles. */
+export function seqStyleKey(k: SeqKind): string {
+  return k === 'participant' ? 'shape:rectangle' : k === 'actor' ? 'shape:pill' : k === 'reply' ? 'seq:reply' : k === 'frame' ? 'seq:frame' : 'arrow';
+}
 
 /** Key under which a tool's style is remembered (shape tools remember per shape kind). */
-export function styleKey(tool: ToolId, shape: ShapeKind): string {
-  return tool === 'shape' ? `shape:${shape}` : tool;
+export function styleKey(tool: ToolId, shape: ShapeKind, seq: SeqKind = 'participant'): string {
+  return tool === 'shape' ? `shape:${shape}` : tool === 'seq' ? seqStyleKey(seq) : tool;
 }
 
 export function defaultToolStyle(key: string): ToolStyle {
@@ -198,6 +206,14 @@ export function defaultToolStyle(key: string): ToolStyle {
   } else if (key === 'highlighter') {
     s.style = { ...s.style, fillStyle: 'none', stroke: '#facc15', strokeWidth: 18, opacity: 0.45 };
     s.shapeAnim = { mode: 'off' };
+  } else if (key === 'seq:reply') {
+    // a sequence-diagram reply: the arrow look, dashed
+    s.style = { ...s.style, fill: 'transparent', fillStyle: 'none', stroke: '#4b5563', strokeStyle: 'dashed' };
+    s.routing = 'straight'; s.endHead = 'arrow'; s.startHead = 'none';
+  } else if (key === 'seq:frame') {
+    // a sequence-diagram block (loop, alt, opt…): a see-through dashed frame with a small title
+    s.style = { ...s.style, stroke: '#343a40', fill: 'transparent', fillStyle: 'none', strokeWidth: 1.5, strokeStyle: 'dashed', cornerRadius: 0 };
+    s.textStyle = { ...s.textStyle, fontSize: 14, bold: false, align: 'left', vAlign: 'middle', padding: 10 };
   } else if (key === 'container') {
     s.style = { ...s.style, stroke: '#343a40', fill: '#f8f9fa', fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'dashed', cornerRadius: 0 };
     s.textStyle = { ...s.textStyle, fontSize: 18, bold: false, align: 'left', vAlign: 'middle', padding: 12 };

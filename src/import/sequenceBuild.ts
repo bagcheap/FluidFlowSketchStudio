@@ -6,6 +6,7 @@
 import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, Endpoint, FlowDocument, Point, ShapeKind, ToolStyle } from '../model/types';
 import { baseFields, makeConnector, makeShape } from '../model/defaults';
 import { moveElements } from '../store/containers';
+import { lifelineFor, SELF_H } from '../store/sequence';
 import type { SGraph } from './mermaidSequence';
 
 export interface SeqTools {
@@ -20,7 +21,6 @@ const BOX_H = 50;
 const GAP_X = 70; // between participant boxes
 const FIRST_ROW = 44; // first message below the boxes
 const ROW = 52; // between messages
-const SELF_H = 56; // height of a message to itself (a loop out to the right)
 const FRAME_MIN_W = 180;
 
 export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at: Point): { doc: FlowDocument; ids: string[]; participants: number; messages: number } {
@@ -98,13 +98,7 @@ export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at:
 
   // lifelines from each box down past the last step
   const bottom = y + 10;
-  const lifelines = [...boxes.entries()].map(([id, b]) => {
-    const c = makeConnector({ x: 0, y: 0, elementId: b.id, anchor: { x: 0.5, y: 1 } }, on(id, bottom), tools.line);
-    c.routing = 'straight'; c.startHead = 'none'; c.endHead = 'none';
-    c.style = { ...c.style, strokeStyle: 'dashed', strokeWidth: 1.5, stroke: '#868e96' };
-    c.anim = { mode: 'none' };
-    return c;
-  });
+  const lifelines = [...boxes.values()].map((b) => lifelineFor(b, bottom, tools.line));
 
   // frames behind everything, then lifelines, participants, notes and messages on top
   const fresh: DiagramElement[] = [...frames.reverse(), ...lifelines, ...boxes.values(), ...notes, ...messages];

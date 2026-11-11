@@ -1,0 +1,127 @@
+// Drawing sequence diagrams by hand (toolbar ▸ Sequence): the same pieces the Mermaid importer makes.
+// A participant is a box with a lifeline: a dashed line attached to the box at its bottom edge and at a point below
+// it. Messages are arrows attached to two participants at one height, so they stay on the lifelines when the
+// participants move. Pure document functions; the canvas gestures call them.
+import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, Endpoint, FlowDocument, Point, ToolStyle } from '../model/types';
+import { baseFields, makeConnector, makeShape } from '../model/defaults';
+import { isLifeline } from '../editor/hitTest';
+
+export const SEQ_BOX = { w: 130, h: 50 };
+export const SELF_H = 56; // height of a message to itself (a loop out to the right)
+const NEW_LIFELINE = 360; // length of the first participant's lifeline
+const BELOW_LAST = 40; // lifelines reach this far below the lowest message
+
+/** A participant's lifeline, from the bottom of its box down to `bottom` (canvas y). */
+export function lifelineFor(box: BoxElement, bottom: number, line: ToolStyle): ConnectorElement {
+  const c = makeConnector({ x: 0, y: 0, elementId: box.id, anchor: { x: 0.5, y: 1 } }, onLifeline(box, bottom), line);
+  c.routing = 'straight'; c.startHead = 'none'; c.endHead = 'none';
+  c.style = { ...c.style, strokeStyle: 'dashed', strokeWidth: 1.5, stroke: '#868e96' };
+  c.anim = { mode: 'none' };
+  return c;
+}
+
+/** The point on a participant's lifeline at canvas height `y`. */
+export function onLifeline(box: BoxElement, y: number): Endpoint {
+  return { x: box.x + box.w / 2, y, elementId: box.id, anchor: { x: 0.5, y: (y - box.y) / Math.max(1, box.h) } };
+}
+
+export interface Participant { box: BoxElement; lifeline: ConnectorElement }
+
+/** The participants on the page: boxes with a lifeline. */
+export function participantsOf(doc: FlowDocument): Participant[] {
+  const byId = new Map(doc.elements.map((e) => [e.id, e]));
+  const out: Participant[] = [];
+  for (const e of doc.elements) {
+    if (!isLifeline(e)) continue;
+    const box = byId.get(e.start.elementId!);
+    if (box && box.type !== 'connector') out.push({ box, lifeline: e });
+  }
+  return out;
+}
+
+/** The participant whose lifeline column (anywhere below its box, even past the lifeline's end) is under `p`. */
+export function columnAt(doc: FlowDocument, p: Point, zoom: number, exclude?: string): Participant | null {
+  const tol = 12 / zoom;
+  let best: Participant | null = null, bd = Infinity;
+  for (const pt of participantsOf(doc)) {
+    const { box } = pt;
+    if (box.id === exclude || box.rotation) continue;
+    const d = Math.abs(p.x - (box.x + box.w / 2));
+    if (d <= tol && p.y > box.y + box.h && d < bd) { best = pt; bd = d; }
+  }
+  return best;
+}
+
+/** Make the given participants' lifelines reach at least `y` (plus a little room below). */
+export function extendLifelines(doc: FlowDocument, boxIds: string[], y: number): FlowDocument {
+  const want = new Set(boxIds);
+  return {
+    ...doc,
+    elements: doc.elements.map((e) => {
+      if (!isLifeline(e) || !want.has(e.start.elementId!)) return e;
+      const box = doc.elements.find((b) => b.id === e.start.elementId) as BoxElement | undefined;
+      if (!box) return e;
+      const end = box.y + (e.end.anchor?.y ?? 1) * box.h;
+      return end >= y + BELOW_LAST ? e : { ...e, end: onLifeline(box, y + BELOW_LAST) };
+    }),
+  };
+}
+
+/**
+ * Add a participant (box, or a pill for an actor) with its lifeline, centred on `at`. With others on the page it
+ * lines up with them: same top, a lifeline as long as theirs, and never on top of another participant.
+ */
+export function addParticipant(doc: FlowDocument, at: Point, actor: boolean, tool: ToolStyle, line: ToolStyle): { doc: FlowDocument; id: string } {
+  const others = participantsOf(doc);
+  const { w, h } = SEQ_BOX;
+  const y = others.length ? Math.min(...others.map((o) => o.box.y)) : at.y - h / 2;
+  let x = at.x - w / 2;
+  // step right past any participant this would overlap
+  for (let guard = 0; guard < others.length + 1; guard++) {
+    const hit = others.find((o) => x < o.box.x + o.box.w + 20 && x + w + 20 > o.box.x);
+    if (!hit) break;
+    x = hit.box.x + hit.box.w + 70;
+  }
+  const box = { ...makeShape(actor ? 'pill' : 'rectangle', x, y, w, h, tool), anim: { mode: 'off' as const } };
+  const bottom = others.length ? Math.max(...others.map((o) => o.box.y + (o.lifeline.end.anchor?.y ?? 1) * o.box.h)) : y + h + NEW_LIFELINE;
+  const lifeline = lifelineFor(box, bottom, line);
+  return { doc: { ...doc, elements: [...doc.elements, lifeline, box] }, id: box.id };
+}
+
+/** Style a message arrow between two participants: straight and level, label above; or a loop for a self-message. */
+export function asMessage(c: ConnectorElement, from: BoxElement, to: BoxElement): ConnectorElement {
+  const self = from.id === to.id;
+  const dx = to.x + to.w / 2 - (from.x + from.w / 2);
+  return {
+    ...c,
+    routing: self ? 'curved' : 'straight',
+    curvature: self ? -1 : 0, // a loop out to the right
+    labelPos: 0.5,
+    labelOffset: self ? -(c.text.length * c.textStyle.fontSize * 0.275 + 40) : dx >= 0 ? -14 : 14, // above the arrow; beside a loop
+  };
+}
+
+/** A message from one participant to another at height `y` (lifelines grow to reach it). */
+export function addMessage(doc: FlowDocument, from: BoxElement, to: BoxElement, y: number, tool: ToolStyle): { doc: FlowDocument; id: string } {
+  const c = asMessage(makeConnector(onLifeline(from, y), onLifeline(to, y), tool), from, to);
+  return { doc: extendLifelines({ ...doc, elements: [...doc.elements, c] }, [from.id, to.id], y), id: c.id };
+}
+
+/** A message from a participant to itself, starting at height `y`. */
+export function addSelfMessage(doc: FlowDocument, box: BoxElement, y: number, tool: ToolStyle): { doc: FlowDocument; id: string } {
+  const c = asMessage(makeConnector(onLifeline(box, y), onLifeline(box, y + SELF_H), tool), box, box);
+  return { doc: extendLifelines({ ...doc, elements: [...doc.elements, c] }, [box.id], y + SELF_H), id: c.id };
+}
+
+/** A block frame (loop, alt, opt…): a see-through titled container. Sits behind everything, so it never hides arrows. */
+export function makeFrame(x: number, y: number, w: number, h: number, tool: ToolStyle, title = 'loop'): ContainerElement {
+  return {
+    ...baseFields(tool), type: 'container', x, y, w, h, text: title, members: [], anim: { mode: 'off' },
+    style: { ...tool.style }, textStyle: { ...tool.textStyle },
+  };
+}
+
+/** Put a frame at the back of the page. */
+export function addFrameBehind(doc: FlowDocument, frame: DiagramElement): FlowDocument {
+  return { ...doc, elements: [frame, ...doc.elements.filter((e) => e.id !== frame.id)] };
+}

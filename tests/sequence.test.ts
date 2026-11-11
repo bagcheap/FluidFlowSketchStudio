@@ -46,10 +46,10 @@ describe('Mermaid sequence reader', () => {
     expect(g.autonumber).toBe(true);
     const msgs = g.steps.filter((s) => s.k === 'msg');
     expect(msgs.map((m) => m.k === 'msg' && [m.from, m.to, m.text, m.endHead, m.dashed])).toEqual([
-      ['U', 'GE', 'Ask a question', 'triangle', false],
-      ['GE', 'M', 'query', 'triangle', false],
-      ['M', 'M', 'scan', 'triangle', false],
-      ['M', 'GE', 'rows', 'triangle', true],
+      ['U', 'GE', 'Ask a question', 'arrow', false],
+      ['GE', 'M', 'query', 'arrow', false],
+      ['M', 'M', 'scan', 'arrow', false],
+      ['M', 'GE', 'rows', 'arrow', true],
       ['M', 'GE', 'empty', 'bar', true],
       ['GE', 'U', 'answer', 'arrow', false],
     ]);

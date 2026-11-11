@@ -4,6 +4,14 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.17] - 2026-11-11
+
+### Added
+- **Draw sequence diagrams by hand:** the new Sequence button on the toolbar opens a palette of sequence tools. **Participant** and **Actor** add a box (or pill) with a dashed lifeline, lined up with the others at the same height. **Message** and **Reply** (dashed) are dragged from one lifeline to another and stay level; clicking a lifeline with Message, or using **Message to itself**, adds a loop back. **Note** adds a sticky note, and **Frame** drags out a see-through loop / alt / opt frame and lets you type its title. Lifelines grow when you add messages below them, and each new item is selected so you can type its text straight away. Each tool remembers its own style.
+
+### Changed
+- Messages and replies in sequence diagrams imported from Mermaid now have open arrowheads, the same as messages drawn with the sequence tools and the arrow tool. The Reply tool uses an open arrowhead too.
+
 ## [0.1.16] - 2026-11-11
 
 ### Added

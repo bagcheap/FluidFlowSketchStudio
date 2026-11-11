@@ -703,6 +703,47 @@ def main():
             assert len(app.doc()['pages']) == 1
         tpages()
 
+        @test('Sequence tools: draw participants, messages, a reply, a self-message and a frame by hand')
+        def tseqtools():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 21000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            def pick(label):
+                app.key('Escape')
+                page.get_by_role('button', name='Sequence diagram tools').click()
+                page.locator('.seq-pop [role=menuitem]', has_text=label).first.click()
+            pick('Actor'); app.click((5150, 21150)); page.keyboard.type('User'); page.keyboard.press('Escape')
+            pick('Participant'); app.click((5450, 21170)); page.keyboard.type('API'); page.keyboard.press('Escape'); page.wait_for_timeout(80)
+            boxes = [e for e in app.els('shape') if e['text'] in ('User', 'API')][-2:]
+            u, api = boxes
+            assert u['shape'] == 'pill' and api['shape'] == 'rectangle' and u['y'] == api['y'], (u['y'], api['y'])
+            ucx, acx = u['x'] + u['w'] / 2, api['x'] + api['w'] / 2
+            pick('Message'); app.drag((ucx, 21300), (acx + 3, 21330)); page.keyboard.type('GET /orders'); page.keyboard.press('Escape')
+            msg = app.els('connector')[-1]
+            assert msg['start']['elementId'] == u['id'] and msg['end']['elementId'] == api['id'] and msg['text'] == 'GET /orders'
+            assert abs(msg['start']['anchor']['y'] - msg['end']['anchor']['y']) < 1e-9, 'messages stay level'
+            pick('Reply'); app.drag((acx, 21380), (ucx, 21380)); page.keyboard.type('200 OK'); page.keyboard.press('Escape')
+            rep = app.els('connector')[-1]
+            assert rep['start']['elementId'] == api['id'] and rep['style']['strokeStyle'] == 'dashed' and rep['text'] == '200 OK'
+            pick('Message to itself'); app.click((acx, 21440)); page.keyboard.press('Escape')
+            self_m = app.els('connector')[-1]
+            assert self_m['start']['elementId'] == self_m['end']['elementId'] == api['id'] and self_m['routing'] == 'curved'
+            pick('Frame'); app.drag((ucx - 40, 21280), (acx + 60, 21420)); page.wait_for_selector('.text-editor')
+            page.keyboard.type('loop every second'); page.keyboard.press('Escape'); page.wait_for_timeout(80)
+            fr = [e for e in app.els('container') if e['text'] == 'loop every second']
+            assert fr and app.els()[0]['id'] == fr[0]['id'], 'the frame goes to the back'
+            # lifelines were lengthened past the self-message
+            api_life = [e for e in app.els('connector') if e['start']['elementId'] == api['id'] and e['end']['elementId'] == api['id'] and e['start']['anchor']['y'] == 1][0]
+            assert api['y'] + api_life['end']['anchor']['y'] * api['h'] > 21440 + 50
+            app.js('() => window.__flowsketch.pause(0)'); page.wait_for_timeout(150)
+            page.screenshot(path=f'{OUT}/e2e-sequence-tools.png')
+            page.get_by_test_id('play').click()
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tseqtools()
+
         @test('3 · Squiggle intensity: 0 = still, low = subtle, high = stronger (continuous)')
         def t3():
             s = app.els('shape')[0]
