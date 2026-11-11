@@ -25,6 +25,17 @@ const lit = (doc: FlowDocument, id: string, t: number) =>
   renderDocumentAtTime(doc, t).items.find((i) => i.id === id)!.parts.some((p) => p.k === 'line' && (p as { color: string }).color === HL);
 
 describe('message-by-message playback', () => {
+  it('messages flow one way, even when the arrow tool remembers a round trip', () => {
+    const rt = { ...tools.arrow, connectorAnim: { ...(tools.arrow.connectorAnim ?? {}), mode: 'travel' as const, direction: 'roundTrip' as const } };
+    const r = buildSequence(newDocument(), parseSequence(TEXT), { ...tools, arrow: rt }, { x: 0, y: 0 });
+    const conn = (d: FlowDocument, id: string) => d.elements.find((e) => e.id === id) as ConnectorElement;
+    for (const id of r.messageIds) expect(conn(r.doc, id).anim?.direction).toBe('forward');
+    // an existing round-trip arrow played in order becomes one-way too
+    const id = r.messageIds[0];
+    const d = { ...r.doc, elements: r.doc.elements.map((e) => (e.id === id ? { ...e, anim: { ...(e as ConnectorElement).anim, direction: 'roundTrip' as const } } : e)) } as FlowDocument;
+    expect(conn(setPlayOrder(d, r.messageIds).doc, id).anim?.direction).toBe('forward');
+  });
+
   it('playPhase: progress inside the window, nothing outside, wrapping with the loop', () => {
     expect(playPhase(1, 4, [0.25, 0.5])).toBeCloseTo(0);
     expect(playPhase(1.5, 4, [0.25, 0.5])).toBeCloseTo(0.5);

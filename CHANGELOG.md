@@ -12,6 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 - Files now use format version 9. Older files open as before, but files saved with this version need this version of FlowSketch or later.
 
+### Fixed
+- Sequence-diagram messages always flow the way their arrow points. Before, if the arrow tool was set to the round-trip highlight, messages lit up out and back again. Messages already in a diagram become one-way when you choose Animation ▸ Play messages in order.
+
 ## [0.1.18] - 2026-11-11
 
 ### Added
