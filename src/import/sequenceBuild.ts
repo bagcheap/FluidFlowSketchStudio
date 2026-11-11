@@ -6,7 +6,7 @@
 import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, Endpoint, FlowDocument, Point, ShapeKind, ToolStyle } from '../model/types';
 import { baseFields, makeConnector, makeShape } from '../model/defaults';
 import { moveElements } from '../store/containers';
-import { lifelineFor, SELF_H } from '../store/sequence';
+import { activeLevel, lifelineFor, makeBar, messageEnd, MIN_BAR, SELF_H } from '../store/sequence';
 import type { SGraph } from './mermaidSequence';
 
 export interface SeqTools {
@@ -14,6 +14,7 @@ export interface SeqTools {
   arrow: ToolStyle;
   line: ToolStyle;
   container: ToolStyle;
+  bar: ToolStyle; // activation bars
   fit: (e: DiagramElement) => DiagramElement;
 }
 
@@ -42,8 +43,27 @@ export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at:
   const stack: { titles: string[]; y0: number; minX: number; maxX: number }[] = [];
   const widen = (a: number, b: number) => { for (const f of stack) { f.minX = Math.min(f.minX, a); f.maxX = Math.max(f.maxX, b); } };
   let y = H + FIRST_ROW, n = 0;
+  // activation bars: an open stack per participant (nested bars stack to the right)
+  const open = new Map<string, number[]>();
+  const bars: ConnectorElement[] = [];
+  const msgY = new Map<string, number>();
+  let lastMsgY = y, prevMsg = false;
 
   for (const s of g.steps) {
+    if (s.k === 'act') {
+      // right after a message (A->>+B, B-->>-A) the bar starts or ends at that message; otherwise just around it
+      const box = boxes.get(s.id);
+      if (!box) continue;
+      const stack = open.get(s.id) ?? [];
+      open.set(s.id, stack);
+      if (s.on) stack.push(prevMsg ? lastMsgY : y - 10);
+      else {
+        const y0 = stack.pop();
+        if (y0 !== undefined) bars.push(makeBar(box, y0, Math.max(prevMsg ? lastMsgY : lastMsgY + 10, y0 + MIN_BAR), stack.length, tools.bar));
+      }
+      continue;
+    }
+    prevMsg = false;
     if (s.k === 'msg') {
       const self = s.from === s.to;
       const start = on(s.from, y), end = on(s.to, self ? y + SELF_H : y);
@@ -59,6 +79,8 @@ export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at:
       if (s.dashed) c.style = { ...c.style, strokeStyle: 'dashed' };
       messages.push(c);
       widen(Math.min(cx(s.from), cx(s.to)), Math.max(cx(s.from), cx(s.to)) + (self ? labelW + 50 : 0));
+      msgY.set(c.id, y);
+      lastMsgY = y; prevMsg = true;
       y += self ? SELF_H + ROW : ROW;
     } else if (s.k === 'note') {
       const a = cx(s.at[0]), b = cx(s.at[s.at.length - 1]);
@@ -96,12 +118,31 @@ export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at:
     }
   }
 
+  // bars still open at the end run to the last step
+  for (const [id, stack] of open) {
+    const box = boxes.get(id)!;
+    while (stack.length) { const y0 = stack.pop()!; bars.push(makeBar(box, y0, Math.max(y - 16, y0 + MIN_BAR), stack.length, tools.bar)); }
+  }
+  // messages touch the edge of an active bar instead of the lifeline's centre
+  const withBars = { ...doc, elements: bars };
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i], my = msgY.get(m.id)!;
+    const from = [...boxes.values()].find((b) => b.id === m.start.elementId)!, to = [...boxes.values()].find((b) => b.id === m.end.elementId)!;
+    if (from === to) { // a message to itself leaves and returns on the right-hand edge of any active bar
+      const y2 = my + SELF_H;
+      messages[i] = { ...m, start: messageEnd(from, my, activeLevel(withBars, from, my), Infinity), end: messageEnd(from, y2, activeLevel(withBars, from, y2), Infinity) };
+      continue;
+    }
+    const fx = from.x + from.w / 2, tx = to.x + to.w / 2;
+    messages[i] = { ...m, start: messageEnd(from, my, activeLevel(withBars, from, my), tx), end: messageEnd(to, my, activeLevel(withBars, to, my), fx) };
+  }
+
   // lifelines from each box down past the last step
   const bottom = y + 10;
   const lifelines = [...boxes.values()].map((b) => lifelineFor(b, bottom, tools.line));
 
   // frames behind everything, then lifelines, participants, notes and messages on top
-  const fresh: DiagramElement[] = [...frames.reverse(), ...lifelines, ...boxes.values(), ...notes, ...messages];
+  const fresh: DiagramElement[] = [...frames.reverse(), ...lifelines, ...bars, ...boxes.values(), ...notes, ...messages];
   let out: FlowDocument = { ...doc, elements: [...doc.elements, ...fresh] };
   const free = [...frames, ...boxes.values(), ...notes];
   if (free.length) {

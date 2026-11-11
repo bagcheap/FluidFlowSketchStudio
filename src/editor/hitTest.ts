@@ -42,7 +42,7 @@ export function connectorLabelBox(doc: FlowDocument, c: ConnectorElement) {
 
 export function hitConnector(doc: FlowDocument, c: ConnectorElement, p: Point, tol: number): boolean {
   const path = connectorPath(c, makeLookup(doc, null));
-  if (distToPolyline(p, path.pts) < tol + c.style.strokeWidth / 2 + 2) return true;
+  if (distToPolyline(p, path.pts) < tol + (c.bar ? 6 : c.style.strokeWidth / 2) + 2) return true; // a bar is 12 px wide
   const lb = connectorLabelBox(doc, c);
   return !!lb && p.x >= lb.x && p.x <= lb.x + lb.w && p.y >= lb.y && p.y <= lb.y + lb.h;
 }
@@ -97,7 +97,7 @@ export function portAnchors(el: BoxElement): Point[] {
 
 /** Is this connector a sequence-diagram lifeline (from the bottom of a participant straight down, both ends on it)? */
 export function isLifeline(c: DiagramElement): c is ConnectorElement {
-  return c.type === 'connector' && !!c.start.elementId && c.start.elementId === c.end.elementId
+  return c.type === 'connector' && !c.bar && !!c.start.elementId && c.start.elementId === c.end.elementId
     && Math.abs((c.start.anchor?.x ?? -1) - 0.5) < 0.001 && Math.abs((c.end.anchor?.x ?? -1) - 0.5) < 0.001
     && Math.abs((c.start.anchor?.y ?? 0) - 1) < 0.001 // starts at the box's bottom edge (a message to itself starts lower)
     && (c.end.anchor?.y ?? 0) > 1;

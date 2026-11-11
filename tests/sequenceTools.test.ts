@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addFrameBehind, addMessage, addParticipant, addSelfMessage, columnAt, extendLifelines, makeFrame, participantsOf, SEQ_BOX } from '../src/store/sequence';
+import { activeLevel, addBar, addFrameBehind, addMessage, addParticipant, addSelfMessage, barsOn, columnAt, extendLifelines, makeFrame, participantsOf, SEQ_BOX } from '../src/store/sequence';
 import { isLifeline } from '../src/editor/hitTest';
 import { defaultToolStyle, newDocument, seqStyleKey, styleKey } from '../src/model/defaults';
 import type { BoxElement, ConnectorElement, FlowDocument } from '../src/model/types';
@@ -98,5 +98,28 @@ describe('drawing sequence diagrams by hand', () => {
     expect(seqStyleKey('reply')).toBe('seq:reply');
     expect(seqStyleKey('message')).toBe('arrow');
     expect(defaultToolStyle('seq:reply').style.strokeStyle).toBe('dashed');
+  });
+
+  it('activation bars: added on a lifeline, nested when they overlap, lifeline grows; messages touch their edge', () => {
+    const { d, boxes } = three();
+    const b = boxes[1], cx = b.x + b.w / 2, bar = defaultToolStyle('seq:bar');
+    let r = addBar(d, b, 450, 600, bar);
+    r = addBar(r.doc, b, 500, 550, bar); // inside the first: nested, shifted right
+    const bars = barsOn(r.doc, b);
+    expect(bars.map((x) => x.level).sort()).toEqual([0, 1]);
+    expect(activeLevel(r.doc, b, 520)).toBe(2);
+    expect(activeLevel(r.doc, b, 460)).toBe(1);
+    expect(activeLevel(r.doc, b, 700)).toBe(0);
+    const big = addBar(r.doc, b, 450, 2000, bar);
+    expect(lifelineEnd(big.doc, b)).toBeGreaterThan(2000);
+    // a message from the left arriving at 460 stops at the bar's left edge; one at 700 on the lifeline
+    const r1 = addMessage(r.doc, boxes[0], b, 460, arrow);
+    const m1 = get(r1.doc, r1.id) as ConnectorElement;
+    expect(m1.end.x).toBeCloseTo(cx - 6, 5);
+    const r2 = addMessage(r.doc, boxes[0], b, 700, arrow);
+    expect((get(r2.doc, r2.id) as ConnectorElement).end.x).toBeCloseTo(cx, 5);
+    // bars sit just above their lifeline in the drawing order (under messages)
+    const life = r.doc.elements.findIndex((e) => isLifeline(e) && e.start.elementId === b.id);
+    expect(r.doc.elements.findIndex((e) => e.id === bars[0].c.id)).toBe(life + 1);
   });
 });

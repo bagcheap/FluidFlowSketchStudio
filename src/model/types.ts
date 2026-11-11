@@ -151,6 +151,7 @@ export interface ConnectorElement extends ElementBase {
   routing: Routing;
   curvature: number; // for curved routing without bends (-1..1)
   elbowRadius: number; // elbow routing: corner rounding in px (0 = sharp 90° corners)
+  bar?: boolean; // a sequence-diagram activation bar: drawn as an outlined bar along the path (both ends on one participant)
   startHead: HeadKind;
   endHead: HeadKind;
   labelPos: number; // 0..1 along path
@@ -201,7 +202,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 7; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box
+export const SCHEMA_VERSION = 8; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar)
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).

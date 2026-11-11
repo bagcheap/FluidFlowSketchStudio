@@ -54,7 +54,7 @@ export function MermaidDialog() {
         <code>A[Box]</code> · <code>A(Rounded)</code> · <code>A([Pill])</code> · <code>A{'{'}Decision{'}'}</code> · <code>A((Circle))</code> · <code>A[(Database)]</code> · <code>A{'{{'}Hexagon{'}}'}</code> · <code>A[/Input/]</code><br />
         <code>A --&gt; B</code> arrow · <code>A --- B</code> line · <code>A -.-&gt; B</code> dashed · <code>A ==&gt; B</code> thick · <code>A &lt;--&gt; B</code> both ways · <code>A --&gt;|yes| B</code> or <code>A -- yes --&gt; B</code> label · <code>A &amp; B --&gt; C</code><br />
         <code>subgraph Title</code> … <code>end</code> makes a container. First line <code>flowchart LR</code> (or TB, RL, BT) sets the direction.<br />
-        Sequence diagrams start with <code>sequenceDiagram</code>: <code>participant A as Alice</code> · <code>actor U</code> · <code>A-&gt;&gt;B: text</code> · <code>B--&gt;&gt;A: reply</code> (dashed) · <code>A-)B</code> async · <code>A-xB</code> lost · <code>Note right of A: text</code> · <code>loop</code>/<code>alt</code>/<code>else</code>/<code>opt</code>/<code>par</code> … <code>end</code> · <code>autonumber</code>
+        Sequence diagrams start with <code>sequenceDiagram</code>: <code>participant A as Alice</code> · <code>actor U</code> · <code>A-&gt;&gt;B: text</code> · <code>B--&gt;&gt;A: reply</code> (dashed) · <code>A-)B</code> async · <code>A-xB</code> lost · <code>Note right of A: text</code> · <code>A-&gt;&gt;+B</code> / <code>activate B</code> activation bars · <code>loop</code>/<code>alt</code>/<code>else</code>/<code>opt</code>/<code>par</code> … <code>end</code> · <code>autonumber</code>
       </details>
     </Modal>
   );

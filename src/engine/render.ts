@@ -265,6 +265,18 @@ export function roundTripLeg(u: number, pause: number | null): { f: number; back
   return { f: (u - legLen - pause) / legLen, back: true };
 }
 
+/** Width of a sequence-diagram activation bar. */
+export const BAR_W = 12;
+
+/** An activation bar: a white (fill colour) outlined bar along the path, square ends. Not animated. */
+function barParts(path: ConnectorPath, st: ConnectorElement['style']): Part[] {
+  const a = path.pts[0], b = path.pts[path.pts.length - 1];
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = (-(b.y - a.y) / len) * (BAR_W / 2), ny = ((b.x - a.x) / len) * (BAR_W / 2);
+  const fill = st.fill === 'transparent' ? '#ffffff' : st.fill;
+  return [{ k: 'line', pts: [a.x + nx, a.y + ny, b.x + nx, b.y + ny, b.x - nx, b.y - ny, a.x - nx, a.y - ny], color: st.stroke, width: st.strokeWidth, alpha: 1, cap: 'butt', dash: null, closed: true, fill }];
+}
+
 function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, lookup: Lookup, flags: PreviewFlags | undefined, background: string, hideLabel: boolean, cull?: Rect): Item[] {
   const path = connectorPath(c, lookup);
   if (path.length < 1) return [];
@@ -276,6 +288,7 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
   }
   const st = c.style;
   const sw = st.strokeWidth;
+  if (c.bar) return [{ id: c.id, opacity: st.opacity, tf: null, parts: barParts(path, st) }];
   const anim = flags?.still ? { ...resolveConnectorAnim(doc.animation, c), mode: 'none' as const } : resolveConnectorAnim(doc.animation, c);
   const settings = doc.animation;
   const L = settings.seamless && settings.loop ? settings.duration : null;

@@ -180,11 +180,11 @@ export type ToolId =
   | 'text' | 'image' | 'eraser' | 'painter' | 'seq';
 
 /** The sequence-diagram tools (toolbar ▸ Sequence). Notes use the sticky-note shape tool. */
-export type SeqKind = 'participant' | 'actor' | 'message' | 'reply' | 'self' | 'frame';
+export type SeqKind = 'participant' | 'actor' | 'message' | 'reply' | 'self' | 'activation' | 'frame';
 
 /** The remembered style each sequence tool draws with: participants and actors share the box tools' styles. */
 export function seqStyleKey(k: SeqKind): string {
-  return k === 'participant' ? 'shape:rectangle' : k === 'actor' ? 'shape:pill' : k === 'reply' ? 'seq:reply' : k === 'frame' ? 'seq:frame' : 'arrow';
+  return k === 'participant' ? 'shape:rectangle' : k === 'actor' ? 'shape:pill' : k === 'reply' ? 'seq:reply' : k === 'frame' ? 'seq:frame' : k === 'activation' ? 'seq:bar' : 'arrow';
 }
 
 /** Key under which a tool's style is remembered (shape tools remember per shape kind). */
@@ -210,6 +210,10 @@ export function defaultToolStyle(key: string): ToolStyle {
     // a sequence-diagram reply: the arrow look, dashed
     s.style = { ...s.style, fill: 'transparent', fillStyle: 'none', stroke: '#4b5563', strokeStyle: 'dashed' };
     s.routing = 'straight'; s.endHead = 'arrow'; s.startHead = 'none';
+  } else if (key === 'seq:bar') {
+    // an activation bar: white with a thin dark outline
+    s.style = { ...s.style, stroke: '#1e1e2e', fill: '#ffffff', fillStyle: 'solid', strokeWidth: 1.5, strokeStyle: 'solid', roughness: 0 };
+    s.connectorAnim = { mode: 'none' };
   } else if (key === 'seq:frame') {
     // a sequence-diagram block (loop, alt, opt…): a see-through dashed frame with a small title
     s.style = { ...s.style, stroke: '#343a40', fill: 'transparent', fillStyle: 'none', strokeWidth: 1.5, strokeStyle: 'dashed', cornerRadius: 0 };

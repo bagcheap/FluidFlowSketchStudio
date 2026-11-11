@@ -377,7 +377,7 @@ function importSequence(text: string): boolean {
   const u = U();
   const r = buildSequence(D().doc, g, {
     shape: (k) => u.toolStyle(styleKey('shape', k)), arrow: u.toolStyle('arrow'), line: u.toolStyle('line'),
-    container: u.toolStyle('container'), fit: fitShapeToText,
+    container: u.toolStyle('container'), bar: u.toolStyle('seq:bar'), fit: fitShapeToText,
   }, screenToWorld(stage.w / 2, stage.h / 2));
   D().commit(() => r.doc);
   u.setTool('select');
