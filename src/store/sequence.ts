@@ -5,6 +5,9 @@
 import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, Endpoint, FlowDocument, Point, ToolStyle } from '../model/types';
 import { baseFields, makeConnector, makeShape } from '../model/defaults';
 import { isLifeline } from '../editor/hitTest';
+import { BAR_W } from '../engine/render';
+
+export { BAR_W };
 
 export const SEQ_BOX = { w: 130, h: 50 };
 export const SELF_H = 56; // height of a message to itself (a loop out to the right)
@@ -103,13 +106,16 @@ export function asMessage(c: ConnectorElement, from: BoxElement, to: BoxElement)
 
 /** A message from one participant to another at height `y` (lifelines grow to reach it). */
 export function addMessage(doc: FlowDocument, from: BoxElement, to: BoxElement, y: number, tool: ToolStyle): { doc: FlowDocument; id: string } {
-  const c = asMessage(makeConnector(onLifeline(from, y), onLifeline(to, y), tool), from, to);
+  const fx = from.x + from.w / 2, tx = to.x + to.w / 2;
+  const start = messageEnd(from, y, activeLevel(doc, from, y), tx), end = messageEnd(to, y, activeLevel(doc, to, y), fx);
+  const c = asMessage(makeConnector(start, end, tool), from, to);
   return { doc: extendLifelines({ ...doc, elements: [...doc.elements, c] }, [from.id, to.id], y), id: c.id };
 }
 
 /** A message from a participant to itself, starting at height `y`. */
 export function addSelfMessage(doc: FlowDocument, box: BoxElement, y: number, tool: ToolStyle): { doc: FlowDocument; id: string } {
-  const c = asMessage(makeConnector(onLifeline(box, y), onLifeline(box, y + SELF_H), tool), box, box);
+  const right = (yy: number) => messageEnd(box, yy, activeLevel(doc, box, yy), Infinity); // the right edge of an active bar
+  const c = asMessage(makeConnector(right(y), right(y + SELF_H), tool), box, box);
   return { doc: extendLifelines({ ...doc, elements: [...doc.elements, c] }, [box.id], y + SELF_H), id: c.id };
 }
 
@@ -124,4 +130,69 @@ export function makeFrame(x: number, y: number, w: number, h: number, tool: Tool
 /** Put a frame at the back of the page. */
 export function addFrameBehind(doc: FlowDocument, frame: DiagramElement): FlowDocument {
   return { ...doc, elements: [frame, ...doc.elements.filter((e) => e.id !== frame.id)] };
+}
+
+// ---- activation bars -------------------------------------------------------------------------------------------
+
+/** How far each nested activation bar shifts right (UML style); the bar width is BAR_W from the renderer. */
+const NEST_SHIFT = 6;
+export const MIN_BAR = 20;
+
+const barX = (box: BoxElement, level: number) => 0.5 + (level * NEST_SHIFT) / Math.max(1, box.w);
+
+/** An activation bar on a participant's lifeline from y0 to y1 (canvas y); `level` 0 = on the lifeline, 1+ nested. */
+export function makeBar(box: BoxElement, y0: number, y1: number, level: number, tool: ToolStyle): ConnectorElement {
+  const top = Math.min(y0, y1), bottom = Math.max(y0, y1, top + MIN_BAR);
+  const ax = barX(box, level);
+  const c = makeConnector(
+    { x: 0, y: 0, elementId: box.id, anchor: { x: ax, y: (top - box.y) / Math.max(1, box.h) } },
+    { x: 0, y: 0, elementId: box.id, anchor: { x: ax, y: (bottom - box.y) / Math.max(1, box.h) } },
+    tool,
+  );
+  return { ...c, bar: true, routing: 'straight', startHead: 'none', endHead: 'none', anim: { mode: 'none' }, text: '' };
+}
+
+/** The activation bars on a participant: their top and bottom (canvas y) and nesting level. */
+export function barsOn(doc: FlowDocument, box: BoxElement): { c: ConnectorElement; y0: number; y1: number; level: number }[] {
+  return doc.elements.flatMap((e) => {
+    if (e.type !== 'connector' || !e.bar || e.start.elementId !== box.id || !e.start.anchor || !e.end.anchor) return [];
+    const ya = box.y + e.start.anchor.y * box.h, yb = box.y + e.end.anchor.y * box.h;
+    return [{ c: e, y0: Math.min(ya, yb), y1: Math.max(ya, yb), level: Math.round(((e.start.anchor.x - 0.5) * box.w) / NEST_SHIFT) }];
+  });
+}
+
+/** How many activation bars cover height `y` on this participant (0 = none). */
+export function activeLevel(doc: FlowDocument, box: BoxElement, y: number): number {
+  return barsOn(doc, box).filter((b) => y >= b.y0 - 0.5 && y <= b.y1 + 0.5).length;
+}
+
+/**
+ * Where a message touches a participant at height `y`: on the lifeline, or, while an activation bar is active
+ * there, on the edge of the (innermost) bar facing the other end of the message.
+ */
+export function messageEnd(box: BoxElement, y: number, level: number, towardX: number): Endpoint {
+  const p = onLifeline(box, y);
+  if (level <= 0) return p;
+  const cx = box.x + box.w / 2 + (level - 1) * NEST_SHIFT; // the innermost bar's centre
+  const x = towardX >= cx ? cx + BAR_W / 2 : cx - BAR_W / 2;
+  return { ...p, x, anchor: { x: (x - box.x) / Math.max(1, box.w), y: p.anchor!.y } };
+}
+
+/** Next free nesting level for a new bar on this participant from y0 to y1 (overlapping bars stack to the right). */
+export function nextBarLevel(doc: FlowDocument, box: BoxElement, y0: number, y1: number): number {
+  const top = Math.min(y0, y1), bottom = Math.max(y0, y1);
+  const used = new Set(barsOn(doc, box).filter((b) => b.y0 < bottom && b.y1 > top).map((b) => b.level));
+  let l = 0;
+  while (used.has(l)) l++;
+  return l;
+}
+
+/** Add an activation bar on a participant (nesting next to overlapping ones); lifelines grow to reach it. */
+export function addBar(doc: FlowDocument, box: BoxElement, y0: number, y1: number, tool: ToolStyle): { doc: FlowDocument; id: string } {
+  const c = makeBar(box, y0, y1, nextBarLevel(doc, box, y0, y1), tool);
+  // just above the lifeline: bars sit on top of it, under the messages
+  const life = doc.elements.findIndex((e) => isLifeline(e) && e.start.elementId === box.id);
+  const els = [...doc.elements];
+  els.splice(life >= 0 ? life + 1 : els.length, 0, c);
+  return { doc: extendLifelines({ ...doc, elements: els }, [box.id], Math.max(y0, y1, Math.min(y0, y1) + MIN_BAR)), id: c.id };
 }

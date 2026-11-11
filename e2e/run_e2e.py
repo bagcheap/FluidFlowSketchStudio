@@ -729,6 +729,13 @@ def main():
             pick('Message to itself'); app.click((acx, 21440)); page.keyboard.press('Escape')
             self_m = app.els('connector')[-1]
             assert self_m['start']['elementId'] == self_m['end']['elementId'] == api['id'] and self_m['routing'] == 'curved'
+            # an activation bar on API, then a message arriving while it's active stops at its edge
+            pick('Activation'); app.drag((acx, 21500), (acx, 21620)); page.keyboard.press('Escape')
+            bar = [e for e in app.els('connector') if e.get('bar')]
+            assert len(bar) == 1 and bar[0]['start']['elementId'] == api['id'], bar
+            pick('Message'); app.drag((ucx, 21560), (acx, 21560)); page.keyboard.press('Escape')
+            hit = app.els('connector')[-1]
+            assert hit['end']['elementId'] == api['id'] and abs(hit['end']['anchor']['x'] * api['w'] + api['x'] - (acx - 6)) < 0.5, hit['end']
             pick('Frame'); app.drag((ucx - 40, 21280), (acx + 60, 21420)); page.wait_for_selector('.text-editor')
             page.keyboard.type('loop every second'); page.keyboard.press('Escape'); page.wait_for_timeout(80)
             fr = [e for e in app.els('container') if e['text'] == 'loop every second']
@@ -827,7 +834,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 7
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 8
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()

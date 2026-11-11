@@ -1,6 +1,6 @@
 // Floating drawing toolbar. Tools stay active after drawing (continuous mode, lock icon).
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, LayoutGrid, Circle, Diamond, Eraser, Hand, Highlighter, ImagePlus, Lock, LockOpen, Minus, MousePointer2, MoveRight, Paintbrush, Pencil, Repeat2, Reply, Shapes, Square, SquareDashed, StickyNote, RectangleHorizontal, Type, User, Workflow } from 'lucide-react';
+import { ArrowUpRight, LayoutGrid, Circle, Diamond, Eraser, Hand, Highlighter, ImagePlus, Lock, LockOpen, Minus, MousePointer2, MoveRight, RectangleVertical, Paintbrush, Pencil, Repeat2, Reply, Shapes, Square, SquareDashed, StickyNote, RectangleHorizontal, Type, User, Workflow } from 'lucide-react';
 import type { ShapeKind } from '../model/types';
 import type { SeqKind, ToolId } from '../model/defaults';
 import { useUI } from '../store/uiStore';
@@ -39,6 +39,7 @@ const SEQ_TOOLS: { k: SeqKind | 'note'; icon: ReactNode; label: string; tip: str
   { k: 'message', icon: <MoveRight size={16} />, label: 'Message', tip: 'Drag from one lifeline to another; click a lifeline for a message to itself' },
   { k: 'reply', icon: <Reply size={16} />, label: 'Reply', tip: 'A dashed return message: drag from one lifeline to another' },
   { k: 'self', icon: <Repeat2 size={16} />, label: 'Message to itself', tip: 'Click a lifeline to add a loop back to it' },
+  { k: 'activation', icon: <RectangleVertical size={16} />, label: 'Activation', tip: 'Drag down a lifeline to show when a participant is busy; click for a short bar' },
   { k: 'note', icon: <StickyNote size={16} />, label: 'Note', tip: 'Click or drag to add a sticky note' },
   { k: 'frame', icon: <SquareDashed size={16} />, label: 'Frame', tip: 'Drag around messages for a loop / alt / opt frame, then type its title' },
 ];

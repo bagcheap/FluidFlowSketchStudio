@@ -179,6 +179,7 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
         routing: oneOf(v.routing, ['straight', 'curved', 'elbow'] as const, 'straight'),
         curvature: num(v.curvature, 0, -1, 1),
         elbowRadius: num(v.elbowRadius, 0, 0, 500),
+        ...(v.bar === true ? { bar: true } : {}),
         startHead: oneOf(v.startHead, heads, 'none'),
         endHead: oneOf(v.endHead, heads, 'arrow'),
         labelPos: num(v.labelPos, 0.5, 0, 1),
@@ -340,6 +341,10 @@ export function migrate(raw: Obj): Obj {
   if (version === 6) {
     // v6 -> v7: pages. A single-page document keeps its elements; parseDocument wraps them in "Page 1".
     version = 7;
+  }
+  if (version === 7) {
+    // v7 -> v8: arrows may be sequence-diagram activation bars (bar: true); nothing to convert
+    version = 8;
   }
   raw.schemaVersion = version;
   return raw;

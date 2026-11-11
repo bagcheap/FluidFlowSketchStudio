@@ -15,7 +15,7 @@ import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, hitTest, isLifeline, lifelineAt, portAnchors, portPositions } from './hitTest';
 import { addConnectedCopy, canQuickConnect, handleLocal, QUICK_SHAPES, SIDES, type Side } from '../store/quickConnect';
-import { addFrameBehind, addParticipant, addSelfMessage, asMessage, columnAt, extendLifelines, makeFrame, onLifeline } from '../store/sequence';
+import { activeLevel, addBar, addFrameBehind, addParticipant, addSelfMessage, asMessage, columnAt, extendLifelines, makeBar, makeFrame, messageEnd, MIN_BAR, nextBarLevel, onLifeline } from '../store/sequence';
 import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { Copy } from 'lucide-react';
@@ -43,7 +43,8 @@ type Interaction =
   | { k: 'label'; id: string }
   | { k: 'quick'; src: string; side: Side; start: Point; connId: string | null } // dragging from a quick-connect handle
   | { k: 'seqmsg'; id: string; from: string; y: number; start: Point; moved: boolean } // Sequence ▸ Message / Reply: lifeline to lifeline, level
-  | { k: 'seqframe'; id: string; start: Point; moved: boolean }; // Sequence ▸ Frame: drag out a loop/alt frame
+  | { k: 'seqframe'; id: string; start: Point; moved: boolean } // Sequence ▸ Frame: drag out a loop/alt frame
+  | { k: 'seqbar'; id: string; box: string; y0: number; level: number; moved: boolean }; // Sequence ▸ Activation: drag along a lifeline
 
 /** Distance (screen px) of the quick-connect handles from a shape's sides. */
 const QC_OFF = 40;
@@ -318,6 +319,14 @@ export function Canvas() {
         }
         const col = columnAt(d, p, u.view.zoom);
         if (!col) { u.setHint('Start on a lifeline (the dashed line under a participant). Add participants first if there are none.'); return; }
+        if (u.seqKind === 'activation') {
+          const level = nextBarLevel(d, col.box, p.y, p.y + MIN_BAR);
+          const bar = makeBar(col.box, p.y, p.y + MIN_BAR, level, ts);
+          D.begin();
+          D.live((dd) => ({ ...dd, elements: [...dd.elements, bar] }));
+          inter.current = { k: 'seqbar', id: bar.id, box: col.box.id, y0: p.y, level, moved: false };
+          return;
+        }
         if (u.seqKind === 'self') {
           const r = addSelfMessage(d, col.box, p.y, ts);
           D.commit(() => r.doc);
@@ -526,6 +535,14 @@ export function Canvas() {
         }));
         return;
       }
+      case 'seqbar': {
+        if (!it.moved && Math.abs(p.y - it.y0) * u.view.zoom < 4) return;
+        it.moved = true;
+        const box = getElement(D.doc, it.box) as BoxElement;
+        const nb = makeBar(box, it.y0, p.y, it.level, u.toolStyle(seqStyleKey('activation')));
+        D.live((d) => mapElements(d, [it.id], (el) => ({ ...el, start: nb.start, end: nb.end } as ConnectorElement)));
+        return;
+      }
       case 'seqframe': {
         if (!it.moved && Math.hypot(p.x - it.start.x, p.y - it.start.y) * u.view.zoom < 4) return;
         it.moved = true;
@@ -549,6 +566,17 @@ export function Canvas() {
       }
       case 'endpoint': {
         const c = getElement(D.doc, it.id) as ConnectorElement;
+        if (c.bar && c.start.elementId) {
+          // an activation bar's end: slide along its lifeline (at least MIN_BAR long, never above the box)
+          const box = getElement(D.doc, c.start.elementId) as BoxElement;
+          const other = box.y + (it.which === 'start' ? c.end.anchor!.y : c.start.anchor!.y) * box.h;
+          let y = Math.max(box.y + box.h + 4, p.y);
+          if (it.which === 'end') y = Math.max(y, other + MIN_BAR); else y = Math.min(y, other - MIN_BAR);
+          const ax = c.start.anchor!.x;
+          const ep = { x: 0, y: 0, elementId: box.id, anchor: { x: ax, y: (y - box.y) / Math.max(1, box.h) } };
+          D.live((d) => extendLifelines(mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), [it.which]: ep })), [box.id], y));
+          return;
+        }
         const owner = isLifeline(c) && it.which === 'end' ? getElement(D.doc, c.start.elementId!) : null;
         if (owner && owner.type !== 'connector') {
           // a lifeline's bottom end: drag to lengthen or shorten it; it stays under its participant
@@ -687,9 +715,27 @@ export function Canvas() {
           return;
         }
         if (!c.end.elementId) { D.cancel(); u.setHint('Drop the message on another lifeline'); return; }
-        D.live((d) => extendLifelines(d, [it.from, c.end.elementId!], it.y));
+        D.live((d) => {
+          // touch the edge of an activation bar where one is active
+          const a = getElement(d, it.from) as BoxElement, b = getElement(d, c.end.elementId!) as BoxElement;
+          const ends = { start: messageEnd(a, it.y, activeLevel(d, a, it.y), b.x + b.w / 2), end: messageEnd(b, it.y, activeLevel(d, b, it.y), a.x + a.w / 2) };
+          return extendLifelines(mapElements(d, [it.id], (el) => ({ ...el, ...ends } as ConnectorElement)), [it.from, c.end.elementId!], it.y);
+        });
         D.end();
         afterCreate(it.id); // selected: type its text
+        return;
+      }
+      case 'seqbar': {
+        const box = getElement(D.doc, it.box) as BoxElement;
+        // a click: a short bar; then the bar is redone with addBar so it sits under the messages and the lifeline grows
+        const bar = getElement(D.doc, it.id) as ConnectorElement;
+        const y1 = it.moved ? box.y + bar.end.anchor!.y * box.h : it.y0 + 60;
+        D.live((d) => {
+          const r = addBar({ ...d, elements: d.elements.filter((e) => e.id !== it.id) }, box, it.y0, y1, u.toolStyle(seqStyleKey('activation')));
+          return { ...r.doc, elements: r.doc.elements.map((e) => (e.id === r.id ? { ...e, id: it.id } : e)) };
+        });
+        D.end();
+        afterCreate(it.id);
         return;
       }
       case 'seqframe': {

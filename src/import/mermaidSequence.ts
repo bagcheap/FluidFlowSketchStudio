@@ -10,7 +10,8 @@ export type SStep =
   | { k: 'note'; at: string[]; side: 'left' | 'right' | 'over'; text: string }
   | { k: 'open'; kind: string; text: string } // loop, alt, opt, par, critical, break, rect
   | { k: 'else'; kind: string; text: string } // else (alt), and (par), option (critical)
-  | { k: 'close' };
+  | { k: 'close' }
+  | { k: 'act'; id: string; on: boolean }; // activate / deactivate a participant (an activation bar starts or ends)
 export interface SGraph { participants: SParticipant[]; steps: SStep[]; autonumber: boolean; warnings: string[] }
 
 export const MAX_PARTICIPANTS = 100;
@@ -42,7 +43,7 @@ const ARROWS: [string, { endHead: HeadKind; startHead: HeadKind; dashed: boolean
 ];
 const BLOCKS = /^(loop|alt|opt|par|critical|break|rect)\b\s*(.*)$/i;
 const DIVIDERS = /^(else|and|option)\b\s*(.*)$/i;
-const IGNORED = /^(activate|deactivate|title|accTitle|accDescr|link|links|properties|details|box|create|destroy|style|classDef|class|click)\b/i;
+const IGNORED = /^(title|accTitle|accDescr|link|links|properties|details|box|create|destroy|style|classDef|class|click)\b/i;
 const NAME = (s: string) => plainText(s).trim().slice(0, 100);
 
 export function parseSequence(input: string): SGraph {
@@ -72,6 +73,8 @@ export function parseSequence(input: string): SGraph {
     if (/^autonumber\b/i.test(line)) { g.autonumber = true; return; }
     if (/^box\b/i.test(line)) { skipBox++; return; } // participant groups: their participants are still read
     if (IGNORED.test(line)) return;
+    const am = /^(activate|deactivate)\s+(.+)$/i.exec(line);
+    if (am) { const id = ref(am[2]); if (id) g.steps.push({ k: 'act', id, on: am[1].toLowerCase() === 'activate' }); return; }
     const pm = /^(participant|actor)\s+(.+?)(?:\s+as\s+(.+))?$/i.exec(line);
     if (pm) { if (!ref(pm[2], pm[3] !== undefined ? cleanLabel(pm[3]) : undefined, pm[1].toLowerCase() === 'actor')) g.warnings.push(`Line ${i + 1}: too many participants`); return; }
     const nm = /^note\s+(left of|right of|over)\s+([^:]+?)\s*:\s*(.*)$/i.exec(line);
@@ -100,9 +103,13 @@ export function parseSequence(input: string): SGraph {
       if (at <= 0) continue;
       const colon = line.indexOf(':', at + op.length);
       const from = ref(line.slice(0, at));
-      const to = ref((colon < 0 ? line.slice(at + op.length) : line.slice(at + op.length, colon)).replace(/^\s*[+-]/, ''));
+      const target = colon < 0 ? line.slice(at + op.length) : line.slice(at + op.length, colon);
+      const sign = /^\s*([+-])/.exec(target)?.[1]; // A->>+B activates B; B-->>-A ends B's activation
+      const to = ref(target.replace(/^\s*[+-]/, ''));
       if (!from || !to) break;
       g.steps.push({ k: 'msg', from, to, text: colon < 0 ? '' : cleanLabel(line.slice(colon + 1)), ...style });
+      if (sign === '+') g.steps.push({ k: 'act', id: to, on: true });
+      if (sign === '-') g.steps.push({ k: 'act', id: from, on: false });
       return;
     }
     g.warnings.push(`Line ${i + 1}: couldn't read "${line.slice(0, 60)}"`);
