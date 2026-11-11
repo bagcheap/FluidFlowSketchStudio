@@ -4,13 +4,13 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.18] - 2026-11-11
 
 ### Added
 - **Activation bars in sequence diagrams:** the narrow boxes on a lifeline that show when a participant is busy. Mermaid's `activate` / `deactivate` and the `A->>+B` / `B-->>-A` shorthands create them when you import, and the new **Activation** tool in the Sequence palette draws one: drag down a lifeline, or click for a short one. Overlapping bars stack slightly to the right, bars move with their participant, and dragging a bar's end makes it longer or shorter. Messages start and end at the edge of an active bar instead of the middle of the lifeline.
 
 ### Changed
-- Files now use format version 8. Older files open as before, but files saved with this version need this version of FlowSketch or later.
+- Files now use format version 8. Older files open as before, but files saved with this version need FlowSketch 0.1.18 or later.
 
 ## [0.1.17] - 2026-11-11
 
