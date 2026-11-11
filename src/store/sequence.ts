@@ -5,7 +5,8 @@
 import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, Endpoint, FlowDocument, Point, ToolStyle } from '../model/types';
 import { baseFields, makeConnector, makeShape } from '../model/defaults';
 import { isLifeline } from '../editor/hitTest';
-import { BAR_W } from '../engine/render';
+import { BAR_W, makeLookup } from '../engine/render';
+import { connectorPath } from '../engine/connectors';
 
 export { BAR_W };
 
@@ -195,4 +196,60 @@ export function addBar(doc: FlowDocument, box: BoxElement, y0: number, y1: numbe
   const els = [...doc.elements];
   els.splice(life >= 0 ? life + 1 : els.length, 0, c);
   return { doc: extendLifelines({ ...doc, elements: els }, [box.id], Math.max(y0, y1, Math.min(y0, y1) + MIN_BAR)), id: c.id };
+}
+
+// ---- message-by-message playback -------------------------------------------------------------------------------
+
+/** The messages of the sequence diagram(s) on the page: arrows with both ends on participants (not lifelines or bars). */
+export function messagesOf(doc: FlowDocument): ConnectorElement[] {
+  const parts = new Set(participantsOf(doc).map((p) => p.box.id));
+  const notLifeline = (e: DiagramElement): boolean => !isLifeline(e); // a plain boolean, not a type guard
+  return doc.elements.filter((e): e is ConnectorElement =>
+    e.type === 'connector' && !e.bar && notLifeline(e) && !!e.start.elementId && !!e.end.elementId
+    && parts.has(e.start.elementId) && parts.has(e.end.elementId));
+}
+
+/** Top-to-bottom order (then left to right) of the given arrows, by where they start. */
+export function inReadingOrder(doc: FlowDocument, arrows: ConnectorElement[]): ConnectorElement[] {
+  const look = makeLookup(doc, null);
+  const at = new Map(arrows.map((c) => [c.id, connectorPath(c, look).pts[0] ?? { x: 0, y: 0 }]));
+  return [...arrows].sort((a, b) => at.get(a.id)!.y - at.get(b.id)!.y || at.get(a.id)!.x - at.get(b.id)!.x);
+}
+
+/**
+ * Message-by-message playback: each arrow gets its own slice of the loop, in reading order, so they light up one
+ * after another (the travelling highlight, once per loop). Returns the number of steps.
+ */
+export function setPlayOrder(doc: FlowDocument, ids: string[]): { doc: FlowDocument; steps: number } {
+  const want = new Set(ids);
+  const arrows = inReadingOrder(doc, doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && want.has(e.id) && !e.bar && !isLifeline(e as DiagramElement)));
+  const n = arrows.length;
+  if (!n) return { doc, steps: 0 };
+  const slot = new Map(arrows.map((c, i) => [c.id, i]));
+  return {
+    doc: {
+      ...doc,
+      elements: doc.elements.map((e) => {
+        const i = slot.get(e.id);
+        if (i === undefined || e.type !== 'connector' || e.locked) return e;
+        // a small pause after each message before the next one starts
+        return { ...e, anim: { ...e.anim, mode: 'travel', window: [i / n, (i + 0.85) / n] as [number, number] } };
+      }),
+    },
+    steps: n,
+  };
+}
+
+/** Back to all arrows animating together: remove play windows. */
+export function clearPlayOrder(doc: FlowDocument, ids: string[]): FlowDocument {
+  const want = new Set(ids);
+  return {
+    ...doc,
+    elements: doc.elements.map((e) => {
+      if (!want.has(e.id) || e.type !== 'connector' || !e.anim?.window) return e;
+      const { window: _w, ...rest } = e.anim;
+      void _w;
+      return { ...e, anim: rest };
+    }),
+  };
 }

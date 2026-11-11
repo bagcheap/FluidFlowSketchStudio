@@ -71,6 +71,7 @@ export interface ConnectorAnim {
   erase: boolean; // drawOn: erase from tail instead of vanishing
   delay: number; // seconds
   arrowPulse: boolean;
+  window?: [number, number]; // travelling highlight plays once, only in this part of the loop (fractions 0..1): sequence-diagram steps
 }
 
 export interface AnimationSettings {
@@ -202,7 +203,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 8; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar)
+export const SCHEMA_VERSION = 9; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback)
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).

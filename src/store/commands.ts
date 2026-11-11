@@ -1,5 +1,5 @@
 // Editor commands shared by menus, keyboard shortcuts, toolbar and inspector.
-import type { Asset, BoxElement, ConnectorAnim, ContainerElement, DiagramElement, FlowDocument, IconAsset, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
+import type { Asset, BoxElement, ConnectorAnim, ConnectorElement, ContainerElement, DiagramElement, FlowDocument, IconAsset, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
 import { SCHEMA_VERSION } from '../model/types';
 import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
@@ -16,6 +16,7 @@ import { importFiles, slugName, useLibraries } from '../icons/libraries';
 import { addConnectedCopy, canQuickConnect, type Side } from './quickConnect';
 import { cycleKeyHeld } from '../ui/modifiers';
 import * as pages from './pages';
+import * as seq from './sequence';
 import { looksLikeMermaid, parseMermaid } from '../import/mermaid';
 import { buildMermaid } from '../import/mermaidBuild';
 import { isSequence, parseSequence } from '../import/mermaidSequence';
@@ -379,7 +380,9 @@ function importSequence(text: string): boolean {
     shape: (k) => u.toolStyle(styleKey('shape', k)), arrow: u.toolStyle('arrow'), line: u.toolStyle('line'),
     container: u.toolStyle('container'), bar: u.toolStyle('seq:bar'), fit: fitShapeToText,
   }, screenToWorld(stage.w / 2, stage.h / 2));
-  D().commit(() => r.doc);
+  // its messages play one after another, in order
+  const ordered = seq.setPlayOrder(r.doc, r.messageIds);
+  D().commit(() => fitLoopTo(ordered.doc, ordered.steps));
   u.setTool('select');
   u.select(r.ids);
   const b = selectionBounds(D().doc, r.ids);
@@ -387,6 +390,39 @@ function importSequence(text: string): boolean {
   const what = `Added ${r.participants} participant${r.participants === 1 ? '' : 's'} and ${r.messages} message${r.messages === 1 ? '' : 's'}`;
   u.toast(g.warnings.length ? `${what}. Skipped: ${g.warnings.slice(0, 2).join('; ')}${g.warnings.length > 2 ? ' …' : ''}` : what);
   return true;
+}
+
+/** Seconds each message gets when messages play one after another. */
+const STEP_SECONDS = 1.2;
+
+/** Make the loop long enough for `steps` messages one after another (never shorter). Returns the new length or null. */
+function fitLoopTo(d: FlowDocument, steps: number): FlowDocument {
+  if (d.animation.duration >= steps * 0.9) return d;
+  return { ...d, animation: { ...d.animation, duration: Math.min(120, Math.round(steps * STEP_SECONDS * 2) / 2), loop: true, seamless: true } };
+}
+
+/**
+ * Animation ▸ Play messages in order: the selected arrows (or every sequence-diagram message on the page) light up
+ * one after another, top to bottom. The loop gets longer if needed. One undo step.
+ */
+export function playMessagesInOrder() {
+  const doc = D().doc;
+  const picked = U().selection.map((id) => getElement(doc, id)).filter((e): e is ConnectorElement => e?.type === 'connector' && !e.bar);
+  const ids = (picked.length ? picked : seq.messagesOf(doc)).map((c) => c.id);
+  if (!ids.length) { U().toast('Select some arrows, or add a sequence diagram, first'); return; }
+  const before = doc.animation.duration;
+  const r = seq.setPlayOrder(doc, ids);
+  D().commit(() => fitLoopTo(r.doc, r.steps));
+  const after = D().doc.animation.duration;
+  U().toast(`${r.steps} arrow${r.steps === 1 ? '' : 's'} now play one after another${after !== before ? ` (loop lengthened to ${after} s)` : ''}`);
+}
+
+/** Animation ▸ Play arrows together: undo "in order" for the selected arrows (or all on the page). */
+export function playArrowsTogether() {
+  const doc = D().doc;
+  const sel = U().selection.filter((id) => getElement(doc, id)?.type === 'connector');
+  const ids = sel.length ? sel : doc.elements.filter((e) => e.type === 'connector').map((e) => e.id);
+  D().commit((d) => seq.clearPlayOrder(d, ids));
 }
 
 /** Auto-layout the selection (2+ items), or the whole diagram, in one direction. One undo step. */

@@ -24,7 +24,7 @@ const FIRST_ROW = 44; // first message below the boxes
 const ROW = 52; // between messages
 const FRAME_MIN_W = 180;
 
-export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at: Point): { doc: FlowDocument; ids: string[]; participants: number; messages: number } {
+export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at: Point): { doc: FlowDocument; ids: string[]; participants: number; messages: number; messageIds: string[] } {
   // participants, left to right
   const boxes = new Map<string, BoxElement>();
   let x = 0;
@@ -149,5 +149,5 @@ export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at:
     const x0 = Math.min(...free.map((e) => e.x)), x1 = Math.max(...free.map((e) => e.x + e.w));
     out = moveElements(out, new Set(free.map((e) => e.id)), at.x - (x0 + x1) / 2, at.y - bottom / 2);
   }
-  return { doc: out, ids: free.map((e) => e.id), participants: boxes.size, messages: messages.length };
+  return { doc: out, ids: free.map((e) => e.id), participants: boxes.size, messages: messages.length, messageIds: messages.map((m) => m.id) };
 }

@@ -4,6 +4,14 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Messages play one after another:** in a sequence diagram the messages can now light up in order (message 1, then 2, then 3…) instead of all at once, so playback and exported GIFs and videos tell the story step by step. Imported sequence diagrams do this automatically. For any arrows, choose Animation ▸ Play messages in order (with arrows selected, or for every sequence-diagram message on the page) or right-click ▸ Play in order; Play arrows together switches back. The loop is lengthened if it's too short (about 1.2 seconds per message), and the Inspector shows which step an arrow is.
+
+### Changed
+- Files now use format version 9. Older files open as before, but files saved with this version need this version of FlowSketch or later.
+
 ## [0.1.18] - 2026-11-11
 
 ### Added
