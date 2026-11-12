@@ -2,9 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { connectorPath, roundCorners } from '../src/engine/connectors';
 import { makeLookup } from '../src/engine/render';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
-import { applySelectionStyleToDefaults, styleOf } from '../src/store/commands';
-import { useDoc } from '../src/store/docStore';
-import { useUI } from '../src/store/uiStore';
 import { parseDocument, serializeDocument } from '../src/model/schema';
 import type { ConnectorElement, FlowDocument } from '../src/model/types';
 
@@ -67,54 +64,5 @@ describe('arrow routing', () => {
     expect(again.elbowRadius).toBe(16);
     const big = parseDocument({ format: 'flowsketch', schemaVersion: 6, elements: [{ ...c, elbowRadius: 1e9 }] }).doc.elements[0] as ConnectorElement;
     expect(big.elbowRadius).toBe(500);
-  });
-
-  describe('elbow arrows go round the shapes they connect', () => {
-    const t = defaultToolStyle('shape:rectangle');
-    const inside = (p: { x: number; y: number }, r: { x: number; y: number; w: number; h: number }) => p.x > r.x + 1 && p.x < r.x + r.w - 1 && p.y > r.y + 1 && p.y < r.y + r.h - 1;
-    function route(a: ReturnType<typeof makeShape>, b: ReturnType<typeof makeShape>, sa: { x: number; y: number } | null, sb: { x: number; y: number } | null) {
-      const c = { ...makeConnector({ x: 0, y: 0, elementId: a.id, anchor: sa }, { x: 0, y: 0, elementId: b.id, anchor: sb }, defaultToolStyle('arrow')), routing: 'elbow' as const };
-      return connectorPath(c, makeLookup({ ...newDocument(), elements: [a, b, c] }, null));
-    }
-
-    it('bottom of one shape to the bottom of another, lower right (the reported case): round underneath, never through', () => {
-      const a = makeShape('rectangle', 0, 0, 400, 230, t), b = makeShape('roundRect', 550, 290, 320, 160, t);
-      const p = route(a, b, { x: 0.5, y: 1 }, { x: 0.5, y: 1 });
-      for (const q of p.pts) { expect(inside(q, a)).toBe(false); expect(inside(q, b)).toBe(false); }
-      const n = p.control.length;
-      expect(p.control[n - 1].y).toBeLessThan(p.control[n - 2].y); // comes up into the bottom side
-    });
-
-    it('any side to any side, shapes in any direction: no route passes through either shape', () => {
-      const sides = [{ x: 0.5, y: 0 }, { x: 1, y: 0.5 }, { x: 0.5, y: 1 }, { x: 0, y: 0.5 }, null];
-      const a = makeShape('rectangle', 0, 0, 160, 100, t);
-      for (const [dx, dy] of [[300, 0], [300, 220], [0, 260], [-300, 220], [-300, -40], [40, -260], [220, 160]]) {
-        const b = makeShape('rectangle', dx, dy, 140, 90, t);
-        for (const sa of sides) for (const sb of sides) {
-          const p = route(a, b, sa, sb);
-          for (const q of p.pts) {
-            expect(inside(q, a), JSON.stringify({ dx, dy, sa, sb })).toBe(false);
-            expect(inside(q, b), JSON.stringify({ dx, dy, sa, sb })).toBe(false);
-          }
-        }
-      }
-    });
-
-    it('two shapes side by side, facing ports: still the simple halfway route', () => {
-      const a = makeShape('rectangle', 0, 0, 100, 60, t), b = makeShape('rectangle', 300, 200, 100, 60, t);
-      const p = route(a, b, { x: 1, y: 0.5 }, { x: 0, y: 0.5 });
-      expect(p.control).toHaveLength(4); // out, across at halfway, in
-      expect(p.control[1].x).toBeCloseTo(200, 0);
-    });
-  });
-
-  it('Set as default style keeps the arrow\'s routing, curve and corner radius', () => {
-    const c = { ...makeConnector({ x: 0, y: 0, elementId: null }, { x: 100, y: 50, elementId: null }, defaultToolStyle('arrow')), routing: 'elbow' as const, elbowRadius: 18, curvature: 0.4 };
-    expect(styleOf(c)).toMatchObject({ routing: 'elbow', elbowRadius: 18, curvature: 0.4 });
-    useDoc.getState().replace((d) => ({ ...d, elements: [c] }));
-    useUI.getState().select([c.id]);
-    applySelectionStyleToDefaults();
-    const next = makeConnector({ x: 0, y: 0, elementId: null }, { x: 10, y: 10, elementId: null }, useUI.getState().toolStyle('arrow'));
-    expect([next.routing, next.elbowRadius, next.curvature]).toEqual(['elbow', 18, 0.4]);
   });
 });

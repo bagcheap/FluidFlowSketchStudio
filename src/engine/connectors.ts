@@ -38,14 +38,7 @@ export const centerOf = (el: BoxElement, m: Motion = STILL): Point => ({ x: el.x
 
 export const GAP = 5;
 
-interface Rect { x0: number; y0: number; x1: number; y1: number }
-// dir = outward direction from the attached shape (for elbow/arrow logic); box = that shape's world bounds (elbow routes avoid it)
-interface End { p: Point; dir: Point; box?: Rect }
-
-function worldBounds(el: BoxElement, m: Motion): Rect {
-  const cs = [{ x: 0, y: 0 }, { x: el.w, y: 0 }, { x: el.w, y: el.h }, { x: 0, y: el.h }].map((q) => toWorld(el, m, q));
-  return { x0: Math.min(...cs.map((q) => q.x)), y0: Math.min(...cs.map((q) => q.y)), x1: Math.max(...cs.map((q) => q.x)), y1: Math.max(...cs.map((q) => q.y)) };
-}
+interface End { p: Point; dir: Point } // dir = outward direction from the attached shape (for elbow/arrow logic)
 
 function norm(v: Point): Point { const l = Math.hypot(v.x, v.y) || 1; return { x: v.x / l, y: v.y / l }; }
 
@@ -66,8 +59,7 @@ function resolveEnd(end: ConnectorElement['start'], aim: Point, lookup: Lookup, 
     const ax = end.anchor.x - 0.5, ay = end.anchor.y - 0.5;
     const sideDir = Math.abs(ax) >= Math.abs(ay) ? { x: Math.sign(ax) || 1, y: 0 } : { x: 0, y: Math.sign(ay) || 1 };
     const dir = elbow ? sideDir : d;
-    const wdir = elbow ? rotate(dir, el.rotation + m.rot) : dir;
-    return { p: { x: wp.x + wdir.x * GAP, y: wp.y + wdir.y * GAP }, dir: wdir, box: worldBounds(el, m) };
+    return { p: { x: wp.x + dir.x * GAP, y: wp.y + dir.y * GAP }, dir };
   }
   const al = toLocal(el, m, aim);
   const lc = { x: el.w / 2, y: el.h / 2 };
@@ -81,12 +73,7 @@ function resolveEnd(end: ConnectorElement['start'], aim: Point, lookup: Lookup, 
   const wp = toWorld(el, m, lp);
   const a = rad(el.rotation + m.rot);
   const wd = { x: ld.x * Math.cos(a) - ld.y * Math.sin(a), y: ld.x * Math.sin(a) + ld.y * Math.cos(a) };
-  return { p: wp, dir: wd, box: worldBounds(el, m) };
-}
-
-function rotate(v: Point, deg: number): Point {
-  const a = rad(deg);
-  return { x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) };
+  return { p: wp, dir: wd };
 }
 
 function refPoint(end: ConnectorElement['start'], lookup: Lookup): Point {
@@ -130,71 +117,7 @@ function densify(points: Point[], step = 6): Point[] {
   return out;
 }
 
-const STUB = 20; // an elbow arrow leaves and enters a shape straight for at least this far
-const AROUND = 24; // clearance when a route goes round a shape
-
-/** Does the axis-aligned segment a-b pass through the inside of r? */
-function crosses(a: Point, b: Point, r: Rect): boolean {
-  const e = 0.5; // touching an edge (where the arrow ends) is fine
-  return Math.max(a.x, b.x) > r.x0 + e && Math.min(a.x, b.x) < r.x1 - e && Math.max(a.y, b.y) > r.y0 + e && Math.min(a.y, b.y) < r.y1 - e;
-}
-
-/** Drop repeated points and points in the middle of a straight run. */
-function simplify(pts: Point[]): Point[] {
-  const out: Point[] = [];
-  for (const q of pts) {
-    if (out.length && Math.hypot(q.x - out[out.length - 1].x, q.y - out[out.length - 1].y) < 0.01) continue;
-    if (out.length >= 2) {
-      const a = out[out.length - 2], b = out[out.length - 1];
-      if ((Math.abs(a.x - b.x) < 0.01 && Math.abs(b.x - q.x) < 0.01) || (Math.abs(a.y - b.y) < 0.01 && Math.abs(b.y - q.y) < 0.01)) out.pop();
-    }
-    out.push(q);
-  }
-  return out;
-}
-
-/**
- * An elbow route with no waypoints between attached shapes: out of each side for a short stub, then the best of a
- * handful of 1–3-turn routes between the stubs: never through either shape, never doubling back over a stub, then
- * shortest with the fewest turns (a route halfway between the shapes wins a tie).
- */
-function autoElbow(s: End, e: End): Point[] {
-  const boxes = [s.box, e.box].filter((b): b is Rect => !!b);
-  // stubs no longer than half the gap between facing ends, so close shapes still get a clean route
-  const along = (e.p.x - s.p.x) * s.dir.x + (e.p.y - s.p.y) * s.dir.y;
-  const facing = s.dir.x * e.dir.x + s.dir.y * e.dir.y < -0.99 && along > 0;
-  const stub = facing ? Math.min(STUB, along / 2) : STUB;
-  const P = { x: s.p.x + s.dir.x * stub, y: s.p.y + s.dir.y * stub };
-  const Q = { x: e.p.x + e.dir.x * stub, y: e.p.y + e.dir.y * stub };
-  const xs = [(P.x + Q.x) / 2, P.x, Q.x], ys = [(P.y + Q.y) / 2, P.y, Q.y];
-  for (const b of boxes) { xs.push(b.x0 - AROUND, b.x1 + AROUND); ys.push(b.y0 - AROUND, b.y1 + AROUND); }
-  const cands: { mid: Point[]; halfway: boolean }[] = [
-    ...xs.map((x, i) => ({ mid: [{ x, y: P.y }, { x, y: Q.y }], halfway: i === 0 })),
-    ...ys.map((y, i) => ({ mid: [{ x: P.x, y }, { x: Q.x, y }], halfway: i === 0 })),
-  ];
-  let best: Point[] | null = null, bestScore = Infinity;
-  for (const c of cands) {
-    const route = simplify([s.p, P, ...c.mid, Q, e.p]);
-    let score = c.halfway ? 0 : 1, len = 0;
-    for (let i = 1; i < route.length; i++) {
-      const a = route[i - 1], b = route[i];
-      len += Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
-      if (boxes.some((r) => crosses(a, b, r))) score += 1e6;
-    }
-    score += len + 30 * (route.length - 2);
-    // doubling back: leaving against the start direction, or arriving moving away from the end's shape
-    const d0 = { x: route[1].x - route[0].x, y: route[1].y - route[0].y };
-    if (d0.x * s.dir.x + d0.y * s.dir.y < -0.01) score += 1e4;
-    const n = route.length;
-    const dn = { x: route[n - 1].x - route[n - 2].x, y: route[n - 1].y - route[n - 2].y };
-    if (dn.x * e.dir.x + dn.y * e.dir.y > 0.01) score += 1e4;
-    if (score < bestScore) { bestScore = score; best = route; }
-  }
-  return best!;
-}
-
 function elbowRoute(s: End, e: End, bends: Point[]): Point[] {
-  if (!bends.length && (s.box || e.box)) return autoElbow(s, e);
   const way = [s.p, ...bends, e.p];
   const out: Point[] = [s.p];
   let horiz = Math.abs(s.dir.x) >= Math.abs(s.dir.y);

@@ -9,10 +9,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - **⌘-drag to duplicate** (Ctrl-drag on Windows), as in Visio: hold ⌘ and drag a shape, arrow or selection to pull away a copy, leaving the original where it was. Alt/Option-drag still works too. One drag is one undo step.
 
-### Fixed
-- Elbow arrows no longer cut through the shapes they connect. For example, an arrow to the bottom of a shape below and to the right now goes round underneath and comes up into it, instead of dropping through the shape. Arrows with your own bend points keep the route you gave them.
-- **Set as default style** on an arrow now also saves its corner radius and curve, so new arrows get them too. Copy style / Paste style carry them as well.
-
 ## [0.1.20] - 2026-11-12
 
 ### Added
