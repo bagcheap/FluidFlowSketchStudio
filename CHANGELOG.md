@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Three snap points on each side:** when you draw or drag an arrow onto a shape there are now three points to attach to on every side (in the middle, and halfway between the middle and each corner) instead of one, so several arrows can meet a side without piling up. On rounded shapes such as ellipses and diamonds the points sit on the outline. The nearest point always wins.
+
 ## [0.1.22] - 2026-11-12
 
 ### Added

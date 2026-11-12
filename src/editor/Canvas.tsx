@@ -13,7 +13,7 @@ import { imageMap, onImageLoaded } from '../engine/images';
 import { connectorPath, isHorizontal, labelPlacement, moveElbowSegment, tidyElbow } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
-import { boxAt, connectorLabelBox, hitTest, isLifeline, lifelineAt, portAnchors, portPositions } from './hitTest';
+import { boxAt, connectorLabelBox, hitTest, isLifeline, lifelineAt, nearestPort, portAnchors, portPositions } from './hitTest';
 import { addConnectedCopy, canQuickConnect, handleLocal, QUICK_SHAPES, SIDES, type Side } from '../store/quickConnect';
 import { activeLevel, addBar, addFrameBehind, addParticipant, addSelfMessage, asMessage, columnAt, extendLifelines, makeBar, makeFrame, messageEnd, MIN_BAR, nextBarLevel, onLifeline } from '../store/sequence';
 import { ShapeIcon } from '../ui/ShapeIcon';
@@ -431,7 +431,8 @@ export function Canvas() {
     const ports = portPositions(target);
     const anchors = portAnchors(target);
     const r = 14 / useUI.getState().view.zoom;
-    for (let i = 0; i < ports.length; i++) if (Math.hypot(ports[i].x - p.x, ports[i].y - p.y) < r) return { x: p.x, y: p.y, elementId: target.id, anchor: anchors[i] };
+    const i = nearestPort(ports, p, r); // ports are closer together now (three a side): take the nearest
+    if (i !== null) return { x: p.x, y: p.y, elementId: target.id, anchor: anchors[i] };
     void other;
     return { x: p.x, y: p.y, elementId: target.id, anchor: null };
   }

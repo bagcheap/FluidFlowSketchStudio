@@ -46,7 +46,6 @@ function resolveEnd(end: ConnectorElement['start'], aim: Point, lookup: Lookup, 
   const pl = end.elementId ? lookup(end.elementId) : null;
   if (!pl) return { p: { x: end.x, y: end.y }, dir: norm({ x: aim.x - end.x, y: aim.y - end.y }) };
   const { el, m } = pl;
-  const c = centerOf(el, m);
   if (end.anchor) {
     const lp = { x: end.anchor.x * el.w, y: end.anchor.y * el.h };
     const wp = toWorld(el, m, lp);
@@ -54,12 +53,14 @@ function resolveEnd(end: ConnectorElement['start'], aim: Point, lookup: Lookup, 
     if (end.anchor.x < -0.001 || end.anchor.x > 1.001 || end.anchor.y < -0.001 || end.anchor.y > 1.001) {
       return { p: wp, dir: norm({ x: aim.x - wp.x, y: aim.y - wp.y }) };
     }
-    const d = norm({ x: wp.x - c.x, y: wp.y - c.y });
     // snap port direction to its nearest side for nicer elbows
     const ax = end.anchor.x - 0.5, ay = end.anchor.y - 0.5;
     const sideDir = Math.abs(ax) >= Math.abs(ay) ? { x: Math.sign(ax) || 1, y: 0 } : { x: 0, y: Math.sign(ay) || 1 };
-    const dir = elbow ? sideDir : d;
-    return { p: { x: wp.x + dir.x * GAP, y: wp.y + dir.y * GAP }, dir };
+    // the gap runs straight out of the port's side (the same as from the centre for a side's middle port)
+    const a = rad(el.rotation + m.rot);
+    const out = { x: sideDir.x * Math.cos(a) - sideDir.y * Math.sin(a), y: sideDir.x * Math.sin(a) + sideDir.y * Math.cos(a) };
+    const dir = elbow ? sideDir : out;
+    return { p: { x: wp.x + out.x * GAP, y: wp.y + out.y * GAP }, dir };
   }
   const al = toLocal(el, m, aim);
   const lc = { x: el.w / 2, y: el.h / 2 };
