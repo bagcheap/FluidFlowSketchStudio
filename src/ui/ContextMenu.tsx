@@ -46,6 +46,7 @@ function selectionItems(): MenuItem[] {
     ] } as MenuItem, { label: 'Match size', sub: matchSizeItems(ui.prefs.matchSizeKeepsProportions) }, { label: 'Auto-layout selection', sub: AUTO_LAYOUT_ITEMS } as MenuItem as MenuItem] : []),
     ...(els.some((e) => e.type === 'connector') ? [
       { label: 'Swap direction', run: () => cmd.swapDirection() } as MenuItem,
+      { label: 'Set play order…', note: 'click arrows in turn', run: cmd.startPlayOrder } as MenuItem,
       els.some((e) => e.type === 'connector' && e.anim?.window)
         ? { label: 'Play arrows together', run: cmd.playArrowsTogether } as MenuItem
         : { label: 'Play in order', note: 'one after another', run: cmd.playMessagesInOrder, disabled: els.filter((e) => e.type === 'connector').length < 2 } as MenuItem,

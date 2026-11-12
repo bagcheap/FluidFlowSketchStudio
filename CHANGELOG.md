@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.24] - 2026-11-12
+
+### Added
+- **Choose the order arrows play in:** Animation ▸ **Set play order…** (also on the right-click menu for arrows) puts a numbered badge on every arrow. Click arrows in the order they should play: 1, 2, 3… Shift-click an arrow to have it play at the same time as the previous one, and click a numbered arrow again to take it out (the numbers after it close up). **Clear** starts again; **Done** or Esc finishes. The arrows then play one step after another and the loop repeats; arrows left out keep animating all the time. Each click is one undo step, and the loop gets longer if it's too short for the number of steps.
+
 ## [0.1.23] - 2026-11-12
 
 ### Added

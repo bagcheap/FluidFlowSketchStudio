@@ -425,6 +425,32 @@ export function playArrowsTogether() {
   D().commit((d) => seq.clearPlayOrder(d, ids));
 }
 
+/** Animation ▸ Set play order: click arrows in turn to number them (numbered badges show the order). Esc / Done ends it. */
+export function startPlayOrder() {
+  const u = U();
+  u.setTool('select');
+  u.select([]);
+  u.setPlayOrderMode(true);
+}
+
+export function endPlayOrder() {
+  U().setPlayOrderMode(false);
+}
+
+/** In "Set play order": an arrow becomes the next step (Shift: the same step as the last one), or leaves the order. */
+export function playOrderClick(id: string, together: boolean) {
+  const doc = D().doc;
+  const c = getElement(doc, id);
+  if (!c || c.type !== 'connector' || c.bar || c.locked) return;
+  const steps = seq.togglePlayStep(seq.readPlaySteps(doc), id, together);
+  D().commit(() => fitLoopTo(seq.applyPlaySteps(doc, steps), steps.length));
+}
+
+/** In "Set play order": start again, with every arrow animating all the time. */
+export function clearAllPlayOrder() {
+  D().commit((d) => seq.applyPlaySteps(d, []));
+}
+
 /** Auto-layout the selection (2+ items), or the whole diagram, in one direction. One undo step. */
 export function autoLayout(dir: LayoutDir) {
   const doc = D().doc;

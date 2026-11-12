@@ -76,6 +76,7 @@ export function useShortcuts() {
       }
       if (e.altKey && k === 'n') return run(cmd.newDiagram);
       if (e.key === 'Escape') {
+        if (u.playOrderMode) return run(() => u.setPlayOrderMode(false)); // finishes "Set play order"
         if (u.hint) u.setHint(null);
         if (u.tool === 'painter') { u.setCopiedStyle(null); }
         if (u.tool !== 'select') return run(() => { u.setTool('select'); u.select([]); }); // so letter shortcuts work again straight away
