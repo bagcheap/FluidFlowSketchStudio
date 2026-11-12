@@ -192,6 +192,7 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
         endHead: oneOf(v.endHead, heads, 'arrow'),
         labelPos: num(v.labelPos, 0.5, 0, 1),
         labelOffset: num(v.labelOffset, 0, -500, 500),
+        ...(typeof v.labelWidth === 'number' && Number.isFinite(v.labelWidth) ? { labelWidth: num(v.labelWidth, 120, 40, 2000) } : {}),
         ...(isObj(v.anim) ? { anim: sanitizeConnectorAnim(v.anim, true) } : {}),
       };
     }
@@ -357,6 +358,10 @@ export function migrate(raw: Obj): Obj {
   if (version === 8) {
     // v8 -> v9: arrow animations may have a play window (message-by-message playback); nothing to convert
     version = 9;
+  }
+  if (version === 9) {
+    // v9 -> v10: arrow labels may have a width (labelWidth, text wraps); nothing to convert
+    version = 10;
   }
   raw.schemaVersion = version;
   return raw;

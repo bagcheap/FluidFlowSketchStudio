@@ -6,7 +6,7 @@ import { useUI } from '../store/uiStore';
 import { geometryFor } from '../engine/shapes';
 import { cssFont } from '../engine/text';
 import { connectorPath, pointAt } from '../engine/connectors';
-import { containerHeader, iconLabelLayout, makeLookup } from '../engine/render';
+import { connectorLabelSize, containerHeader, iconLabelLayout, makeLookup } from '../engine/render';
 
 export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p: Point) => Point; onDone: (id: string, text: string) => void }) {
   const doc = useDoc((s) => s.doc);
@@ -46,9 +46,17 @@ export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p:
     const path = connectorPath(el, makeLookup(doc, null));
     const { pt, tan } = pointAt(path, el.labelPos * path.length);
     const c = toScreen({ x: pt.x - tan.y * el.labelOffset, y: pt.y + tan.x * el.labelOffset });
-    const w = Math.max(120, (text.length + 2) * ts.fontSize * 0.6) * z;
-    outer = { left: c.x - w / 2, top: c.y - (lines * lh * z) / 2, width: w, height: lines * lh * z };
-    inner = { ...common, left: 0, top: 0, width: '100%', height: '100%', textAlign: 'center', background: 'var(--canvas-chip)' };
+    if (el.labelWidth) {
+      // a sized label: the text wraps at the box width while you type, and the box grows downwards
+      const { w, h } = connectorLabelSize({ ...el, text: text || ' ' });
+      const pad = ts.padding;
+      outer = { left: c.x - (w / 2) * z, top: c.y - (h / 2) * z, width: w * z, height: h * z };
+      inner = { ...common, left: pad * z, top: pad * z, width: (w - pad * 2) * z + 2, height: (h - pad * 2) * z + 4, textAlign: 'center', background: 'var(--canvas-chip)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' };
+    } else {
+      const w = Math.max(120, (text.length + 2) * ts.fontSize * 0.6) * z;
+      outer = { left: c.x - w / 2, top: c.y - (lines * lh * z) / 2, width: w, height: lines * lh * z };
+      inner = { ...common, left: 0, top: 0, width: '100%', height: '100%', textAlign: 'center', background: 'var(--canvas-chip)' };
+    }
   } else if (el.type === 'icon') {
     // the label sits below (or right of) the icon; a hidden label is edited below and shown there
     const { box } = iconLabelLayout({ ...el, labelPos: el.labelPos === 'right' ? 'right' : 'below' }, text);

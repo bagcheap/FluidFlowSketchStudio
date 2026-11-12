@@ -464,6 +464,59 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tswap()
 
+        @test('Arrow labels can be dragged off the line; the arrow stays put; one undo step')
+        def tlabeldrag():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 7000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('u'); app.drag((5100, 7200), (5260, 7280)); app.drag((5500, 7200), (5660, 7280))
+            ids = [e['id'] for e in app.els('shape')[-2:]]
+            app.tool('a'); app.drag((5180, 7240), (5580, 7240))
+            page.keyboard.type('go'); app.key('Escape')  # the new arrow is selected: typing labels it
+            c = app.els('connector')[-1]
+            assert c['text'] == 'go' and c['labelOffset'] == 0, (c['text'], c['labelOffset'])
+            app.key('Escape')
+            before = app.js('() => window.__flowsketch.history()')['past']
+            app.drag((5380, 7240), (5395, 7290))  # press on the label, drag it below the line
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert abs(abs(s['labelOffset']) - 50) < 3 and 0.5 < s['labelPos'] < 0.6, (s['labelOffset'], s['labelPos'])
+            assert s['start'] == c['start'] and s['end'] == c['end'] and s['bends'] == c['bends'], 'the arrow itself moved'
+            assert app.ui()['selection'] == [c['id']], app.ui()['selection']
+            assert app.js('() => window.__flowsketch.history()')['past'] == before + 1, 'not one undo step'
+            # the label is drawn where it was dropped
+            box = app.js('(id) => { const f = window.__flowsketch.frame(0); const t = f.items.filter((i) => i.id === id + ":label").flatMap((i) => i.parts).find((p) => p.k === "text"); return t ? t.lines.map((l) => l.y) : null }', c['id'])
+            assert box and min(box) > 7270, box
+            # dragging it back near the line snaps it onto the line
+            app.drag((5395, 7290), (5395, 7243))
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert s['labelOffset'] == 0, s['labelOffset']
+            app.key('Control+z'); app.key('Control+z')
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert s['labelOffset'] == 0 and s['labelPos'] == 0.5, 'undo did not restore the label'
+            # the label's side handles set its width; the text wraps and the box grows downwards
+            app.click((5290, 7240)); page.keyboard.type('one two three four five six seven'); app.key('Escape')
+            app.click((5290, 7240))
+            def lbox():
+                pts = app.js('(id) => window.__flowsketch.frame(0).items.find((i) => i.id === id + ":label").parts[0].pts', c['id'])
+                xs, ys = pts[0::2], pts[1::2]
+                return min(xs), min(ys), max(xs), max(ys)
+            x0, y0, x1, y1 = lbox()
+            app.drag((x1, (y0 + y1) / 2), ((x0 + x1) / 2 + 45, (y0 + y1) / 2))
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert s.get('labelWidth') and abs(s['labelWidth'] - 90) <= 2, s.get('labelWidth')
+            nx0, ny0, nx1, ny1 = lbox()
+            assert abs((nx1 - nx0) - s['labelWidth']) < 1 and (ny1 - ny0) > (y1 - y0) * 2, ((x0, y0, x1, y1), (nx0, ny0, nx1, ny1))
+            assert s['start'] == c['start'] and s['end'] == c['end'], 'the arrow moved'
+            page.screenshot(path=f'{OUT}/label-width.png')
+            page.get_by_role('button', name='Fit label to its text').click(); page.wait_for_timeout(60)
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert 'labelWidth' not in s or s['labelWidth'] is None, s.get('labelWidth')
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tlabeldrag()
+
         @test('Quick-connect: hover handles add a connected copy (click), connect shapes or drop a copy (drag), Ctrl+Arrow')
         def tquick():
             app.key('Escape')
@@ -871,7 +924,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 9
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 10
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()

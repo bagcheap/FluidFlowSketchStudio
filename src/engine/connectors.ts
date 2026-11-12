@@ -213,6 +213,33 @@ export function pointAt(p: ConnectorPath, s: number): { pt: Point; tan: Point } 
   return { pt: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, tan: norm({ x: b.x - a.x, y: b.y - a.y }) };
 }
 
+/** The point on the path nearest to q: its arc length, position and direction. */
+export function nearestOnPath(p: ConnectorPath, q: Point): { s: number; pt: Point; tan: Point } {
+  if (p.pts.length < 2) return { s: 0, pt: p.pts[0] ?? { x: 0, y: 0 }, tan: { x: 1, y: 0 } };
+  let best = { d: Infinity, s: 0, pt: p.pts[0], tan: { x: 1, y: 0 } };
+  for (let i = 0; i < p.pts.length - 1; i++) {
+    const a = p.pts[i], b = p.pts[i + 1];
+    const ex = b.x - a.x, ey = b.y - a.y, l2 = ex * ex + ey * ey;
+    if (l2 < 1e-9) continue;
+    const t = Math.max(0, Math.min(1, ((q.x - a.x) * ex + (q.y - a.y) * ey) / l2));
+    const pt = { x: a.x + ex * t, y: a.y + ey * t };
+    const d = Math.hypot(q.x - pt.x, q.y - pt.y);
+    if (d < best.d) best = { d, s: p.cum[i] + (p.cum[i + 1] - p.cum[i]) * t, pt, tan: norm({ x: ex, y: ey }) };
+  }
+  return { s: best.s, pt: best.pt, tan: best.tan };
+}
+
+/**
+ * Where an arrow's label goes so that its centre is at (or as close as it can get to) `center`: the fraction along the
+ * arrow (labelPos) and the sideways distance (labelOffset), the same pair the renderer reads. Stored relative to the
+ * arrow, so the label keeps its place when the arrow's shapes move.
+ */
+export function labelPlacement(p: ConnectorPath, center: Point): { labelPos: number; labelOffset: number } {
+  const { s, pt, tan } = nearestOnPath(p, center);
+  const off = (center.x - pt.x) * -tan.y + (center.y - pt.y) * tan.x; // along the normal (-tan.y, tan.x)
+  return { labelPos: p.length > 0 ? Math.max(0, Math.min(1, s / p.length)) : 0.5, labelOffset: Math.max(-500, Math.min(500, off)) };
+}
+
 /** Sub-polyline between arc lengths s0 < s1 */
 export function slice(p: ConnectorPath, s0: number, s1: number): Point[] {
   s0 = Math.max(0, s0); s1 = Math.min(p.length, s1);
