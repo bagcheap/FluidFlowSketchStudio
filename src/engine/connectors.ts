@@ -140,6 +140,48 @@ function elbowRoute(s: End, e: End, bends: Point[]): Point[] {
   return out.filter((p, i) => i === 0 || Math.hypot(p.x - out[i - 1].x, p.y - out[i - 1].y) > 0.01);
 }
 
+export const ELBOW_JOG = 20; // dragging an end segment of an elbow arrow adds a jog this far from its shape
+
+/** Does the elbow segment a→b run horizontally (so it slides up and down)? */
+export const isHorizontal = (a: Point, b: Point) => Math.abs(b.x - a.x) >= Math.abs(b.y - a.y);
+
+/**
+ * Slide segment k of an elbow route (its control points, start to end) sideways to coordinate c: y for a horizontal
+ * segment, x for a vertical one. The ends stay where they are: moving the first or last segment adds a short jog next
+ * to its shape. Returns the route's new corners, which become the arrow's bend points (an elbow route passes through
+ * its bend points in turn, so the arrow keeps exactly this shape).
+ */
+export function moveElbowSegment(control: Point[], k: number, c: number): Point[] {
+  const n = control.length;
+  if (n < 2 || k < 0 || k > n - 2) return control.slice(1, -1);
+  const a = control[k], b = control[k + 1];
+  const horiz = isHorizontal(a, b);
+  const to = (q: Point): Point => (horiz ? { x: q.x, y: c } : { x: c, y: q.y });
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const jog = Math.min(ELBOW_JOG, len / 3);
+  const step = (from: Point, toward: Point): Point => ({ x: from.x + ((toward.x - from.x) / len) * jog, y: from.y + ((toward.y - from.y) / len) * jog });
+  let head: Point[], tail: Point[];
+  if (k === 0) { const A = step(a, b); head = [a, A, to(A)]; } else head = [...control.slice(0, k), to(a)];
+  if (k + 1 === n - 1) { const B = step(b, a); tail = [to(B), B, b]; } else tail = [to(b), ...control.slice(k + 2)];
+  return [...head, ...tail].slice(1, -1);
+}
+
+/** Bend points of an elbow route without repeated points or points in the middle of a straight run. */
+export function tidyElbow(start: Point, bends: Point[], end: Point): Point[] {
+  const out: Point[] = [start];
+  for (const q of [...bends, end]) {
+    const last = out[out.length - 1];
+    if (Math.hypot(q.x - last.x, q.y - last.y) < 0.5) continue;
+    if (out.length >= 2) {
+      const pre = out[out.length - 2];
+      const straight = (Math.abs(pre.x - last.x) < 0.5 && Math.abs(last.x - q.x) < 0.5) || (Math.abs(pre.y - last.y) < 0.5 && Math.abs(last.y - q.y) < 0.5);
+      if (straight && out.length > 1 && out[out.length - 1] !== start) out.pop();
+    }
+    out.push(q);
+  }
+  return out.slice(1, -1);
+}
+
 /**
  * Round the corners of an elbow route: each corner becomes a smooth turn of radius up to `r`, never more than
  * half a segment shared with another corner (or the whole end segment), so short segments still look right.

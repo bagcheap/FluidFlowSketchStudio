@@ -547,6 +547,49 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tdupdrag()
 
+        @test('Elbow waypoints: drag a segment bar to slide it; Reset route; double-click removes a waypoint')
+        def twaypoints():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 11000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('u'); app.drag((5100, 11200), (5260, 11280)); app.drag((5500, 11380), (5660, 11460))
+            ids = [e['id'] for e in app.els('shape')[-2:]]
+            app.tool('a'); app.drag((5180, 11240), (5580, 11420))
+            c = app.els('connector')[-1]
+            assert c['start']['elementId'] == ids[0] and c['end']['elementId'] == ids[1]
+            page.get_by_role('radiogroup', name='Routing').get_by_role('radio', name='Elbow').click(); page.wait_for_timeout(80)
+            app.key('Escape'); app.click((5380, 11330))  # select the arrow by its vertical middle segment
+            assert app.ui()['selection'] == [c['id']], app.ui()['selection']
+            before = app.js('() => window.__flowsketch.history()')['past']
+            app.drag((5380, 11330), (5300, 11330))  # the bar on that segment: slide it left
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            xs = sorted({round(b['x']) for b in s['bends']})
+            assert len(s['bends']) == 2 and all(abs(x - 5300) <= 10 for x in xs), s['bends']
+            assert s['start'] == c['start'] and s['end'] == c['end'], 'the ends moved'
+            assert app.js('() => window.__flowsketch.history()')['past'] == before + 1, 'not one undo step'
+            page.screenshot(path=f'{OUT}/elbow-waypoints.png')
+            # the route goes through the new segment position: the middle of the arrow is now at x ≈ 5300
+            app.key('Escape'); app.click((xs[0], 11330))
+            assert app.ui()['selection'] == [c['id']], 'the arrow is not at its new route'
+            page.get_by_role('button', name='Reset route').click(); page.wait_for_timeout(60)
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert s['bends'] == [], s['bends']
+            # straight arrows: a waypoint added from the mid-dot can be removed with a double-click
+            page.get_by_role('radiogroup', name='Routing').get_by_role('radio', name='Straight').click(); page.wait_for_timeout(80)
+            ends = app.js('(id) => window.__flowsketch.connectorEnds(id)', c['id'])
+            mid = ((ends['s']['x'] + ends['e']['x']) / 2, (ends['s']['y'] + ends['e']['y']) / 2)
+            app.drag(mid, (mid[0], mid[1] + 60))
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert len(s['bends']) == 1, s['bends']
+            app.click((s['bends'][0]['x'], s['bends'][0]['y']), count=2)
+            s = [e for e in app.els('connector') if e['id'] == c['id']][0]
+            assert s['bends'] == [] and not app.ui().get('editingId'), (s['bends'], app.ui().get('editingId'))
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        twaypoints()
+
         @test('Quick-connect: hover handles add a connected copy (click), connect shapes or drop a copy (drag), Ctrl+Arrow')
         def tquick():
             app.key('Escape')

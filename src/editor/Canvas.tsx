@@ -10,7 +10,7 @@ import { useUI } from '../store/uiStore';
 import { renderDocumentAtTime, makeLookup, boxCorners, MIN_LABEL_W } from '../engine/render';
 import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
-import { connectorPath, labelPlacement } from '../engine/connectors';
+import { connectorPath, isHorizontal, labelPlacement, moveElbowSegment, tidyElbow } from '../engine/connectors';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, connectorLabelBox, hitTest, isLifeline, lifelineAt, portAnchors, portPositions } from './hitTest';
@@ -40,6 +40,7 @@ type Interaction =
   | { k: 'bend'; id: string; index: number }
   | { k: 'label'; id: string; start: Point; center: Point; orig: FlowDocument; moved: boolean } // dragging an arrow's label
   | { k: 'labelWidth'; id: string; cx: number; side: number } // a label's side handle: its width (symmetric about its centre)
+  | { k: 'segment'; id: string; control: Point[]; index: number; horiz: boolean; moved: boolean } // sliding a segment of an elbow arrow
   | { k: 'freehand'; id: string; pts: Point[] }
   | { k: 'erase'; ids: Set<string> }
   | { k: 'quick'; src: string; side: Side; start: Point; connId: string | null } // dragging from a quick-connect handle
@@ -185,7 +186,17 @@ export function Canvas() {
     return { box, handles: [[-1, { x: box.x, y: cy }], [1, { x: box.x + box.w, y: cy }]] };
   }
 
-  function handleAt(p: Point): { kind: 'resize' | 'rotate' | 'endpoint' | 'bend' | 'addBend' | 'multi' | 'quick' | 'labelWidth'; handle?: Handle; which?: 'start' | 'end'; index?: number; side?: Side; id?: string } | null {
+  /** The draggable segments of an elbow route (long enough to grab), with their middles. */
+  function elbowSegments(control: Point[]): { k: number; mid: Point; horiz: boolean; len: number }[] {
+    const out: { k: number; mid: Point; horiz: boolean; len: number }[] = [];
+    for (let k = 0; k < control.length - 1; k++) {
+      const a = control[k], b = control[k + 1], len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len * view.zoom >= 18) out.push({ k, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, horiz: isHorizontal(a, b), len });
+    }
+    return out;
+  }
+
+  function handleAt(p: Point): { kind: 'resize' | 'rotate' | 'endpoint' | 'bend' | 'addBend' | 'multi' | 'quick' | 'labelWidth' | 'segment'; horiz?: boolean; handle?: Handle; which?: 'start' | 'end'; index?: number; side?: Side; id?: string } | null {
     const r = 9 / view.zoom;
     const near = (q: Point) => Math.hypot(q.x - p.x, q.y - p.y) < r;
     if (singleBox && !singleBox.locked) {
@@ -208,6 +219,11 @@ export function Canvas() {
       let best: NonNullable<ReturnType<typeof handleAt>> | null = null, bd = r;
       for (const [q, h] of cands) { const dd = Math.hypot(q.x - p.x, q.y - p.y); if (dd < bd) { bd = dd; best = h; } }
       if (best) return best;
+      if (singleConn.routing === 'elbow') {
+        // elbow arrows: a handle in the middle of each segment slides it sideways (no free bend points)
+        for (const sg of elbowSegments(path.control)) if (near(sg.mid)) return { kind: 'segment', index: sg.k, horiz: sg.horiz };
+        return null;
+      }
       for (let i = 0; i < singleConn.bends.length; i++) if (near(singleConn.bends[i])) return { kind: 'bend', index: i };
       const ctrl = [path.pts[0], ...singleConn.bends, path.pts[path.pts.length - 1]];
       for (let i = 0; i < ctrl.length - 1; i++) {
@@ -269,6 +285,9 @@ export function Canvas() {
           else if (h.kind === 'multi' && multiBox) inter.current = { k: 'resizeMulti', ids: selection, handle: h.handle!, box: multiBox, orig: d };
           else if (h.kind === 'endpoint' && singleConn) inter.current = { k: 'endpoint', id: singleConn.id, which: h.which! };
           else if (h.kind === 'bend' && singleConn) inter.current = { k: 'bend', id: singleConn.id, index: h.index! };
+          else if (h.kind === 'segment' && singleConn) {
+            inter.current = { k: 'segment', id: singleConn.id, control: connectorPath(singleConn, makeLookup(d, null)).control, index: h.index!, horiz: !!h.horiz, moved: false };
+          }
           else if (h.kind === 'labelWidth' && singleConn) {
             const lb = connectorLabelBox(d, singleConn)!;
             inter.current = { k: 'labelWidth', id: singleConn.id, cx: lb.x + lb.w / 2, side: h.index! };
@@ -468,6 +487,12 @@ export function Canvas() {
     if (u.presentation || !['select', 'shape', 'text'].includes(u.tool)) return;
     const p = toWorldPt(e);
     const d = useDoc.getState().doc;
+    // double-click a waypoint of a straight or curved arrow to remove it
+    const h = u.tool === 'select' ? handleAt(p) : null;
+    if (h?.kind === 'bend' && singleConn) {
+      useDoc.getState().commit((dd) => mapElements(dd, [singleConn.id], (c) => { const cc = c as ConnectorElement; return { ...cc, bends: cc.bends.filter((_, i) => i !== h.index) }; }));
+      return;
+    }
     const hit = hitTest(d, p, u.view.zoom);
     if (hit) startTextEdit(hit.id);
     else if (u.tool === 'select') createTextAt(p);
@@ -626,6 +651,12 @@ export function Canvas() {
       }
       case 'bend': {
         D.live((d) => mapElements(d, [it.id], (el) => { const c = el as ConnectorElement; const b = [...c.bends]; b[it.index] = snapPt(p); return { ...c, bends: b }; }));
+        return;
+      }
+      case 'segment': {
+        const q = snapPt(p);
+        it.moved = true;
+        D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), bends: moveElbowSegment(it.control, it.index, it.horiz ? q.y : q.x) })));
         return;
       }
       case 'labelWidth': {
@@ -833,6 +864,17 @@ export function Canvas() {
       case 'label':
         if (it.moved) D.end(); else D.cancel();
         return;
+      case 'segment': {
+        if (!it.moved) { D.cancel(); return; }
+        // drop corners that ended up on a straight run (a segment dragged into line with its neighbour)
+        D.live((d) => mapElements(d, [it.id], (el) => {
+          const c = el as ConnectorElement;
+          const ctl = connectorPath(c, makeLookup(d, null)).control;
+          return { ...c, bends: tidyElbow(ctl[0], c.bends, ctl[ctl.length - 1]) };
+        }));
+        D.end();
+        return;
+      }
       case 'marquee': return;
       case 'pan': return;
       case 'resize':
@@ -902,6 +944,7 @@ export function Canvas() {
       if (h?.kind === 'rotate') c = 'grab';
       else if (h?.kind === 'quick') c = 'pointer';
       else if (h?.kind === 'labelWidth') c = 'ew-resize';
+      else if (h?.kind === 'segment') c = h.horiz ? 'ns-resize' : 'ew-resize';
       else if (h?.kind === 'resize' || h?.kind === 'multi') c = ({ n: 'ns', s: 'ns', e: 'ew', w: 'ew', nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw' } as const)[h.handle!] + '-resize';
       else if (h) c = 'crosshair';
       else if (hitTest(useDoc.getState().doc, p, u.view.zoom)) c = 'move';
@@ -1006,17 +1049,26 @@ export function Canvas() {
     if (singleConn && !singleConn.locked) {
       const path = connectorPath(singleConn, makeLookup(doc, null));
       const ends = [path.pts[0], path.pts[path.pts.length - 1]];
-      const ctrl = [ends[0], ...singleConn.bends, ends[1]];
-      for (let i = 0; i < ctrl.length - 1; i++) {
-        const m = { x: (ctrl[i].x + ctrl[i + 1].x) / 2, y: (ctrl[i].y + ctrl[i + 1].y) / 2 };
-        overlayEls.push(<circle key={'mid' + i} cx={m.x} cy={m.y} r={hs * 0.45} fill={accent} fillOpacity={0.35} stroke="none" />);
+      const elbow = singleConn.routing === 'elbow';
+      if (elbow) {
+        // a bar across the middle of each segment: drag it to slide the segment sideways
+        for (const sg of elbowSegments(path.control)) {
+          const w = hs * 1.5, h = hs * 0.55;
+          overlayEls.push(<rect key={'seg' + sg.k} x={sg.mid.x - (sg.horiz ? w : h) / 2} y={sg.mid.y - (sg.horiz ? h : w) / 2} width={sg.horiz ? w : h} height={sg.horiz ? h : w} rx={h / 2} fill="var(--panel)" stroke={accent} strokeWidth={1.5 / z} />);
+        }
+      } else {
+        const ctrl = [ends[0], ...singleConn.bends, ends[1]];
+        for (let i = 0; i < ctrl.length - 1; i++) {
+          const m = { x: (ctrl[i].x + ctrl[i + 1].x) / 2, y: (ctrl[i].y + ctrl[i + 1].y) / 2 };
+          overlayEls.push(<circle key={'mid' + i} cx={m.x} cy={m.y} r={hs * 0.45} fill={accent} fillOpacity={0.35} stroke="none" />);
+        }
       }
       const lh = labelHandles(singleConn);
       if (lh) {
         overlayEls.push(<rect key="lbox" x={lh.box.x} y={lh.box.y} width={lh.box.w} height={lh.box.h} rx={4 / z} fill="none" stroke={accent} strokeDasharray={`${3 / z} ${3 / z}`} strokeWidth={1 / z} />);
         for (const [side, q] of lh.handles) overlayEls.push(<rect key={'lw' + side} x={q.x - hs * 0.3} y={q.y - hs * 0.6} width={hs * 0.6} height={hs * 1.2} rx={2 / z} fill="var(--panel)" stroke={accent} strokeWidth={1.5 / z} />);
       }
-      singleConn.bends.forEach((b, i) => overlayEls.push(<circle key={'b' + i} cx={b.x} cy={b.y} r={hs * 0.55} fill="var(--panel)" stroke={accent} strokeWidth={1.5 / z} />));
+      if (!elbow) singleConn.bends.forEach((b, i) => overlayEls.push(<circle key={'b' + i} cx={b.x} cy={b.y} r={hs * 0.55} fill="var(--panel)" stroke={accent} strokeWidth={1.5 / z} />));
       ends.forEach((p, i) => {
         const attached = !!(i === 0 ? singleConn.start : singleConn.end).elementId;
         overlayEls.push(<circle key={'e' + i} cx={p.x} cy={p.y} r={hs * 0.65} fill={attached ? accent : 'var(--panel)'} stroke={accent} strokeWidth={1.5 / z} />);
