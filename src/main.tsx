@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictM
 Object.assign(window, {
   __flowsketch: {
     doc: () => useDoc.getState().doc,
-    ui: () => { const s = useUI.getState(); return { tool: s.tool, shapeKind: s.shapeKind, selection: s.selection, view: s.view, playing: s.playing, time: s.time, dialog: s.dialog, editingId: s.editingId }; },
+    ui: () => { const s = useUI.getState(); return { tool: s.tool, shapeKind: s.shapeKind, selection: s.selection, view: s.view, playing: s.playing, time: s.time, dialog: s.dialog, editingId: s.editingId, playOrderMode: s.playOrderMode }; },
     toolStyle: (k: string) => useUI.getState().toolStyle(k),
     setView: (v: { x: number; y: number; zoom: number }) => useUI.getState().setView(v),
     pause: (t?: number) => { useUI.getState().setPlaying(false); if (t !== undefined) useUI.getState().setTime(t); },

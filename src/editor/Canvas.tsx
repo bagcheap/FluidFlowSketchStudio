@@ -10,7 +10,8 @@ import { useUI } from '../store/uiStore';
 import { renderDocumentAtTime, makeLookup, boxCorners, MIN_LABEL_W } from '../engine/render';
 import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
-import { connectorPath, isHorizontal, labelPlacement, moveElbowSegment, tidyElbow } from '../engine/connectors';
+import { connectorPath, isHorizontal, labelPlacement, moveElbowSegment, pointAt, tidyElbow } from '../engine/connectors';
+import { readPlaySteps } from '../store/sequence';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, connectorLabelBox, hitTest, isLifeline, lifelineAt, nearestPort, portAnchors, portPositions } from './hitTest';
@@ -19,7 +20,7 @@ import { activeLevel, addBar, addFrameBehind, addParticipant, addSelfMessage, as
 import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { Copy } from 'lucide-react';
-import { applyStyle, cloneElements, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
+import { applyStyle, clearAllPlayOrder, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
 import { updateMembership, withMembers } from '../store/containers';
@@ -68,6 +69,7 @@ export function Canvas() {
   const selection = useUI((s) => s.selection);
   const view = useUI((s) => s.view);
   const editingId = useUI((s) => s.editingId);
+  const playOrderMode = useUI((s) => s.playOrderMode);
   const presentation = useUI((s) => s.presentation);
   const [size, setSize] = useState({ w: 1200, h: 800 });
   const [overlay, setOverlay] = useState<Overlay>({});
@@ -266,6 +268,12 @@ export function Canvas() {
       return;
     }
     if (e.button !== 0) return;
+    // "Set play order": a click on an arrow numbers it (Shift: same step as the last one); nothing else happens
+    if (u.playOrderMode) {
+      const hit = hitTest(d, p, u.view.zoom, (x) => x.type === 'connector' && !x.bar && !isLifeline(x));
+      if (hit) playOrderClick(hit.id, e.shiftKey);
+      return;
+    }
 
     switch (u.tool) {
       case 'select': {
@@ -485,7 +493,7 @@ export function Canvas() {
   const onDoubleClick = (e: React.MouseEvent) => {
     if (isEditable(e.target) || (e.target as HTMLElement).closest('.no-canvas')) return;
     const u = useUI.getState();
-    if (u.presentation || !['select', 'shape', 'text'].includes(u.tool)) return;
+    if (u.presentation || u.playOrderMode || !['select', 'shape', 'text'].includes(u.tool)) return;
     const p = toWorldPt(e);
     const d = useDoc.getState().doc;
     // double-click a waypoint of a straight or curved arrow to remove it
@@ -940,6 +948,7 @@ export function Canvas() {
     const u = useUI.getState();
     let c = 'default';
     if (spaceDown || u.tool === 'hand') c = 'grab';
+    else if (u.playOrderMode) c = hitTest(useDoc.getState().doc, p, u.view.zoom, (x) => x.type === 'connector' && !x.bar && !isLifeline(x)) ? 'pointer' : 'default';
     else if (u.tool === 'select') {
       const h = handleAt(p);
       if (h?.kind === 'rotate') c = 'grab';
@@ -1102,6 +1111,26 @@ export function Canvas() {
       const m = overlay.marquee;
       overlayEls.push(<rect key="mq" x={m.x} y={m.y} width={m.w} height={m.h} fill={accent} fillOpacity={0.07} stroke={accent} strokeWidth={1 / z} />);
     }
+    if (playOrderMode) {
+      // a numbered badge on every arrow: its step in the play order (hollow = not in the order, animates all the time)
+      const stepOf = new Map<string, number>();
+      readPlaySteps(doc).forEach((g, k) => g.forEach((id) => stepOf.set(id, k + 1)));
+      for (const el of doc.elements) {
+        if (el.type !== 'connector' || el.bar) continue;
+        const lifeline: boolean = isLifeline(el); // (a plain boolean, so the arrow's type isn't narrowed away)
+        if (lifeline) continue;
+        const path = connectorPath(el, makeLookup(doc, null));
+        const { pt } = pointAt(path, path.length * (el.text ? 0.22 : 0.5)); // clear of a label in the middle
+        const n = stepOf.get(el.id);
+        const r = 11 / z;
+        overlayEls.push(
+          <g key={'ord' + el.id} opacity={el.locked ? 0.4 : 1}>
+            <circle cx={pt.x} cy={pt.y} r={r} fill={n ? accent : 'var(--panel)'} stroke={accent} strokeWidth={1.5 / z} strokeDasharray={n ? undefined : `${3 / z} ${2 / z}`} />
+            {n && <text x={pt.x} y={pt.y} fill="#fff" fontSize={12 / z} fontWeight={700} textAnchor="middle" dominantBaseline="central" fontFamily="Inter, system-ui, sans-serif">{n}</text>}
+          </g>,
+        );
+      }
+    }
     overlay.guides?.forEach((g, i) => overlayEls.push(<line key={'g' + i} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} stroke="#ec4899" strokeWidth={1 / z} strokeDasharray={`${3 / z} ${3 / z}`} />));
   }
 
@@ -1128,6 +1157,13 @@ export function Canvas() {
       <svg className="stage-overlay" width={size.w} height={size.h} aria-hidden>
         <g transform={`scale(${z}) translate(${-view.x} ${-view.y})`}>{overlayEls}</g>
       </svg>
+      {playOrderMode && !presentation && (
+        <div className="order-bar no-canvas" role="toolbar" aria-label="Set play order">
+          <span><b>Set play order:</b> click arrows in the order they should play. Shift-click plays one with the previous step; click again to take it out.</span>
+          <button className="btn small" onClick={clearAllPlayOrder}>Clear</button>
+          <button className="btn small primary" onClick={endPlayOrder}>Done</button>
+        </div>
+      )}
       {qcPop && !editingId && !presentation && (() => {
         const src = getElement(doc, qcPop.id);
         if (!canQuickConnect(src)) return null;

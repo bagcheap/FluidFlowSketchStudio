@@ -246,6 +246,52 @@ export function setPlayOrder(doc: FlowDocument, ids: string[]): { doc: FlowDocum
   };
 }
 
+/**
+ * The play order set on this page, read back from the arrows' play windows: steps in order, each a list of arrow ids
+ * (arrows in one step share a window and play together). Arrows with no window aren't in the order.
+ */
+export function readPlaySteps(doc: FlowDocument): string[][] {
+  const byStart = new Map<number, string[]>();
+  for (const e of doc.elements) {
+    if (e.type !== 'connector' || e.bar || !e.anim?.window) continue;
+    const k = Math.round(e.anim.window[0] * 1e4);
+    byStart.set(k, [...(byStart.get(k) ?? []), e.id]);
+  }
+  return [...byStart.entries()].sort((a, b) => a[0] - b[0]).map(([, ids]) => ids);
+}
+
+/**
+ * Give the arrows in `steps` play windows in that order (one window per step, a short pause after each), and take
+ * the window off any other arrow, so they go back to animating all the time. Locked arrows are left as they are.
+ */
+export function applyPlaySteps(doc: FlowDocument, steps: string[][]): FlowDocument {
+  const n = steps.length;
+  const slot = new Map<string, number>();
+  steps.forEach((g, k) => g.forEach((id) => slot.set(id, k)));
+  return {
+    ...doc,
+    elements: doc.elements.map((e) => {
+      if (e.type !== 'connector' || e.locked) return e;
+      const k = slot.get(e.id);
+      if (k !== undefined) return { ...e, anim: { ...oneWay(e.anim), mode: 'travel', window: [k / n, (k + 0.85) / n] as [number, number] } };
+      if (!e.anim?.window) return e;
+      const { window: _w, ...rest } = e.anim;
+      void _w;
+      return { ...e, anim: rest };
+    }),
+  };
+}
+
+/**
+ * One click in "Set play order": an arrow already in the order comes out (later steps move up); otherwise it becomes
+ * the next step, or joins the last step when `together` (Shift-click) so they play at the same time.
+ */
+export function togglePlayStep(steps: string[][], id: string, together: boolean): string[][] {
+  if (steps.some((g) => g.includes(id))) return steps.map((g) => g.filter((x) => x !== id)).filter((g) => g.length);
+  if (together && steps.length) return [...steps.slice(0, -1), [...steps[steps.length - 1], id]];
+  return [...steps, [id]];
+}
+
 /** Back to all arrows animating together: remove play windows. */
 export function clearPlayOrder(doc: FlowDocument, ids: string[]): FlowDocument {
   const want = new Set(ids);

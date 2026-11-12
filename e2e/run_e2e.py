@@ -613,6 +613,47 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tports()
 
+        @test('Set play order: click arrows to number them, Shift-click joins a step, Esc finishes; plays in that order')
+        def tplayorder():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 15000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('r')
+            for i in range(4): app.drag((5100 + i * 220, 15100), (5220 + i * 220, 15160))
+            app.tool('a')
+            for i in range(3): app.drag((5160 + i * 220, 15130), (5380 + i * 220, 15130))
+            app.key('Escape')
+            cs = app.els('connector')[-3:]
+            page.get_by_role('menuitem', name='Animation').click()
+            page.get_by_role('menuitem', name='Set play order…').click(); page.wait_for_timeout(80)
+            assert app.ui()['playOrderMode'] is True
+            assert page.get_by_role('toolbar', name='Set play order').is_visible()
+            def along(c, f):
+                e = app.js('(id) => window.__flowsketch.connectorEnds(id)', c['id'])
+                return (e['s']['x'] + (e['e']['x'] - e['s']['x']) * f, e['s']['y'] + (e['e']['y'] - e['s']['y']) * f)
+            app.click(along(cs[2], 0.3)); app.click(along(cs[0], 0.3))
+            x, y = app.pt(*along(cs[1], 0.3)); page.keyboard.down('Shift'); page.mouse.click(x, y); page.keyboard.up('Shift'); page.wait_for_timeout(60)
+            page.screenshot(path=f'{OUT}/play-order.png')
+            win = {e['id']: e.get('anim', {}).get('window') for e in app.els('connector') if e['id'] in [c['id'] for c in cs]}
+            assert win[cs[2]['id']][0] == 0 and win[cs[0]['id']] == win[cs[1]['id']] and win[cs[0]['id']][0] == 0.5, win
+            assert app.ui()['selection'] == [], 'clicks in the mode must not select'
+            # it plays: step 1 = the third arrow alone, step 2 = the first two together
+            L = app.doc()['animation']['duration']
+            def lit(t):
+                f = app.js('(t) => window.__flowsketch.frame(t)', t)
+                return [any(p['k'] == 'line' and p.get('color') == '#3b82f6' for p in [x for x in f['items'] if x['id'] == c['id']][0]['parts']) for c in cs]
+            assert lit(L * 0.2) == [False, False, True], lit(L * 0.2)
+            assert lit(L * 0.7) == [True, True, False], lit(L * 0.7)
+            # clicking a numbered arrow takes it out; Esc finishes
+            app.click(along(cs[2], 0.3))
+            assert not [e for e in app.els('connector') if e['id'] == cs[2]['id']][0].get('anim', {}).get('window')
+            app.key('Escape')
+            assert app.ui()['playOrderMode'] is False and not page.get_by_role('toolbar', name='Set play order').is_visible()
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tplayorder()
+
         @test('Quick-connect: hover handles add a connected copy (click), connect shapes or drop a copy (drag), Ctrl+Arrow')
         def tquick():
             app.key('Escape')

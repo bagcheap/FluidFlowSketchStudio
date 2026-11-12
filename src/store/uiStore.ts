@@ -119,6 +119,7 @@ interface UIState {
   confirmReq: { message: string; ok: string; resolve: (v: boolean) => void } | null;
   welcomeDismissed: boolean;
   contextMenu: { x: number; y: number; pageId?: string } | null; // right-click menu position (screen px); pageId: a page tab's menu
+  playOrderMode: boolean; // "Set play order": clicking arrows numbers them
 }
 
 interface UIActions {
@@ -141,6 +142,7 @@ interface UIActions {
   setHint(h: string | null): void;
   setMenuOpen(m: string | null): void;
   setContextMenu(at: { x: number; y: number; pageId?: string } | null): void;
+  setPlayOrderMode(on: boolean): void;
   /** In-app confirmation (native confirm() is unavailable in sandboxed hosts). */
   ask(message: string, ok?: string): Promise<boolean>;
 }
@@ -167,6 +169,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   confirmReq: null,
   welcomeDismissed: false,
   contextMenu: null,
+  playOrderMode: false,
   reducedMotionOS: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
 
   setTool(tool, shape, seq) { set((s) => ({ tool, shapeKind: shape ?? s.shapeKind, seqKind: seq ?? s.seqKind, selection: tool === 'select' ? s.selection : [], editingId: null, welcomeDismissed: s.welcomeDismissed || (tool !== 'select' && tool !== 'hand') })); },
@@ -213,6 +216,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   setHint(h) { set({ hint: h }); },
   setMenuOpen(m) { set({ menuOpen: m }); },
   setContextMenu(at) { set({ contextMenu: at, menuOpen: null }); },
+  setPlayOrderMode(on) { set({ playOrderMode: on }); },
   ask(message, ok = 'Continue') {
     get().confirmReq?.resolve(false);
     return new Promise<boolean>((resolve) => set({ confirmReq: { message, ok, resolve: (v) => { set({ confirmReq: null }); resolve(v); } }, menuOpen: null }));
