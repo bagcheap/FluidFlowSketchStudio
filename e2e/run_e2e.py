@@ -517,6 +517,36 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tlabeldrag()
 
+        @test('Cmd/Ctrl-drag and Alt-drag duplicate: the original stays, the copy moves; one undo step')
+        def tdupdrag():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 9000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('u'); app.drag((5100, 9100), (5260, 9180)); app.key('Escape')
+            orig = app.els('shape')[-1]
+            n = len(app.els())
+            # Ctrl stands in for Cmd here (the test browser is not a Mac)
+            for mod, to in (('Control', (5480, 9180)), ('Alt', (5180, 9380))):
+                before = app.js('() => window.__flowsketch.history()')['past']
+                app.drag((5180, 9140), to, mods=[mod])
+                els = app.els()
+                assert len(els) == n + 1, (mod, len(els), n)
+                o = [e for e in els if e['id'] == orig['id']][0]
+                assert (o['x'], o['y']) == (orig['x'], orig['y']), (mod, 'the original moved')
+                copy = els[-1]
+                assert copy['type'] == 'shape' and abs(copy['x'] - (orig['x'] + to[0] - 5180)) < 2 and abs(copy['y'] - (orig['y'] + to[1] - 9140)) < 2, (mod, copy['x'], copy['y'])
+                assert app.ui()['selection'] == [copy['id']], (mod, app.ui()['selection'])
+                assert app.js('() => window.__flowsketch.history()')['past'] == before + 1, (mod, 'not one undo step')
+                n += 1
+            # a plain drag still just moves
+            app.drag((5180, 9140), (5200, 9160))
+            assert len(app.els()) == n
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tdupdrag()
+
         @test('Quick-connect: hover handles add a connected copy (click), connect shapes or drop a copy (drag), Ctrl+Arrow')
         def tquick():
             app.key('Escape')
