@@ -4,6 +4,14 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.21] - 2026-11-12
+
+### Added
+- **⌘-drag to duplicate** (Ctrl-drag on Windows), as in Visio: hold ⌘ and drag a shape, arrow or selection to pull away a copy, leaving the original where it was. Alt/Option-drag still works too. One drag is one undo step.
+
+### Fixed
+- **Set as default style** on an arrow now also saves its corner radius and curve, so new arrows get them too. Copy style / Paste style carry them as well.
+
 ## [0.1.20] - 2026-11-12
 
 ### Added

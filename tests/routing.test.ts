@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { connectorPath, roundCorners } from '../src/engine/connectors';
 import { makeLookup } from '../src/engine/render';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
+import { applySelectionStyleToDefaults, styleOf } from '../src/store/commands';
+import { useDoc } from '../src/store/docStore';
+import { useUI } from '../src/store/uiStore';
 import { parseDocument, serializeDocument } from '../src/model/schema';
 import type { ConnectorElement, FlowDocument } from '../src/model/types';
 
@@ -64,5 +67,15 @@ describe('arrow routing', () => {
     expect(again.elbowRadius).toBe(16);
     const big = parseDocument({ format: 'flowsketch', schemaVersion: 6, elements: [{ ...c, elbowRadius: 1e9 }] }).doc.elements[0] as ConnectorElement;
     expect(big.elbowRadius).toBe(500);
+  });
+
+  it('Set as default style keeps the arrow\'s routing, curve and corner radius', () => {
+    const c = { ...makeConnector({ x: 0, y: 0, elementId: null }, { x: 100, y: 50, elementId: null }, defaultToolStyle('arrow')), routing: 'elbow' as const, elbowRadius: 18, curvature: 0.4 };
+    expect(styleOf(c)).toMatchObject({ routing: 'elbow', elbowRadius: 18, curvature: 0.4 });
+    useDoc.getState().replace((d) => ({ ...d, elements: [c] }));
+    useUI.getState().select([c.id]);
+    applySelectionStyleToDefaults();
+    const next = makeConnector({ x: 0, y: 0, elementId: null }, { x: 10, y: 10, elementId: null }, useUI.getState().toolStyle('arrow'));
+    expect([next.routing, next.elbowRadius, next.curvature]).toEqual(['elbow', 18, 0.4]);
   });
 });

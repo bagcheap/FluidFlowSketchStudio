@@ -281,7 +281,7 @@ export function Canvas() {
         }
         const hit = hitTest(d, p, u.view.zoom);
         // pressing on an arrow's label drags just the label (Visio-style); the arrow stays where it is
-        if (hit?.type === 'connector' && !hit.locked && !e.shiftKey && !(u.selection.length > 1 && u.selection.includes(hit.id)) && expandGroups(d, [hit.id]).length === 1) {
+        if (hit?.type === 'connector' && !hit.locked && !e.shiftKey && !e.altKey && !isCycleKey(e) && !(u.selection.length > 1 && u.selection.includes(hit.id)) && expandGroups(d, [hit.id]).length === 1) {
           const lb = connectorLabelBox(d, hit);
           if (lb && p.x >= lb.x && p.x <= lb.x + lb.w && p.y >= lb.y && p.y <= lb.y + lb.h) {
             u.select([hit.id]);
@@ -646,8 +646,8 @@ export function Canvas() {
       case 'move': {
         let dx = p.x - it.start.x, dy = p.y - it.start.y;
         if (!it.moved && Math.hypot(dx, dy) * u.view.zoom < 3) return;
-        if (!it.moved && e.altKey && !it.dupDone) {
-          // Alt-drag duplicates: originals stay, copies move
+        if (!it.moved && (e.altKey || isCycleKey(e)) && !it.dupDone) {
+          // ⌘-drag (Ctrl-drag on Windows/Linux, like Visio) or Alt/Option-drag duplicates: originals stay, copies move
           it.dupDone = true;
           const clones = cloneElements(it.orig, it.ids.map((id) => getElement(it.orig, id)!), 0, 0);
           D.live((d) => ({ ...d, elements: [...d.elements, ...clones] }));
