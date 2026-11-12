@@ -3,7 +3,7 @@ import type { BoxElement, ConnectorElement, DiagramElement, Endpoint, FlowDocume
 import { STILL } from '../engine/animation';
 import { connectorPath, pointAt, toLocal, toWorld } from '../engine/connectors';
 import { containerHeader, iconLabelLayout, connectorLabelSize, makeLookup } from '../engine/render';
-import { distToPolyline, geometryFor, pointInPolygon } from '../engine/shapes';
+import { distToPolyline, geometryFor, pointInPolygon, rayPolygon } from '../engine/shapes';
 
 export function hitBox(el: BoxElement, p: Point, tol: number): boolean {
   const l = toLocal(el, STILL, p);
@@ -71,21 +71,35 @@ export function boxAt(doc: FlowDocument, p: Point, zoom: number, exclude?: strin
   return null;
 }
 
-export const PORTS: Point[] = [{ x: 0.5, y: 0 }, { x: 1, y: 0.5 }, { x: 0.5, y: 1 }, { x: 0, y: 0.5 }];
+/** Snap points: three on each side (a quarter, half and three quarters along it), clockwise from the top left. */
+export const PORTS: Point[] = [
+  { x: 0.25, y: 0 }, { x: 0.5, y: 0 }, { x: 0.75, y: 0 },
+  { x: 1, y: 0.25 }, { x: 1, y: 0.5 }, { x: 1, y: 0.75 },
+  { x: 0.75, y: 1 }, { x: 0.5, y: 1 }, { x: 0.25, y: 1 },
+  { x: 0, y: 0.75 }, { x: 0, y: 0.5 }, { x: 0, y: 0.25 },
+];
 
 export function portPositions(el: BoxElement): Point[] {
   if (el.type === 'shape') {
-    // put ports on the actual outline, along the axis from the centre
+    // on the actual outline: straight out from the middle line towards that side (an ellipse's or diamond's edge)
     const poly = geometryFor(el).poly;
     return PORTS.map((pt) => {
-      const target = { x: pt.x * el.w, y: pt.y * el.h };
-      let best = target, bd = Infinity;
-      for (const q of poly) { const d = Math.hypot(q.x - target.x, q.y - target.y); if (d < bd) { bd = d; best = q; } }
-      const onAxis = pt.x === 0.5 ? { x: el.w / 2, y: best.y } : { x: best.x, y: el.h / 2 };
-      return toWorld(el, STILL, onAxis);
+      const vertical = pt.y === 0 || pt.y === 1; // a top or bottom port moves up/down to the outline
+      const from = vertical ? { x: pt.x * el.w, y: el.h / 2 } : { x: el.w / 2, y: pt.y * el.h };
+      const dir = vertical ? { x: 0, y: pt.y === 0 ? -1 : 1 } : { x: pt.x === 0 ? -1 : 1, y: 0 };
+      const t = rayPolygon(from, dir, poly);
+      const local = t === null ? { x: pt.x * el.w, y: pt.y * el.h } : { x: from.x + dir.x * t, y: from.y + dir.y * t };
+      return toWorld(el, STILL, local);
     });
   }
   return PORTS.map((pt) => toWorld(el, STILL, { x: pt.x * el.w, y: pt.y * el.h }));
+}
+
+/** The port nearest to p, if within r: its index. */
+export function nearestPort(ports: Point[], p: Point, r: number): number | null {
+  let best: number | null = null, bd = r;
+  ports.forEach((q, i) => { const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = i; } });
+  return best;
 }
 
 /** Port anchors in normalised coords matching portPositions */

@@ -590,6 +590,29 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         twaypoints()
 
+        @test('Three snap points per side: an arrow drawn between quarter ports attaches to them')
+        def tports():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 13000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('r'); app.drag((5100, 13100), (5300, 13180)); app.drag((5100, 13400), (5300, 13480))
+            ids = [e['id'] for e in app.els('shape')[-2:]]
+            app.tool('a')
+            x0, y0 = app.pt(5150, 13180); x1, y1 = app.pt(5252, 13398)
+            page.mouse.move(x0, y0); page.mouse.down(); page.mouse.move(x1, y1, steps=10); page.wait_for_timeout(80)
+            page.screenshot(path=f'{OUT}/ports.png')
+            page.mouse.up(); page.wait_for_timeout(80)
+            c = app.els('connector')[-1]
+            assert c['start']['elementId'] == ids[0] and c['end']['elementId'] == ids[1], (c['start'], c['end'])
+            assert c['start']['anchor'] == {'x': 0.25, 'y': 1} and c['end']['anchor'] == {'x': 0.75, 'y': 0}, (c['start']['anchor'], c['end']['anchor'])
+            ends = app.js('(id) => window.__flowsketch.connectorEnds(id)', c['id'])
+            assert abs(ends['s']['x'] - 5150) < 1 and abs(ends['e']['x'] - 5250) < 1, ends
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tports()
+
         @test('Quick-connect: hover handles add a connected copy (click), connect shapes or drop a copy (drag), Ctrl+Arrow')
         def tquick():
             app.key('Escape')
