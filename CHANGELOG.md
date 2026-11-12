@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.22] - 2026-11-12
 
 ### Added
 - **Steer elbow arrows with waypoints:** a selected elbow arrow shows a small bar in the middle of each segment. Drag a bar to slide that segment sideways; the arrow keeps its right angles and stays attached. Dragging the first or last segment adds a short jog next to the shape, so even a simple L-shaped arrow can be routed round things. **Reset route** in the Inspector goes back to the automatic route.
