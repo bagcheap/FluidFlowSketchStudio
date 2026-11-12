@@ -202,12 +202,14 @@ export function Inspector() {
               </Row>
               {routing === 'curved' && !conn?.bends.length && <Slider label="Curvature" value={curvature} min={-1} max={1} step={0.05} onChange={(v) => setConn({ curvature: v })} hint="How far the arrow bows out; negative bends the other way" />}
               {routing === 'elbow' && <Slider label="Corner radius" value={elbowRadius} min={0} max={80} unit="px" onChange={(v) => setConn({ elbowRadius: v })} hint="0 = sharp right-angle corners; larger values round the elbows" />}
-              {conn && conn.bends.length > 0 && <button className="btn small" onClick={() => setConn({ bends: [] })}>Remove {conn.bends.length} bend point{conn.bends.length > 1 ? 's' : ''}</button>}
+              {conn && conn.bends.length > 0 && (routing === 'elbow'
+                ? <button className="btn small" onClick={() => setConn({ bends: [] })}>Reset route</button>
+                : <button className="btn small" onClick={() => setConn({ bends: [] })}>Remove {conn.bends.length} waypoint{conn.bends.length > 1 ? 's' : ''}</button>)}
               {conn && <Slider label="Label position" value={conn.labelPos} min={0} max={1} step={0.01} onChange={(v) => setConn({ labelPos: v })} />}
               {conn && <Slider label="Label offset" value={conn.labelOffset} min={-200} max={200} unit="px" onChange={(v) => setConn({ labelOffset: v })} />}
               {conn?.text && conn.labelWidth !== undefined && <Slider label="Label width" value={conn.labelWidth} min={40} max={600} unit="px" onChange={(v) => setConn({ labelWidth: v })} hint="The text wraps to this width; the height follows the text" />}
               {conn?.text && conn.labelWidth !== undefined && <button className="btn small" onClick={() => setConn({ labelWidth: undefined })}>Fit label to its text</button>}
-              <p className="insp-tip">Drag an end onto a shape to attach (snaps to side ports). Drag the faint mid-dots to add bends; Alt-drag an end to detach. Drag the label to move it; drag its side handles to make it narrower or wider (the text wraps).</p>
+              <p className="insp-tip">Drag an end onto a shape to attach (snaps to side ports). {routing === 'elbow' ? 'Drag the bar on a segment to slide it and steer the route.' : 'Drag the faint mid-dots to add waypoints; double-click a waypoint to remove it.'} Alt-drag an end to detach. Drag the label to move it; drag its side handles to make it narrower or wider (the text wraps).</p>
             </Section>
           )}
 
