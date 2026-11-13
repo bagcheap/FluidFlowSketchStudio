@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.27] - 2026-11-13
 
 ### Added
 - **Play in label order:** Animation ▸ **Play in label order** (also **From labels** on the Set play order bar) reads the step numbers at the start of your arrow labels — "1.", "2.", "4a.", "4b." — and plays the arrows in that order. Arrows with the same number and different letters (4a, 4b) play together; arrows without a number keep animating all the time. Flowcharts you import from Mermaid with numbered labels play in that order straight away.
