@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.33] - 2026-11-13
+
+### Changed
+- The README now has a **roadmap** of features planned for the future: step captions and camera moves for animated walkthroughs, line jumps, swimlanes, Find, layers, a command palette, draw.io/Excalidraw import and more.
+
 ## [0.1.32] - 2026-11-13
 
 ### Changed

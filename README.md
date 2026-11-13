@@ -188,10 +188,42 @@ The 60 FPS target for 100+150 objects is **not demonstrated** here, because no G
 **Deferred / not yet built:**
 * AI text-to-diagram (Phase 2; the document-edit command layer in `store/commands.ts` is the intended integration point)
 * Keyframes, easing curves and timeline tracks (the timing model already has per-object delay and phase)
-* Auto-layout; Find objects; collaboration and accounts
-* Rotating multi-selections as a unit; dragging connector labels directly (use the label position/offset sliders)
+* Find objects; collaboration and accounts
+* Rotating multi-selections as a unit
 * Bold/italic for *individual words* (styles apply per text block)
 * Transparent GIFs use 1-bit alpha, so anti-aliased edges against transparency can show a faint fringe
+
+## Roadmap: ideas for what's next
+
+Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excalidraw and Visio. None are built yet; the order within each group is roughly by value.
+
+### 1. Animated explainers (building on what makes FlowSketch different)
+
+1. **Step captions.** Each play-order step gets a short caption (for example "3. Client sends the token to the Agent"), shown as a subtitle bar during playback, in GIF/video exports and in the HTML player. It can be filled in from the arrow labels.
+2. **Highlight the boxes, not just the arrows.** When a step plays, its sender and receiver shapes glow too, and everything else can dim slightly, so the flow is obvious in large diagrams.
+3. **Camera moves (scenes).** A step, or group of steps, zooms and pans to the part of the diagram it concerns, then pulls back to the whole picture, like a presentation.
+4. **Interactive HTML player.** Next/previous buttons to step through the flow, clicking a shape to jump to a linked page (drill down from overview to detail), and notes on hover. A self-contained, shareable walkthrough.
+
+### 2. Everyday editing
+
+5. **Line jumps (hop-overs).** Where two arrows cross, one hops over the other, as in Visio and draw.io.
+6. **Swimlanes and tables.** Lanes per team or system that shapes snap into (cross-functional flowcharts), and a simple table shape.
+7. **Find (and replace).** ⌘F to find text across all pages and jump to it.
+8. **Equal-spacing guides.** While dragging, show when gaps between shapes are equal (Figma-style), alongside the existing alignment guides.
+9. **Layers.** Show, hide or lock groups of things, for example an annotations layer switched on for one audience.
+10. **Command palette (⌘K).** Type to run any command, add any shape or icon, or jump to a page.
+11. **Minimap.** A small overview in a corner for finding your way around large diagrams.
+12. **Version snapshots.** Save named versions locally and restore them later, beyond undo.
+
+### 3. Getting work in and out
+
+13. **Import draw.io and Excalidraw files, and export to Mermaid.** Bring existing diagrams in and animate them (Visio files are much harder and are left out).
+14. **Shape sets for common notations.** UML class, ER (database), BPMN and network diagrams, with shapes that behave correctly (for example class boxes with compartments).
+
+### 4. Bigger bets
+
+15. **AI "describe it and I'll draw it".** Type a description and get a diagram, using Mermaid import as the safe, validated path. Opt-in only, since it needs an API key and internet.
+16. **Data-linked shapes.** Shapes carry properties (owner, status, cost) that drive their look, for example red when "down", for living architecture maps.
 
 ## Known limitations
 
