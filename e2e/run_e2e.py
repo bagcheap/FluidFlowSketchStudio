@@ -1025,7 +1025,7 @@ def main():
             app.tool('r'); app.drag((5100, 19200), (5200, 19260)); app.drag((5500, 19400), (5600, 19460))
             app.tool('a'); app.drag((5150, 19230), (5550, 19430))
             c = app.els('connector')[-1]
-            assert c['routing'] == 'straight', c['routing']
+            assert c['routing'] == 'elbow', c['routing']  # the arrow tool's built-in default
             routing = page.get_by_role('radiogroup', name='Routing')
             routing.get_by_role('radio', name='Curved').click(); page.wait_for_timeout(80)
             c2 = [e for e in app.els() if e['id'] == c['id']][0]
@@ -1203,6 +1203,8 @@ def main():
             mx, my = (mid['s']['x'] + mid['e']['x']) / 2, (mid['s']['y'] + mid['e']['y']) / 2
             app.click((mx, my))
             assert app.ui()['selection'] == [c['id']], app.ui()['selection']
+            # a straight arrow, so the highlight's direction shows as left/right movement (an elbow can be vertical there)
+            page.get_by_role('radiogroup', name='Routing').get_by_role('radio', name='Straight').click(); page.wait_for_timeout(60)
             page.get_by_label('Arrow animation', exact=True).select_option('travel')
             page.get_by_label('Highlight colour #ec4899').click()
             page.get_by_label('Length value').fill('10')

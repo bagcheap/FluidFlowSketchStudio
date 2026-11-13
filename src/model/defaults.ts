@@ -196,7 +196,7 @@ export function defaultToolStyle(key: string): ToolStyle {
   const s: ToolStyle = { style: { ...DEFAULT_STYLE }, textStyle: { ...DEFAULT_TEXT } };
   if (key === 'arrow') {
     s.style = { ...s.style, fill: 'transparent', fillStyle: 'none', stroke: '#4b5563' };
-    s.routing = 'straight'; s.endHead = 'arrow'; s.startHead = 'none';
+    s.routing = 'elbow'; s.endHead = 'arrow'; s.startHead = 'none'; // right-angled, like Visio and draw.io
   } else if (key === 'line') {
     s.style = { ...s.style, fill: 'transparent', fillStyle: 'none' };
     s.routing = 'straight'; s.endHead = 'none'; s.startHead = 'none';
