@@ -654,6 +654,40 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tplayorder()
 
+        @test('Diagram from text remembers the last script; Route arrows around shapes keeps arrows out of shapes')
+        def tmermaidmem():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 17000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            n0 = len(app.els())
+            script = 'flowchart LR\n  A[Start] --> B[Middle] --> C[End]\n  A --> C'
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill(script)
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            # opening the dialog again shows the script just used
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            assert page.get_by_label('Flowchart text').input_value() == script, page.get_by_label('Flowchart text').input_value()
+            app.key('Escape')
+            # A --> C runs straight through B; routing sends it round
+            new = app.els()[n0:]
+            shapes = {e['text']: e for e in new if e['type'] == 'shape'}
+            ac = [e for e in new if e['type'] == 'connector' and e['start']['elementId'] == shapes['Start']['id'] and e['end']['elementId'] == shapes['End']['id']][0]
+            app.key('Escape')
+            page.get_by_role('menuitem', name='Arrange').click()
+            page.get_by_role('menuitem', name='Route arrows around shapes').click(); page.wait_for_timeout(120)
+            r = [e for e in app.els() if e['id'] == ac['id']][0]
+            assert r['routing'] == 'elbow' and r['bends'], (r['routing'], r['bends'])
+            f = app.js('(id) => window.__flowsketch.frame(0).items.find((i) => i.id === id)', ac['id'])
+            mid = shapes['Middle']
+            pts = [p for part in f['parts'] if part['k'] == 'line' for p in zip(part['pts'][0::2], part['pts'][1::2])]
+            assert pts and not any(mid['x'] < x < mid['x'] + mid['w'] and mid['y'] < y < mid['y'] + mid['h'] for x, y in pts), 'still runs through the middle shape'
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tmermaidmem()
+
         @test('Quick-connect: hover handles add a connected copy (click), connect shapes or drop a copy (drag), Ctrl+Arrow')
         def tquick():
             app.key('Escape')

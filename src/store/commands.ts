@@ -5,8 +5,10 @@ import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { useUI } from './uiStore';
 import { contentBounds, playSchedule } from '../engine/render';
+import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
 import { openDocumentFile, pickFile, resetFileHandle, saveDocumentFile } from '../persistence/files';
+import { rememberMermaid } from '../persistence/storage';
 import { DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
 import { geometryFor, SHAPE_LABELS } from '../engine/shapes';
@@ -352,6 +354,7 @@ export function matchSize(mode: MatchSizeMode) {
  * centred in the view, as one undo step. Returns false if nothing could be read.
  */
 export function importMermaid(text: string, dir?: LayoutDir): boolean {
+  rememberMermaid(text); // offered again next time Diagram from text opens
   if (isSequence(text)) return importSequence(text);
   const g = parseMermaid(text.slice(0, 200_000));
   if (!g.nodes.length) { U().toast('No flowchart found in that text', 'error'); return false; }
@@ -450,6 +453,21 @@ export function playOrderClick(id: string, together: boolean) {
 /** In "Set play order": start again, with every arrow animating all the time. */
 export function clearAllPlayOrder() {
   D().commit((d) => seq.applyPlaySteps(d, []));
+}
+
+/**
+ * Arrange ▸ Route arrows around shapes: the selected arrows (or every arrow on the page) become elbow arrows with
+ * waypoints that keep clear of every shape, and arrows sharing a side of a shape spread along it. One undo step.
+ */
+export function routeArrows() {
+  const doc = D().doc;
+  const sel = U().selection.filter((id) => getElement(doc, id)?.type === 'connector');
+  const ids = sel.length ? sel : doc.elements.filter((e) => e.type === 'connector').map((e) => e.id);
+  const r = routeArrowsAround(doc, ids);
+  if (!r.routed) { U().toast('No arrows between two shapes to route', 'error'); return; }
+  D().commit(() => r.doc);
+  const skipped = ids.length - r.routed;
+  U().toast(`Routed ${r.routed} arrow${r.routed === 1 ? '' : 's'} around shapes${skipped ? ` (${skipped} left as they were: not between two shapes, locked or no way through)` : ''}. Reset route on an arrow undoes its route.`);
 }
 
 /** Auto-layout the selection (2+ items), or the whole diagram, in one direction. One undo step. */

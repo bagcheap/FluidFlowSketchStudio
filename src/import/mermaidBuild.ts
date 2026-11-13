@@ -2,11 +2,13 @@
 // for subgraphs, then auto-laid out and centred on a point.
 import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, Endpoint, FlowDocument, Point, ShapeKind, ToolStyle } from '../model/types';
 import { baseFields, makeConnector, makeShape, SHAPE_DEFAULT_SIZE } from '../model/defaults';
-import { elementBounds } from '../engine/render';
+import { connectorLabelSize, elementBounds } from '../engine/render';
+import { NODE_GAP, RANK_GAP } from '../layout/layered';
 import { moveElements } from '../store/containers';
 import { autoLayout } from '../layout/autoLayout';
 import type { LayoutDir } from '../layout/layered';
 import type { MGraph } from './mermaid';
+import { routeArrowsAround } from '../layout/routeArrows';
 
 export interface BuildTools {
   shape: (kind: ShapeKind) => ToolStyle;
@@ -18,6 +20,29 @@ export interface BuildTools {
 }
 
 const attached = (id: string): Endpoint => ({ x: 0, y: 0, elementId: id, anchor: null });
+
+/** The Mermaid node ids inside a node or subgraph, nested subgraphs included. */
+function nodesIn(g: MGraph, id: string, seen = new Set<string>()): Set<string> {
+  const grp = g.groups.find((x) => x.id === id);
+  if (!grp) return new Set([id]);
+  const out = new Set<string>();
+  if (seen.has(id)) return out;
+  seen.add(id);
+  for (const m of grp.members) for (const n of nodesIn(g, m, seen)) out.add(n);
+  return out;
+}
+
+/**
+ * A subgraph's own `direction`, by Mermaid's rule: it applies only when none of the subgraph's nodes link to anything
+ * outside it; otherwise the subgraph follows its parent's direction (undefined = inherit). So a group of targets fed
+ * from the left in an LR chart stacks up and down, and arrows don't run through the shapes in front of them.
+ */
+function ownDirection(g: MGraph, id: string): LayoutDir | undefined {
+  const grp = g.groups.find((x) => x.id === id);
+  if (!grp?.dir) return undefined;
+  const inside = nodesIn(g, id);
+  return g.edges.some((e) => inside.has(e.from) !== inside.has(e.to)) ? undefined : grp.dir;
+}
 
 /** Add the graph to `doc`, laid out in `dir` and centred on `at`. Returns the document and the new top-level ids. */
 export function buildMermaid(doc: FlowDocument, g: MGraph, tools: BuildTools, dir: LayoutDir, at: Point): { doc: FlowDocument; ids: string[]; shapes: number; arrows: number } {
@@ -51,10 +76,20 @@ export function buildMermaid(doc: FlowDocument, g: MGraph, tools: BuildTools, di
     return [c];
   });
 
-  const boxIds = [...containers.map((c) => c.id), ...shapes.map((s) => s.id)];
+  // lay out in the order things appear in the text (so loops are broken the way the text reads, as Mermaid does)
+  const first = new Map(g.nodes.map((n, i) => [n.id, i]));
+  const rank = (mid: string) => Math.min(...[...nodesIn(g, mid)].map((n) => first.get(n) ?? Infinity));
+  const mermaidOf = new Map([...idOf].map(([m, el]) => [el, m]));
+  const boxIds = [...containers.map((c) => c.id), ...shapes.map((s) => s.id)].sort((a, b) => rank(mermaidOf.get(a)!) - rank(mermaidOf.get(b)!));
   let out: FlowDocument = { ...doc, elements: [...doc.elements, ...containers, ...shapes, ...arrows] };
-  const dirOf = new Map(g.groups.map((grp) => [idOf.get(grp.id)!, grp.dir]));
-  out = autoLayout(out, dir, boxIds, (id) => dirOf.get(id));
+  const dirOf = new Map(g.groups.map((grp) => [idOf.get(grp.id)!, ownDirection(g, grp.id)]));
+  // leave room for the arrows' labels: the gap along the flow fits the widest label (across it, the tallest), within limits
+  const labels = arrows.filter((a) => a.text.trim()).map(connectorLabelSize);
+  const horizontal = dir === 'LR' || dir === 'RL';
+  const along = Math.max(0, ...labels.map((l) => (horizontal ? l.w : l.h)));
+  const across = Math.max(0, ...labels.map((l) => (horizontal ? l.h : l.w)));
+  const gaps = { rankGap: Math.min(260, Math.max(RANK_GAP, along + 50)), nodeGap: Math.min(160, Math.max(NODE_GAP, across + 30)) };
+  out = autoLayout(out, dir, boxIds, (id) => dirOf.get(id), gaps);
 
   // centre the new diagram on `at`
   const mine = new Set([...boxIds, ...arrows.map((a) => a.id)]);
@@ -64,6 +99,9 @@ export function buildMermaid(doc: FlowDocument, g: MGraph, tools: BuildTools, di
     const x1 = Math.max(...bs.map((b) => b.x + b.w)), y1 = Math.max(...bs.map((b) => b.y + b.h));
     out = moveElements(out, mine, at.x - (x0 + x1) / 2, at.y - (y0 + y1) / 2);
   }
+  // elbow arrows are routed round the shapes (saved as waypoints, so they stay editable)
+  const elbows = arrows.filter((a) => a.routing === 'elbow').map((a) => a.id);
+  if (elbows.length) out = routeArrowsAround(out, elbows).doc;
   const inside = new Set(containers.flatMap((c) => c.members));
   const tops = [...boxIds.filter((id) => !inside.has(id))];
   return { doc: out, ids: tops, shapes: shapes.length, arrows: arrows.length };

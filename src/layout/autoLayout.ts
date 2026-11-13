@@ -5,7 +5,7 @@ import type { DiagramElement, FlowDocument } from '../model/types';
 import { elementBounds } from '../engine/render';
 import { containerHeader } from '../engine/render';
 import { CONTAINER_PAD, fitToContents, moveElements, parentOf, withMembers } from '../store/containers';
-import { layered, type LayoutDir } from './layered';
+import { layered, type LayoutDir, type LayoutOptions } from './layered';
 
 /** Elements auto-layout moves: shapes, icons, pictures and containers (not text, pen strokes, arrows or locked items). */
 export const canLayout = (e: DiagramElement | undefined): boolean =>
@@ -15,7 +15,7 @@ export const canLayout = (e: DiagramElement | undefined): boolean =>
  * Lay out `ids` (or, without ids, the whole diagram) in direction `dir`. The laid-out group keeps its top-left
  * corner where it was. `dirOf` can give a container its own direction (Mermaid `direction` inside a subgraph).
  */
-export function autoLayout(doc: FlowDocument, dir: LayoutDir, ids?: string[], dirOf?: (containerId: string) => LayoutDir | undefined): FlowDocument {
+export function autoLayout(doc: FlowDocument, dir: LayoutDir, ids?: string[], dirOf?: (containerId: string) => LayoutDir | undefined, gaps?: LayoutOptions): FlowDocument {
   const scope = new Set((ids ?? doc.elements.map((e) => e.id)).filter((id) => canLayout(doc.elements.find((e) => e.id === id))));
   if (!scope.size) return doc;
   // the top of the scope: items whose container isn't itself being laid out
@@ -51,7 +51,7 @@ export function autoLayout(doc: FlowDocument, dir: LayoutDir, ids?: string[], di
       const a = levelOf(c.start.elementId), b = levelOf(c.end.elementId);
       if (a && b && a !== b) edges.push([a, b]);
     }
-    const pos = layered(members.map((id) => ({ id, w: bounds.get(id)!.w, h: bounds.get(id)!.h })), edges, d);
+    const pos = layered(members.map((id) => ({ id, w: bounds.get(id)!.w, h: bounds.get(id)!.h })), edges, d, gaps);
     const o = origin ?? {
       x: Math.min(...members.map((id) => bounds.get(id)!.x)),
       y: Math.min(...members.map((id) => bounds.get(id)!.y)),
