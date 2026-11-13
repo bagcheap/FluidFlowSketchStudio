@@ -7,7 +7,7 @@ import { useUI } from './uiStore';
 import { contentBounds, playSchedule } from '../engine/render';
 import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
-import { openDocumentFile, pickFile, resetFileHandle, saveDocumentFile } from '../persistence/files';
+import { openDocumentFile, pickFile, resetFileHandle, restoreFileFor, saveDocumentFile } from '../persistence/files';
 import { rememberMermaid } from '../persistence/storage';
 import { DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
@@ -792,6 +792,7 @@ export async function newDiagram() {
 }
 
 export function loadDocument(doc: FlowDocument, fileName: string | null = null, dirty = false) {
+  void restoreFileFor(doc.id); // Save writes back to the file this diagram last came from or went to, if known
   D().load(doc, { fileName, dirty });
   U().select([]);
   U().setTime(0);

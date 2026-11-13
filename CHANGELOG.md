@@ -4,6 +4,12 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.28] - 2026-11-13
+
+### Fixed
+- **Save writes back to your file again after reopening.** FlowSketch now remembers which file each diagram came from, so File ▸ Save keeps saving to that file after the app (or the browser tab) is closed and reopened, or when you reopen the diagram from Recents, instead of asking where to save as if it were Save as. In the desktop app the permission to write files you chose is now kept between launches. In Chrome and Edge, the first Save after reopening may ask once whether FlowSketch may edit the file. (Safari can't write back to files at all, so there Save always downloads a copy — use the desktop app or Chrome to save in place.)
+- **Shift-drag keeps a move straight.** Holding Shift while dragging a selected shape (or selection) now moves it only horizontally or vertically, as in Visio and PowerPoint, instead of deselecting it. Shift-click still adds a shape to the selection, or takes it out.
+
 ## [0.1.27] - 2026-11-13
 
 ### Added
