@@ -293,6 +293,41 @@ export function togglePlayStep(steps: string[][], id: string, together: boolean)
   return [...steps, [id]];
 }
 
+/**
+ * What each arrow in the play order is called: its step number, plus a letter when it shares the step with others
+ * (4a, 4b play together). Arrows not in the order aren't in the map.
+ */
+export function playStepLabels(steps: string[][]): Map<string, string> {
+  const out = new Map<string, string>();
+  steps.forEach((g, k) => g.forEach((id, i) => out.set(id, g.length > 1 && i < 26 ? `${k + 1}${String.fromCharCode(97 + i)}` : `${k + 1}`)));
+  return out;
+}
+
+/**
+ * The step number at the start of an arrow's label: "8a. Live MS Graph…" → { n: 8, sub: 'a' }; "3) Ask" → { n: 3 }.
+ * The number must be followed by an optional letter and then a full stop, bracket, colon, dash, space or the end, so
+ * "2FA check" or "v2 API" don't count. Up to 999.
+ */
+export function labelStep(text: string): { n: number; sub: string } | null {
+  const m = /^\s*(\d{1,3})([a-z]?)(?=$|[\s.):\-])/i.exec(text);
+  return m ? { n: Number(m[1]), sub: m[2].toLowerCase() } : null;
+}
+
+/**
+ * A play order from the arrows' labels: numbered arrows play in number order, arrows with the same number play
+ * together (8a, 8b, 8c), and arrows without a number aren't in the order.
+ */
+export function labelSteps(doc: FlowDocument): string[][] {
+  const notLifeline = (e: DiagramElement): boolean => !isLifeline(e);
+  const byNum = new Map<number, { id: string; sub: string }[]>();
+  for (const e of doc.elements) {
+    if (e.type !== 'connector' || e.bar || e.locked || !notLifeline(e)) continue;
+    const s = labelStep(e.text);
+    if (s) byNum.set(s.n, [...(byNum.get(s.n) ?? []), { id: e.id, sub: s.sub }]);
+  }
+  return [...byNum.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => g.sort((x, y) => x.sub.localeCompare(y.sub)).map((x) => x.id));
+}
+
 /** Back to all arrows animating together: remove play windows. */
 export function clearPlayOrder(doc: FlowDocument, ids: string[]): FlowDocument {
   const want = new Set(ids);

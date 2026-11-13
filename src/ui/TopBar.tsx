@@ -129,6 +129,7 @@ export function TopBar() {
       { label: 'Shape preset → selection', disabled: !hasSel, sub: Object.entries(cmd.SHAPE_PRESETS).map(([k, v]) => ({ label: k, run: () => cmd.applyAnimToSelection(v) })) },
       { label: 'Arrow flow type → selection', disabled: !hasSel, sub: Object.entries(cmd.ARROW_PRESETS).map(([k, v]) => ({ label: k, run: () => cmd.applyAnimToSelection(undefined, v) })) },
       { label: 'Set play order…', note: 'click arrows in turn', run: cmd.startPlayOrder },
+      { label: 'Play in label order', note: '1, 2, 4a+4b…', run: cmd.playInLabelOrder },
       { label: 'Play messages in order', note: 'one after another', run: cmd.playMessagesInOrder },
       { label: 'Play arrows together', run: cmd.playArrowsTogether },
       { label: 'Default arrow flow (document)', sub: Object.entries(cmd.ARROW_PRESETS).map(([k, v]) => ({ label: k, checked: a.connector.mode === v.mode, run: () => cmd.setAnimation({ connector: { ...a.connector, ...v } }) })) },

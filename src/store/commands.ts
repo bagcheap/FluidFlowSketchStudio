@@ -7,7 +7,7 @@ import { useUI } from './uiStore';
 import { contentBounds, playSchedule } from '../engine/render';
 import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
-import { openDocumentFile, pickFile, resetFileHandle, saveDocumentFile } from '../persistence/files';
+import { openDocumentFile, pickFile, resetFileHandle, restoreFileFor, saveDocumentFile } from '../persistence/files';
 import { rememberMermaid } from '../persistence/storage';
 import { DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
@@ -363,7 +363,10 @@ export function importMermaid(text: string, dir?: LayoutDir): boolean {
     shape: (k) => u.toolStyle(styleKey('shape', k)), arrow: u.toolStyle('arrow'), line: u.toolStyle('line'),
     container: u.toolStyle('container'), fit: fitShapeToText,
   }, dir ?? g.dir, screenToWorld(stage.w / 2, stage.h / 2));
-  D().commit(() => r.doc);
+  // arrows numbered in their labels ("1.", "2.", "4a."…) play in that order
+  const numbered = seq.labelSteps(r.doc);
+  const withOrder = numbered.reduce((t, g) => t + g.length, 0) >= 2 ? fitLoopToPlay(seq.applyPlaySteps(r.doc, numbered)) : r.doc;
+  D().commit(() => withOrder);
   u.setTool('select');
   u.select(r.ids);
   // a diagram bigger than the view: zoom out (never in) so all of it shows
@@ -448,6 +451,19 @@ export function playOrderClick(id: string, together: boolean) {
   if (!c || c.type !== 'connector' || c.bar || c.locked) return;
   const steps = seq.togglePlayStep(seq.readPlaySteps(doc), id, together);
   D().commit(() => fitLoopToPlay(seq.applyPlaySteps(doc, steps)));
+}
+
+/**
+ * Animation ▸ Play in label order: arrows whose labels start with a step number (1, 2, 4a, 4b…) play in that order;
+ * the same number with different letters plays together. One undo step.
+ */
+export function playInLabelOrder() {
+  const doc = D().doc;
+  const steps = seq.labelSteps(doc);
+  if (!steps.length) { U().toast('No arrow labels start with a step number, like "1.", "2." or "4a."', 'error'); return; }
+  D().commit(() => fitLoopToPlay(seq.applyPlaySteps(doc, steps)));
+  const n = steps.reduce((t, g) => t + g.length, 0);
+  U().toast(`${n} numbered arrow${n === 1 ? '' : 's'} now play in label order (${steps.length} step${steps.length === 1 ? '' : 's'}, loop ${D().doc.animation.duration} s)`);
 }
 
 /** In "Set play order": start again, with every arrow animating all the time. */
@@ -776,6 +792,7 @@ export async function newDiagram() {
 }
 
 export function loadDocument(doc: FlowDocument, fileName: string | null = null, dirty = false) {
+  void restoreFileFor(doc.id); // Save writes back to the file this diagram last came from or went to, if known
   D().load(doc, { fileName, dirty });
   U().select([]);
   U().setTime(0);
