@@ -4,6 +4,14 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Arrowhead size:** arrows with a head now have an **Arrowhead size** setting in the Inspector (50%–300%; 100% is the usual size for the line width). Set it with the arrow tool active and every new arrow gets it; set it on selected arrows to change just those. **Set as default style** and Copy/Paste style carry it too.
+
+### Changed
+- Files now use format version 11. Older files open as before, but files saved with this version need this version of FlowSketch or later.
+
 ## [0.1.30] - 2026-11-13
 
 ### Fixed

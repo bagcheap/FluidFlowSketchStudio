@@ -617,6 +617,30 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         treroute()
 
+        @test('Arrowhead size: set on the arrow tool, new arrows get it; set on a selected arrow, it grows')
+        def theadsize():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 27000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            before_ts = app.js('() => window.__flowsketch.toolStyle("arrow")')
+            app.tool('a')  # the tool's defaults are in the Inspector
+            page.get_by_label('Arrowhead size value').fill('200'); page.get_by_label('Arrowhead size value').press('Enter'); page.wait_for_timeout(80)
+            assert app.js('() => window.__flowsketch.toolStyle("arrow")').get('headSize') == 2, app.js('() => window.__flowsketch.toolStyle("arrow")').get('headSize')
+            app.drag((5100, 27200), (5400, 27200))
+            c = app.els('connector')[-1]
+            assert c.get('headSize') == 2, c.get('headSize')
+            # on the selected arrow (selected right after drawing): 300%
+            page.get_by_label('Arrowhead size value').fill('300'); page.get_by_label('Arrowhead size value').press('Enter'); page.wait_for_timeout(80)
+            c = [e for e in app.els() if e['id'] == c['id']][0]
+            assert c.get('headSize') == 3, c.get('headSize')
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            # put the tool's remembered size back for the tests that follow
+            app.tool('a'); page.get_by_label('Arrowhead size value').fill(str(round((before_ts.get('headSize') or 1) * 100))); page.get_by_label('Arrowhead size value').press('Enter'); app.key('Escape')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        theadsize()
+
         @test('Elbow waypoints: drag a segment bar to slide it; Reset route; double-click removes a waypoint')
         def twaypoints():
             app.key('Escape')
@@ -1227,7 +1251,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 10
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 11
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()

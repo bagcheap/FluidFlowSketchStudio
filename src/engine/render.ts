@@ -251,7 +251,7 @@ function halo(pts: number[], color: string, sw: number, alpha: number): Part[] {
 
 function headParts(kind: HeadKind, tip: Point, dir: Point, color: string, sw: number, scale = 1): Part[] {
   if (kind === 'none') return [];
-  const size = Math.min(34, 9 + sw * 3) * scale;
+  const size = Math.min(34, 9 + sw * 3) * scale; // (scale includes the arrow's own head size)
   const rot = (v: Point, a: number) => ({ x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) });
   const back = { x: -dir.x, y: -dir.y };
   if (kind === 'arrow' || kind === 'triangle') {
@@ -368,7 +368,8 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
   const parts: Part[] = [];
   const len = path.length;
   const range = (a: number, b: number) => (anim.direction === 'reverse' ? [len - b, len - a] : [a, b]);
-  const shorten = (k: HeadKind) => (k === 'triangle' || k === 'dot' ? Math.min(34, 9 + sw * 3) * 0.55 : 0);
+  const hs = c.headSize ?? 1; // arrowhead size (multiple of the usual)
+  const shorten = (k: HeadKind) => (k === 'triangle' || k === 'dot' ? Math.min(34, 9 + sw * 3) * hs * 0.55 : 0);
   let visible: [number, number] = [0, len];
   let pulse = 1;
 
@@ -438,13 +439,13 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
       const lead = pointAt(path, leadS);
       const forward = anim.direction === 'reverse' ? { x: -lead.tan.x, y: -lead.tan.y } : lead.tan;
       const head = anim.direction === 'reverse' ? c.startHead : c.endHead;
-      parts.push(...headParts(head, atEnd ? (anim.direction === 'reverse' ? path.pts[0] : path.pts[path.pts.length - 1]) : lead.pt, atEnd ? endTangent(path, anim.direction === 'reverse') : forward, st.stroke, sw, headScale));
+      parts.push(...headParts(head, atEnd ? (anim.direction === 'reverse' ? path.pts[0] : path.pts[path.pts.length - 1]) : lead.pt, atEnd ? endTangent(path, anim.direction === 'reverse') : forward, st.stroke, sw, headScale * hs));
       const tailHead = anim.direction === 'reverse' ? c.endHead : c.startHead;
       const tailVisible = anim.direction === 'reverse' ? vb >= len - 0.5 : va <= 0.5;
-      if (tailVisible) parts.push(...headParts(tailHead, anim.direction === 'reverse' ? path.pts[path.pts.length - 1] : path.pts[0], endTangent(path, anim.direction !== 'reverse'), st.stroke, sw));
+      if (tailVisible) parts.push(...headParts(tailHead, anim.direction === 'reverse' ? path.pts[path.pts.length - 1] : path.pts[0], endTangent(path, anim.direction !== 'reverse'), st.stroke, sw, hs));
     } else {
-      parts.push(...headParts(c.endHead, path.pts[path.pts.length - 1], endTangent(path, false), st.stroke, sw, headScale));
-      parts.push(...headParts(c.startHead, path.pts[0], endTangent(path, true), st.stroke, sw, headScale));
+      parts.push(...headParts(c.endHead, path.pts[path.pts.length - 1], endTangent(path, false), st.stroke, sw, headScale * hs));
+      parts.push(...headParts(c.startHead, path.pts[0], endTangent(path, true), st.stroke, sw, headScale * hs));
     }
   }
   const items: Item[] = [{ id: c.id, opacity: st.opacity, tf: null, parts }];

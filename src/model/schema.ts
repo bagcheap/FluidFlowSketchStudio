@@ -4,6 +4,9 @@ import type {
   Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, IconAsset, IconGradient, IconPaint, IconPart, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle, Page,
 } from './types';
 import { SCHEMA_VERSION } from './types';
+
+/** Arrowhead size limits (a multiple of the usual size). */
+export const HEAD_SIZE_MIN = 0.5, HEAD_SIZE_MAX = 3;
 import { DEFAULT_ANIMATION, DEFAULT_CONNECTOR_ANIM, DEFAULT_SHAPE_ANIM, DEFAULT_STYLE, DEFAULT_TEXT, newDocument, newSeed, uid } from './defaults';
 
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -187,6 +190,7 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
         routing: oneOf(v.routing, ['straight', 'curved', 'elbow'] as const, 'straight'),
         curvature: num(v.curvature, 0, -1, 1),
         elbowRadius: num(v.elbowRadius, 0, 0, 500),
+        ...(typeof v.headSize === 'number' && Number.isFinite(v.headSize) ? { headSize: num(v.headSize, 1, HEAD_SIZE_MIN, HEAD_SIZE_MAX) } : {}),
         ...(v.bar === true ? { bar: true } : {}),
         startHead: oneOf(v.startHead, heads, 'none'),
         endHead: oneOf(v.endHead, heads, 'arrow'),
@@ -217,6 +221,7 @@ export function sanitizeToolStyle(v: unknown, fallback: ToolStyle): ToolStyle {
     ...(v.routing !== undefined || fallback.routing ? { routing: oneOf(v.routing, ['straight', 'curved', 'elbow'] as const, fallback.routing ?? 'straight') } : {}),
     ...(v.curvature !== undefined ? { curvature: num(v.curvature, 0, -1, 1) } : {}),
     ...(v.elbowRadius !== undefined ? { elbowRadius: num(v.elbowRadius, 0, 0, 500) } : {}),
+    ...(v.headSize !== undefined ? { headSize: num(v.headSize, 1, HEAD_SIZE_MIN, HEAD_SIZE_MAX) } : {}),
     ...(v.startHead !== undefined || fallback.startHead ? { startHead: oneOf(v.startHead, heads, fallback.startHead ?? 'none') } : {}),
     ...(v.endHead !== undefined || fallback.endHead ? { endHead: oneOf(v.endHead, heads, fallback.endHead ?? 'arrow') } : {}),
   };
@@ -362,6 +367,10 @@ export function migrate(raw: Obj): Obj {
   if (version === 9) {
     // v9 -> v10: arrow labels may have a width (labelWidth, text wraps); nothing to convert
     version = 10;
+  }
+  if (version === 10) {
+    // v10 -> v11: arrows may have an arrowhead size (headSize); nothing to convert
+    version = 11;
   }
   raw.schemaVersion = version;
   return raw;

@@ -85,6 +85,7 @@ export function Inspector() {
   const routing = conn?.routing ?? ts?.routing ?? 'straight';
   const curvature = conn ? conn.curvature : ts?.curvature ?? 0;
   const elbowRadius = conn ? conn.elbowRadius ?? 0 : ts?.elbowRadius ?? 0;
+  const headSize = conn ? conn.headSize ?? 1 : ts?.headSize ?? 1;
   // picking Curved on a straight arrow gives it a gentle curve straight away (a curve of 0 would look straight)
   const setRouting = (r: 'straight' | 'curved' | 'elbow') => setConn(r === 'curved' && Math.abs(curvature) < 0.001 && !conn?.bends.length ? { routing: r, curvature: 0.3 } : { routing: r });
   const startHead = conn?.startHead ?? ts?.startHead ?? 'none';
@@ -201,6 +202,7 @@ export function Inspector() {
               <Row label="End">
                 <Select label="End arrowhead" value={endHead} onChange={(v) => setConn({ endHead: v })} options={HEADS} />
               </Row>
+              {(startHead !== 'none' || endHead !== 'none') && <Slider label="Arrowhead size" value={Math.round(headSize * 100)} min={50} max={300} step={10} unit="%" onChange={(v) => setConn({ headSize: v / 100 })} hint="100% = the usual size for this line width" />}
               {routing === 'curved' && !conn?.bends.length && <Slider label="Curvature" value={curvature} min={-1} max={1} step={0.05} onChange={(v) => setConn({ curvature: v })} hint="How far the arrow bows out; negative bends the other way" />}
               {routing === 'elbow' && <Slider label="Corner radius" value={elbowRadius} min={0} max={80} unit="px" onChange={(v) => setConn({ elbowRadius: v })} hint="0 = sharp right-angle corners; larger values round the elbows" />}
               {conn && conn.bends.length > 0 && (routing === 'elbow'
