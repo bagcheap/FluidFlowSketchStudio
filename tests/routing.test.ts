@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { connectorPath, roundCorners } from '../src/engine/connectors';
-import { makeLookup } from '../src/engine/render';
+import { makeLookup, renderDocumentAtTime } from '../src/engine/render';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
 import { applySelectionStyleToDefaults, styleOf } from '../src/store/commands';
 import { useDoc } from '../src/store/docStore';
@@ -77,5 +77,42 @@ describe('arrow routing', () => {
     applySelectionStyleToDefaults();
     const next = makeConnector({ x: 0, y: 0, elementId: null }, { x: 10, y: 10, elementId: null }, useUI.getState().toolStyle('arrow'));
     expect([next.routing, next.elbowRadius, next.curvature]).toEqual(['elbow', 18, 0.4]);
+  });
+
+  describe('arrowhead size', () => {
+    const headLen = (doc: FlowDocument, id: string) => {
+      // the open arrowhead is the 3-point line ending at the tip: its arm length
+      const item = renderDocumentAtTime({ ...doc, animation: { ...doc.animation, enabled: false } }, 0).items.find((i) => i.id === id)!;
+      const head = item.parts.find((p) => p.k === 'line' && (p as { pts: number[] }).pts.length === 6) as { pts: number[] };
+      return Math.hypot(head.pts[0] - head.pts[2], head.pts[1] - head.pts[3]);
+    };
+    const arrow = (headSize?: number) => ({ ...makeConnector({ x: 0, y: 0, elementId: null }, { x: 300, y: 0, elementId: null }, defaultToolStyle('arrow')), ...(headSize ? { headSize } : {}) });
+
+    it('scales the arrowhead; unset is the usual size', () => {
+      const a = arrow(), b = arrow(2), c = arrow(0.5);
+      const doc: FlowDocument = { ...newDocument(), elements: [a, b, c] };
+      expect(headLen(doc, b.id) / headLen(doc, a.id)).toBeCloseTo(2, 5);
+      expect(headLen(doc, c.id) / headLen(doc, a.id)).toBeCloseTo(0.5, 5);
+    });
+
+    it('is saved, clamped on load, absent in older files, and carried by the arrow tool and Set as default style', () => {
+      const a = arrow(1.6);
+      const again = parseDocument(serializeDocument({ ...newDocument(), elements: [a] })).doc.elements[0] as ConnectorElement;
+      expect(again.headSize).toBe(1.6);
+      const raw = JSON.parse(serializeDocument({ ...newDocument(), elements: [a] }));
+      raw.pages[0].elements[0].headSize = 99;
+      expect((parseDocument(JSON.stringify(raw)).doc.elements[0] as ConnectorElement).headSize).toBe(3);
+      raw.pages[0].elements[0].headSize = 'big';
+      expect((parseDocument(JSON.stringify(raw)).doc.elements[0] as ConnectorElement).headSize).toBeUndefined();
+      raw.schemaVersion = 10; delete raw.pages[0].elements[0].headSize;
+      expect((parseDocument(JSON.stringify(raw)).doc.elements[0] as ConnectorElement).headSize).toBeUndefined();
+      // the tool's remembered size goes on new arrows; Set as default style remembers it
+      expect(makeConnector({ x: 0, y: 0, elementId: null }, { x: 1, y: 1, elementId: null }, { ...defaultToolStyle('arrow'), headSize: 2.2 }).headSize).toBe(2.2);
+      expect(styleOf(a).headSize).toBe(1.6);
+      useDoc.getState().replace((d) => ({ ...d, elements: [a] }));
+      useUI.getState().select([a.id]);
+      applySelectionStyleToDefaults();
+      expect(makeConnector({ x: 0, y: 0, elementId: null }, { x: 1, y: 1, elementId: null }, useUI.getState().toolStyle('arrow')).headSize).toBe(1.6);
+    });
   });
 });

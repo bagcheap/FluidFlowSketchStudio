@@ -152,6 +152,7 @@ export interface ConnectorElement extends ElementBase {
   routing: Routing;
   curvature: number; // for curved routing without bends (-1..1)
   elbowRadius: number; // elbow routing: corner rounding in px (0 = sharp 90° corners)
+  headSize?: number; // arrowhead size as a multiple of the usual size for this line width (1 = usual; unset = 1)
   bar?: boolean; // a sequence-diagram activation bar: drawn as an outlined bar along the path (both ends on one participant)
   startHead: HeadKind;
   endHead: HeadKind;
@@ -204,7 +205,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 10; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth)
+export const SCHEMA_VERSION = 11; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth) · v11: arrowhead size (headSize)
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).
@@ -277,6 +278,7 @@ export interface ToolStyle {
   routing?: Routing;
   curvature?: number; // connector tools: curve of new curved arrows
   elbowRadius?: number; // connector tools: corner rounding of new elbow arrows
+  headSize?: number; // connector tools: arrowhead size of new arrows (multiple of the usual size)
   startHead?: HeadKind;
   endHead?: HeadKind;
 }

@@ -182,7 +182,7 @@ function topLevel(els: DiagramElement[]): string[] {
 // ---- style --------------------------------------------------------------------
 export function styleOf(e: DiagramElement): ToolStyle {
   const s: ToolStyle = { style: { ...e.style }, textStyle: { ...e.textStyle } };
-  if (e.type === 'connector') { s.routing = e.routing; s.curvature = e.curvature; s.elbowRadius = e.elbowRadius ?? 0; s.startHead = e.startHead; s.endHead = e.endHead; if (e.anim) s.connectorAnim = { ...e.anim }; }
+  if (e.type === 'connector') { s.routing = e.routing; s.curvature = e.curvature; s.elbowRadius = e.elbowRadius ?? 0; s.headSize = e.headSize ?? 1; s.startHead = e.startHead; s.endHead = e.endHead; if (e.anim) s.connectorAnim = { ...e.anim }; }
   else if (e.anim) s.shapeAnim = { ...e.anim };
   return s;
 }
@@ -195,7 +195,7 @@ export function copyStyle() {
 export function applyStyle(ids: string[], s: ToolStyle) {
   D().commit((d) => mapElements(d, ids, (e) => {
     if (e.locked) return e;
-    if (e.type === 'connector') return { ...e, style: { ...s.style, fillStyle: 'none' }, textStyle: { ...s.textStyle }, ...(s.routing ? { routing: s.routing } : {}), ...(s.curvature !== undefined ? { curvature: s.curvature } : {}), ...(s.elbowRadius !== undefined ? { elbowRadius: s.elbowRadius } : {}), ...(s.endHead ? { endHead: s.endHead, startHead: s.startHead ?? 'none' } : {}), ...(s.connectorAnim ? { anim: { ...s.connectorAnim } } : {}) };
+    if (e.type === 'connector') return { ...e, style: { ...s.style, fillStyle: 'none' }, textStyle: { ...s.textStyle }, ...(s.routing ? { routing: s.routing } : {}), ...(s.curvature !== undefined ? { curvature: s.curvature } : {}), ...(s.elbowRadius !== undefined ? { elbowRadius: s.elbowRadius } : {}), ...(s.headSize !== undefined ? { headSize: s.headSize } : {}), ...(s.endHead ? { endHead: s.endHead, startHead: s.startHead ?? 'none' } : {}), ...(s.connectorAnim ? { anim: { ...s.connectorAnim } } : {}) };
     return { ...e, style: { ...s.style }, textStyle: { ...s.textStyle, ...(e.type === 'text' ? { padding: e.textStyle.padding } : {}) }, ...(s.shapeAnim ? { anim: { ...s.shapeAnim } } : {}) } as DiagramElement;
   }));
 }
