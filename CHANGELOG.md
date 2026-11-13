@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [0.1.25] - 2026-11-13
+## [0.1.26] - 2026-11-13
 
 ### Added
 - **Diagram from text remembers your last script:** the box opens with the last Mermaid text you inserted (or pasted onto the canvas), so you can tweak it and insert again. It's kept in this browser (and separately in the desktop app).
@@ -13,6 +13,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 - **Moving an arrow's end gives it a fresh route.** Dragging the start or end of an arrow drops its old waypoints, so it no longer twists back through them. When you let go, an elbow arrow between two shapes finds its way round the shapes again, starting from the snap point you dropped it on.
 - **Flowcharts from Mermaid are laid out more like Mermaid does:** a subgraph's `direction` is only used when none of its shapes link outside it (Mermaid's own rule), so a group of targets fed from one side stacks up and down instead of lining up behind each other; shapes are placed in the order they appear in the text (so the first one, like an End User, comes first); and the gaps between shapes grow to fit the arrows' labels. If your arrows are elbow arrows, they're also routed around shapes straight away.
+
+## [0.1.25] - 2026-11-13
+
+### Changed
 - **Arrows that play one after another now all move at the same speed.** Before, every arrow got the same amount of time, so long arrows rushed and short ones crawled. Each step now lasts as long as its arrow needs, with the same short pause between steps, and the loop length is set from that whenever you change the order: more (or longer) arrows mean a longer loop. Moving shapes afterwards keeps the speeds even.
 - **Arrows with heads at both ends play out and back.** Imported two-headed arrows (`<-->` in flowcharts, `<<->>` in sequence diagrams) get the round-trip highlight, and so does any two-headed arrow you put in a play order.
 
