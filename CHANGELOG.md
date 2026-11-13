@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.32] - 2026-11-13
 
 ### Changed
 - **New arrows are elbow arrows by default.** The arrow tool now starts out drawing right-angled arrows (as in Visio and draw.io), and **Reset default style** goes back to elbow. If you've already chosen a routing for the arrow tool, it's kept. The line tool still draws straight lines, and sequence-diagram messages stay straight across.
