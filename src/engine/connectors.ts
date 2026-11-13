@@ -118,7 +118,34 @@ function densify(points: Point[], step = 6): Point[] {
   return out;
 }
 
+/** Waypoints this close to lining up with an arrow's end are lined up with it (see elbowRoute). */
+const END_SNAP = 16;
+
+/**
+ * Line the first and last waypoints up with the arrow's ends when they're nearly in line. Waypoints stay put while
+ * shapes float a few px (animation) or are nudged; without this the corner next to the end would split into two with
+ * a tiny step between them, and rounding (limited by segment length) would make it look sharp. Moving a waypoint
+ * along its own segment keeps the route right-angled, because only the coordinate across that segment changes.
+ */
+function alignToEnds(s: End, e: End, bends: Point[]): Point[] {
+  const b = bends.map((p) => ({ ...p }));
+  const n = b.length;
+  const firstHoriz = Math.abs(s.dir.x) >= Math.abs(s.dir.y), lastHoriz = Math.abs(e.dir.x) >= Math.abs(e.dir.y);
+  if (firstHoriz ? Math.abs(b[0].y - s.p.y) <= END_SNAP : Math.abs(b[0].x - s.p.x) <= END_SNAP) {
+    if (firstHoriz) b[0].y = s.p.y; else b[0].x = s.p.x;
+  }
+  // with a single waypoint, the end can only be lined up when it runs the other way (an L)
+  if (n > 1 || firstHoriz !== lastHoriz) {
+    const L = b[n - 1];
+    if (lastHoriz ? Math.abs(L.y - e.p.y) <= END_SNAP : Math.abs(L.x - e.p.x) <= END_SNAP) {
+      if (lastHoriz) L.y = e.p.y; else L.x = e.p.x;
+    }
+  }
+  return b;
+}
+
 function elbowRoute(s: End, e: End, bends: Point[]): Point[] {
+  if (bends.length) bends = alignToEnds(s, e, bends);
   const way = [s.p, ...bends, e.p];
   const out: Point[] = [s.p];
   let horiz = Math.abs(s.dir.x) >= Math.abs(s.dir.y);

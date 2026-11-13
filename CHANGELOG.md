@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.29] - 2026-11-13
+
+### Fixed
+- **Rounded elbow arrows no longer get a sharp corner next to a shape.** On an arrow with a set route (from Route arrows around shapes, a Mermaid import or dragging its segments), the corner closest to each end could turn sharp while the shapes floated, because the arrow's end moved a few pixels but its route didn't. The route now stays lined up with its ends, so every corner keeps its radius.
+
 ## [0.1.28] - 2026-11-13
 
 ### Fixed
