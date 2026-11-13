@@ -33,7 +33,7 @@ type Interaction =
   | { k: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { k: 'create'; id: string; start: Point; moved: boolean; onExisting: boolean; cycled?: { key: string; ts: ToolStyle } } // cycled: Cmd-drawn, fill moved to the next colour
   | { k: 'connect'; id: string; start: Point; moved: boolean }
-  | { k: 'move'; ids: string[]; top: string[]; start: Point; orig: FlowDocument; moved: boolean; dupDone: boolean } // ids = top + everything inside moved containers
+  | { k: 'move'; ids: string[]; top: string[]; start: Point; orig: FlowDocument; moved: boolean; dupDone: boolean; shiftToggle?: string[] } // ids = top + everything inside moved containers; shiftToggle: a Shift-click without a drag deselects these
   | { k: 'resize'; id: string; handle: Handle; orig: BoxElement }
   | { k: 'resizeMulti'; ids: string[]; handle: Handle; box: { x: number; y: number; w: number; h: number }; orig: FlowDocument }
   | { k: 'rotate'; id: string; orig: BoxElement; startAngle: number }
@@ -320,19 +320,20 @@ export function Canvas() {
         }
         if (hit) {
           let ids = expandGroups(d, [hit.id]);
+          // Shift: a click adds the shape to the selection (or, if it's already in it, takes it out on release);
+          // a drag moves the selection, kept horizontal or vertical (Visio/PowerPoint)
+          let shiftToggle: string[] | undefined;
           if (e.shiftKey) {
             const cur = new Set(u.selection);
-            const isSel = ids.every((id) => cur.has(id));
-            ids.forEach((id) => (isSel ? cur.delete(id) : cur.add(id)));
-            u.select([...cur]);
-            return;
-          }
-          if (!ids.every((id) => u.selection.includes(id))) u.select(ids);
+            if (ids.every((id) => cur.has(id))) shiftToggle = ids;
+            else { ids.forEach((id) => cur.add(id)); u.select([...cur]); }
+            ids = useUI.getState().selection;
+          } else if (!ids.every((id) => u.selection.includes(id))) u.select(ids);
           else ids = u.selection;
           if (ids.every((id) => getElement(d, id)?.locked)) return;
           D.begin();
           const top = useUI.getState().selection.filter((id) => !getElement(d, id)?.locked);
-          inter.current = { k: 'move', ids: withMembers(d, top), top, start: p, orig: d, moved: false, dupDone: false };
+          inter.current = { k: 'move', ids: withMembers(d, top), top, start: p, orig: d, moved: false, dupDone: false, shiftToggle };
           return;
         }
         inter.current = { k: 'marquee', start: p, cur: p, additive: e.shiftKey ? u.selection : [] };
@@ -865,6 +866,7 @@ export function Canvas() {
       case 'move':
         if (!it.moved) {
           D.cancel();
+          if (it.shiftToggle) { const out = new Set(it.shiftToggle); u.select(u.selection.filter((id) => !out.has(id))); return; } // Shift-click on a selected shape
           const h = hitTest(D.doc, toWorldPt(e), u.view.zoom);
           if (h && !e.shiftKey && u.selection.length > 1) u.select(expandGroups(D.doc, [h.id]));
           return;

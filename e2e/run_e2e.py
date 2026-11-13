@@ -547,6 +547,34 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tdupdrag()
 
+        @test('Shift-drag moves a selected shape straight across or down (stays selected); Shift-click adds and removes')
+        def tshiftmove():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 23000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('r'); app.drag((5100, 23200), (5220, 23260)); app.drag((5400, 23200), (5520, 23260)); app.key('Escape')
+            a, b = app.els('shape')[-2:]
+            app.click((5160, 23230))
+            assert app.ui()['selection'] == [a['id']]
+            app.drag((5160, 23230), (5300, 23250), mods=['Shift'])  # mostly sideways, a little down
+            m = [e for e in app.els() if e['id'] == a['id']][0]
+            assert abs(m['x'] - (a['x'] + 140)) < 2 and abs(m['y'] - a['y']) < 0.5, ('not kept level', m['x'], m['y'], a['x'], a['y'])
+            assert app.ui()['selection'] == [a['id']], ('deselected', app.ui()['selection'])
+            app.drag((5300, 23230), (5310, 23330), mods=['Shift'])  # mostly down
+            m = [e for e in app.els() if e['id'] == a['id']][0]
+            assert abs(m['x'] - (a['x'] + 140)) < 2 and abs(m['y'] - (a['y'] + 100)) < 2, ('not kept vertical', m['x'], m['y'])
+            # Shift-click: adds the other shape, then takes it out again
+            x, y = app.pt(5460, 23230)
+            page.keyboard.down('Shift'); page.mouse.click(x, y); page.keyboard.up('Shift'); page.wait_for_timeout(60)
+            assert sorted(app.ui()['selection']) == sorted([a['id'], b['id']]), app.ui()['selection']
+            page.keyboard.down('Shift'); page.mouse.click(x, y); page.keyboard.up('Shift'); page.wait_for_timeout(60)
+            assert app.ui()['selection'] == [a['id']], app.ui()['selection']
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tshiftmove()
+
         @test('Elbow waypoints: drag a segment bar to slide it; Reset route; double-click removes a waypoint')
         def twaypoints():
             app.key('Escape')
