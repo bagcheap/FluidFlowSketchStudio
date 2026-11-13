@@ -87,4 +87,24 @@ describe('route arrows around shapes', () => {
     expect(last.x).toBeCloseTo(530); expect(last.y).toBeGreaterThan(60); // comes up into b's bottom, a quarter along
     for (const p of path.pts) expect(inside(p, mid)).toBe(false);
   });
+
+  it('when a shape drifts a few px (floating animation), corners next to the ends stay single corners and keep their radius', () => {
+    const a = box(0, 0, 300, 230), b = box(450, 0, 300, 230), c = box(1000, 40, 300, 230);
+    const mk = (p: ShapeElement, q: ShapeElement, sa: { x: number; y: number }, sb: { x: number; y: number }) =>
+      ({ ...makeConnector({ x: 0, y: 0, elementId: p.id, anchor: sa }, { x: 0, y: 0, elementId: q.id, anchor: sb }, { ...defaultToolStyle('arrow'), routing: 'elbow' as const, elbowRadius: 16 }) });
+    const cs = [mk(a, c, { x: 0.5, y: 0 }, { x: 0.25, y: 0 }), mk(a, b, { x: 1, y: 0.25 }, { x: 0, y: 0.5 }), mk(c, b, { x: 0, y: 0.75 }, { x: 1, y: 0.9 })];
+    const routed = routeArrowsAround({ ...newDocument(), elements: [a, b, c, ...cs] }, cs.map((x) => x.id), { keepAnchors: true }).doc;
+    for (const [dx, dy] of [[3, 2], [-2, -3], [4, -4]]) {
+      // the shapes drift; the arrows' waypoints stay where they were
+      const drifted = { ...routed, elements: routed.elements.map((e) => (e.type === 'shape' ? { ...e, x: e.x + dx, y: e.y + dy } : e)) };
+      for (const x of cs) {
+        const before = connectorPath(routed.elements.find((e) => e.id === x.id) as ConnectorElement, makeLookup(routed, null)).control;
+        const after = connectorPath(drifted.elements.find((e) => e.id === x.id) as ConnectorElement, makeLookup(drifted, null)).control;
+        expect(after.length, JSON.stringify({ dx, dy, before, after })).toBe(before.length); // no extra little steps
+        // every segment keeps (about) its length: the drift moves the end segments, it doesn't add a step
+        const len = (p: { x: number; y: number }[], i: number) => Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y);
+        for (let i = 1; i < after.length; i++) expect(Math.abs(len(after, i) - len(before, i)), JSON.stringify({ dx, dy, i, before, after })).toBeLessThanOrEqual(Math.abs(dx) + Math.abs(dy) + 0.01);
+      }
+    }
+  });
 });

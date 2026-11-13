@@ -11,7 +11,7 @@ import { renderDocumentAtTime, makeLookup, boxCorners, MIN_LABEL_W } from '../en
 import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
 import { connectorPath, isHorizontal, labelPlacement, moveElbowSegment, pointAt, tidyElbow } from '../engine/connectors';
-import { readPlaySteps } from '../store/sequence';
+import { playStepLabels, readPlaySteps } from '../store/sequence';
 import { routeArrowsAround } from '../layout/routeArrows';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
@@ -21,7 +21,7 @@ import { activeLevel, addBar, addFrameBehind, addParticipant, addSelfMessage, as
 import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { Copy } from 'lucide-react';
-import { applyStyle, clearAllPlayOrder, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
+import { applyStyle, clearAllPlayOrder, playInLabelOrder, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
 import { updateMembership, withMembers } from '../store/containers';
@@ -1144,8 +1144,7 @@ export function Canvas() {
     }
     if (playOrderMode) {
       // a numbered badge on every arrow: its step in the play order (hollow = not in the order, animates all the time)
-      const stepOf = new Map<string, number>();
-      readPlaySteps(doc).forEach((g, k) => g.forEach((id) => stepOf.set(id, k + 1)));
+      const stepOf = playStepLabels(readPlaySteps(doc)); // "4", or "4a", "4b" for arrows that play together
       for (const el of doc.elements) {
         if (el.type !== 'connector' || el.bar) continue;
         const lifeline: boolean = isLifeline(el); // (a plain boolean, so the arrow's type isn't narrowed away)
@@ -1153,11 +1152,11 @@ export function Canvas() {
         const path = connectorPath(el, makeLookup(doc, null));
         const { pt } = pointAt(path, path.length * (el.text ? 0.22 : 0.5)); // clear of a label in the middle
         const n = stepOf.get(el.id);
-        const r = 11 / z;
+        const r = (n && n.length > 2 ? 13 : 11) / z;
         overlayEls.push(
           <g key={'ord' + el.id} opacity={el.locked ? 0.4 : 1}>
             <circle cx={pt.x} cy={pt.y} r={r} fill={n ? accent : 'var(--panel)'} stroke={accent} strokeWidth={1.5 / z} strokeDasharray={n ? undefined : `${3 / z} ${2 / z}`} />
-            {n && <text x={pt.x} y={pt.y} fill="#fff" fontSize={12 / z} fontWeight={700} textAnchor="middle" dominantBaseline="central" fontFamily="Inter, system-ui, sans-serif">{n}</text>}
+            {n && <text x={pt.x} y={pt.y} fill="#fff" fontSize={(n.length > 1 ? 10.5 : 12) / z} fontWeight={700} textAnchor="middle" dominantBaseline="central" fontFamily="Inter, system-ui, sans-serif">{n}</text>}
           </g>,
         );
       }
@@ -1190,7 +1189,8 @@ export function Canvas() {
       </svg>
       {playOrderMode && !presentation && (
         <div className="order-bar no-canvas" role="toolbar" aria-label="Set play order">
-          <span><b>Set play order:</b> click arrows in the order they should play. Shift-click plays one with the previous step; click again to take it out.</span>
+          <span><b>Set play order:</b> click arrows in the order they should play. Shift-click plays one with the previous step (4a, 4b); click again to take it out.</span>
+          <button className="btn small" title="Order the arrows by the numbers at the start of their labels (1, 2, 4a, 4b…)" onClick={playInLabelOrder}>From labels</button>
           <button className="btn small" onClick={clearAllPlayOrder}>Clear</button>
           <button className="btn small primary" onClick={endPlayOrder}>Done</button>
         </div>
