@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { renderDocumentAtTime } from '../src/engine/render';
+import { makeLookup, playSchedule, renderDocumentAtTime } from '../src/engine/render';
+import { connectorPath } from '../src/engine/connectors';
+import { resolveConnectorAnim } from '../src/engine/animation';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
 import { parseDocument, serializeDocument } from '../src/model/schema';
-import { clearAllPlayOrder, playOrderClick } from '../src/store/commands';
+import { clearAllPlayOrder, importMermaid, playOrderClick } from '../src/store/commands';
 import { useDoc } from '../src/store/docStore';
 import { applyPlaySteps, readPlaySteps, togglePlayStep } from '../src/store/sequence';
 import type { ConnectorElement, FlowDocument } from '../src/model/types';
@@ -61,17 +63,60 @@ describe('set play order', () => {
     expect(ids.every((id) => !anim(cleared, id)?.window)).toBe(true);
   });
 
-  it('clicking arrows in the editor builds the order, one undo step each, and lengthens a short loop', () => {
+  it('clicking arrows in the editor builds the order, one undo step each, and sets the loop length', () => {
     const { doc, ids } = fourArrows();
     useDoc.getState().replace(() => ({ ...doc, animation: { ...doc.animation, duration: 2 } }));
     playOrderClick(ids[3], false);
     playOrderClick(ids[1], false);
     playOrderClick(ids[0], true);
     expect(readPlaySteps(useDoc.getState().doc)).toEqual([[ids[3]], [ids[0], ids[1]]]); // within a step: document order (they play together)
-    expect(useDoc.getState().doc.animation.duration).toBeGreaterThanOrEqual(2);
+    const now = useDoc.getState().doc;
+    expect(now.animation.duration).toBeCloseTo(Math.ceil(playSchedule(now).seconds * 10) / 10, 5); // the loop fits the steps
     useDoc.getState().undo();
     expect(readPlaySteps(useDoc.getState().doc)).toEqual([[ids[3]], [ids[1]]]);
     clearAllPlayOrder();
     expect(readPlaySteps(useDoc.getState().doc)).toEqual([]);
+  });
+
+  it('every arrow moves at the same speed, however long it is; more arrows make a longer loop', () => {
+    const t = defaultToolStyle('shape:rectangle');
+    const a = makeShape('rectangle', 0, 0, 80, 60, t), b = makeShape('rectangle', 160, 0, 80, 60, t), c = makeShape('rectangle', 900, 0, 80, 60, t);
+    const short = makeConnector({ x: 0, y: 0, elementId: a.id }, { x: 0, y: 0, elementId: b.id }, defaultToolStyle('arrow'));
+    const long = makeConnector({ x: 0, y: 0, elementId: b.id }, { x: 0, y: 0, elementId: c.id }, defaultToolStyle('arrow'));
+    const base: FlowDocument = { ...newDocument(), elements: [a, b, c, short, long] };
+    const d = applyPlaySteps(base, [[short.id], [long.id]]);
+    const s = playSchedule(d);
+    const lookup = makeLookup(d, null);
+    const travel = (id: string) => { const c = d.elements.find((e) => e.id === id) as ConnectorElement; const len = connectorPath(c, lookup).length; return len + Math.min(resolveConnectorAnim(d.animation, c).highlightLength, len); };
+    const speed = (id: string) => { const [x, y] = s.win.get(id)!; return travel(id) / ((y - x) * s.seconds); };
+    expect(speed(long.id) / speed(short.id)).toBeCloseTo(1, 6);
+    // the long arrow's step lasts much longer than the short one's
+    const dur = (id: string) => { const [x, y] = s.win.get(id)!; return y - x; };
+    expect(dur(long.id) / dur(short.id)).toBeGreaterThan(3);
+    // one more step: a longer loop
+    expect(playSchedule(applyPlaySteps({ ...base, elements: [...base.elements, { ...short, id: 'extra' }] }, [[short.id], [long.id], ['extra']])).seconds).toBeGreaterThan(s.seconds);
+  });
+
+  it('two-headed arrows play out and back; one-headed ones the way they point', () => {
+    const { doc, ids } = fourArrows();
+    const both = doc.elements.map((e) => (e.id === ids[1] ? { ...(e as ConnectorElement), startHead: 'arrow' as const } : e));
+    const d = applyPlaySteps({ ...doc, elements: both }, [[ids[0]], [ids[1]]]);
+    const dir = (id: string) => (d.elements.find((e) => e.id === id) as ConnectorElement).anim?.direction;
+    expect(dir(ids[1])).toBe('roundTrip');
+    expect(dir(ids[0]) ?? 'forward').toBe('forward');
+  });
+
+  it('imported two-headed arrows play out and back (flowchart <-->, sequence <<->>)', () => {
+    const conns = () => useDoc.getState().doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && !!e.text);
+    useDoc.getState().replace((d) => ({ ...d, elements: [] }));
+    importMermaid('graph LR\n  A <-->|both| B\n  B -->|one| C');
+    const f = conns();
+    expect(f.find((c) => c.text === 'both')!.anim?.direction).toBe('roundTrip');
+    expect(f.find((c) => c.text === 'one')!.anim?.direction ?? 'forward').not.toBe('roundTrip');
+    useDoc.getState().replace((d) => ({ ...d, elements: [] }));
+    importMermaid('sequenceDiagram\n  A<<->>B: sync\n  A->>B: call');
+    const q = conns();
+    expect(q.find((c) => c.text === 'sync')!.anim?.direction).toBe('roundTrip');
+    expect(q.find((c) => c.text === 'call')!.anim?.direction ?? 'forward').toBe('forward');
   });
 });

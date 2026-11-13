@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { playPhase, renderDocumentAtTime } from '../src/engine/render';
+import { playPhase, playSchedule, renderDocumentAtTime } from '../src/engine/render';
 import { parseSequence } from '../src/import/mermaidSequence';
 import { buildSequence } from '../src/import/sequenceBuild';
 import { defaultToolStyle, newDocument } from '../src/model/defaults';
@@ -91,7 +91,8 @@ describe('message-by-message playback', () => {
       playMessagesInOrder();
       const d = useDoc.getState().doc;
       expect(messagesOf(d).every((c) => c.anim?.window)).toBe(true);
-      expect(d.animation.duration).toBe(9.5); // lengthened: 8 messages × 1.2 s
+      expect(d.animation.duration).toBeCloseTo(Math.ceil(playSchedule(d).seconds * 10) / 10, 5); // set from the arrows at the shared speed
+      expect(d.animation.duration).toBeGreaterThan(2);
       useDoc.getState().undo();
       expect(useDoc.getState().doc.animation.duration).toBe(2);
     });

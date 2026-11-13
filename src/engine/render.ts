@@ -298,6 +298,49 @@ function barParts(path: ConnectorPath, st: ConnectorElement['style']): Part[] {
  * Progress (0..1) through a play window [a, b] (fractions of a loop of length `loop`) at time t, or null outside it.
  * At both edges of the window the highlight is off the arrow, so the motion stays continuous.
  */
+/** Arrows playing one after another all move their highlight at this speed (px per second)… */
+export const PLAY_SPEED = 250;
+/** …with this pause (seconds) after each step. */
+export const STEP_PAUSE = 0.35;
+
+interface PlaySchedule { win: Map<string, [number, number]>; seconds: number }
+const schedules = new WeakMap<FlowDocument, PlaySchedule>();
+
+/**
+ * The timing of arrows that play one after another. Their saved play windows give only the order (arrows sharing a
+ * window start play together); here each step gets a share of the loop in proportion to how far its highlight
+ * travels, so every arrow moves at the same speed whatever its length. `seconds` is the loop length at PLAY_SPEED.
+ * Static geometry; cached per document.
+ */
+export function playSchedule(doc: FlowDocument): PlaySchedule {
+  const hit = schedules.get(doc);
+  if (hit) return hit;
+  const lookup = makeLookup(doc, null);
+  const steps = new Map<number, { ids: string[]; secs: number }>();
+  for (const c of doc.elements) {
+    if (c.type !== 'connector' || c.bar || !c.anim?.window) continue;
+    const a = resolveConnectorAnim(doc.animation, c);
+    const len = connectorPath(c, lookup).length;
+    let secs = (len + Math.min(a.highlightLength, len)) / PLAY_SPEED;
+    if (a.direction === 'roundTrip') secs = (2 * secs) / Math.max(0.2, 1 - a.turnPause); // out, wait, back
+    const k = Math.round(c.anim.window[0] * 1e4);
+    const s = steps.get(k) ?? { ids: [], secs: 0 };
+    s.ids.push(c.id); s.secs = Math.max(s.secs, secs);
+    steps.set(k, s);
+  }
+  const ordered = [...steps.entries()].sort((x, y) => x[0] - y[0]).map(([, s]) => s);
+  const total = ordered.reduce((t, s) => t + s.secs + STEP_PAUSE, 0);
+  const win = new Map<string, [number, number]>();
+  let at = 0;
+  for (const s of ordered) {
+    for (const id of s.ids) win.set(id, [at / total, (at + s.secs) / total]);
+    at += s.secs + STEP_PAUSE;
+  }
+  const out = { win, seconds: total };
+  schedules.set(doc, out);
+  return out;
+}
+
 export function playPhase(t: number, loop: number, [a, b]: [number, number]): number | null {
   const p = fract(t / Math.max(1e-6, loop));
   return p >= a && p < b ? (p - a) / (b - a) : null;
@@ -358,7 +401,7 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
   }
 
   // with a play window (sequence-diagram steps) the highlight travels once, only during its part of the loop
-  const win = anim.window ? playPhase(tt, L ?? settings.duration, anim.window) : undefined;
+  const win = anim.window ? playPhase(tt, L ?? settings.duration, playSchedule(doc).win.get(c.id) ?? anim.window) : undefined;
   if (anim.mode === 'travel' && (anim.window ? win !== null : speed > 0 && active)) {
     const hl = Math.min(anim.highlightLength, len);
     const n = win !== undefined ? 1 : Math.max(1, anim.segments);
