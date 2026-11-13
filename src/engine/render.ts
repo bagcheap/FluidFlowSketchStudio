@@ -26,7 +26,7 @@ export type Part =
 
 export interface Transform { x: number; y: number; w: number; h: number; rot: number }
 export interface Item { id: string; opacity: number; tf: Transform | null; parts: Part[] }
-export interface Frame { items: Item[]; time: number; background: string }
+export interface Frame { items: Item[]; time: number; background: string; caption?: { text: string; alpha: number } }
 
 export interface RenderOptions {
   flags?: PreviewFlags;
@@ -303,7 +303,7 @@ export const PLAY_SPEED = 250;
 /** …with this pause (seconds) after each step. */
 export const STEP_PAUSE = 0.35;
 
-interface PlaySchedule { win: Map<string, [number, number]>; seconds: number }
+interface PlaySchedule { win: Map<string, [number, number]>; seconds: number; steps: { ids: string[]; start: number }[] }
 const schedules = new WeakMap<FlowDocument, PlaySchedule>();
 
 /**
@@ -331,14 +331,77 @@ export function playSchedule(doc: FlowDocument): PlaySchedule {
   const ordered = [...steps.entries()].sort((x, y) => x[0] - y[0]).map(([, s]) => s);
   const total = ordered.reduce((t, s) => t + s.secs + STEP_PAUSE, 0);
   const win = new Map<string, [number, number]>();
+  const stepList: { ids: string[]; start: number }[] = [];
   let at = 0;
   for (const s of ordered) {
     for (const id of s.ids) win.set(id, [at / total, (at + s.secs) / total]);
+    stepList.push({ ids: s.ids, start: at / total });
     at += s.secs + STEP_PAUSE;
   }
-  const out = { win, seconds: total };
+  const out = { win, seconds: total, steps: stepList };
   schedules.set(doc, out);
   return out;
+}
+
+/** How long a step's caption and highlight take to fade in (seconds). */
+const STEP_FADE = 0.15;
+
+/**
+ * The step playing at time t (it lasts until the next one starts, so the caption and highlight stay through the
+ * pause) and how far it has faded in (0..1). Null when no arrows play in order.
+ */
+export function currentStep(doc: FlowDocument, t: number): { ids: string[]; index: number; fade: number } | null {
+  const { steps } = playSchedule(doc);
+  if (!steps.length) return null;
+  const L = doc.animation.seamless && doc.animation.loop ? doc.animation.duration : Math.max(1e-6, doc.animation.duration);
+  const p = fract(t / L);
+  let k = 0;
+  for (let i = 0; i < steps.length; i++) if (steps[i].start <= p + 1e-9) k = i;
+  return { ids: steps[k].ids, index: k, fade: Math.min(1, Math.max(0, ((p - steps[k].start) * L) / STEP_FADE)) };
+}
+
+/** What a step's caption says: its arrows' labels, one line each joined with " · ". */
+export function stepCaption(doc: FlowDocument, ids: string[]): string {
+  const texts: string[] = [];
+  for (const id of ids) {
+    const c = doc.elements.find((e) => e.id === id);
+    const t = c?.text.replace(/\s+/g, ' ').trim();
+    if (t && !texts.includes(t)) texts.push(t);
+  }
+  const s = texts.join(' · ');
+  return s.length > 240 ? s.slice(0, 239) + '…' : s;
+}
+
+/** How much the shapes that aren't in the playing step are dimmed (0..1). */
+export const STEP_DIM = 0.5;
+
+/**
+ * Step focus: the shapes at the ends of the playing step's arrows glow in that arrow's highlight colour; every other
+ * item (except containers, which stay as backgrounds) dims. Works on finished items, so it changes nothing else.
+ */
+function applyStepFocus(doc: FlowDocument, items: Item[], ids: string[], fade: number) {
+  const byId = new Map(doc.elements.map((e) => [e.id, e]));
+  const glow = new Map<string, string>(); // shape id -> colour
+  const inStep = new Set(ids);
+  for (const id of ids) {
+    const c = byId.get(id);
+    if (!c || c.type !== 'connector') continue;
+    const colour = resolveConnectorAnim(doc.animation, c).highlightColor;
+    for (const end of [c.start, c.end]) if (end.elementId && !glow.has(end.elementId)) glow.set(end.elementId, colour);
+  }
+  for (const it of items) {
+    const el = byId.get(it.id.split(':')[0]);
+    if (!el || el.type === 'container') continue;
+    if (glow.has(el.id) || inStep.has(el.id)) {
+      if (it.id === el.id && glow.has(el.id) && el.type !== 'connector') {
+        const outline = el.type === 'shape' ? geometryFor(el).poly : [{ x: 0, y: 0 }, { x: el.w, y: 0 }, { x: el.w, y: el.h }, { x: 0, y: el.h }];
+        const pts = [...outline, outline[0]].flatMap((q) => [q.x, q.y]);
+        it.parts = [...halo(pts, glow.get(el.id)!, el.style.strokeWidth + 4, fade * 1.6), ...it.parts];
+      }
+      continue;
+    }
+    it.opacity *= 1 - STEP_DIM * fade;
+  }
 }
 
 export function playPhase(t: number, loop: number, [a, b]: [number, number]): number | null {
@@ -505,7 +568,18 @@ export function renderDocumentAtTime(doc: FlowDocument, t: number, opts: RenderO
       case 'connector': items.push(...connectorItems(doc, el, t, lookup, opts.flags, doc.canvas.background, hide, opts.cull)); break;
     }
   }
-  return { items, time: t, background: doc.canvas.background };
+  // arrows playing in order: the step's caption and its shapes highlighted
+  const anim = doc.animation;
+  let caption: Frame['caption'];
+  if ((anim.captions || anim.stepFocus) && anim.enabled && !opts.flags?.still) {
+    const step = currentStep(doc, t);
+    if (step) {
+      if (anim.stepFocus) applyStepFocus(doc, items, step.ids, step.fade);
+      const text = anim.captions ? stepCaption(doc, step.ids) : '';
+      if (text) caption = { text, alpha: step.fade };
+    }
+  }
+  return { items, time: t, background: doc.canvas.background, ...(caption ? { caption } : {}) };
 }
 
 // ---- bounds ----------------------------------------------------------------

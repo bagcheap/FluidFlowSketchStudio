@@ -21,7 +21,7 @@ import { activeLevel, addBar, addFrameBehind, addParticipant, addSelfMessage, as
 import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { Copy } from 'lucide-react';
-import { applyStyle, clearAllPlayOrder, playInLabelOrder, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
+import { applyStyle, clearAllPlayOrder, playInLabelOrder, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
 import { updateMembership, withMembers } from '../store/containers';
@@ -1189,8 +1189,10 @@ export function Canvas() {
       </svg>
       {playOrderMode && !presentation && (
         <div className="order-bar no-canvas" role="toolbar" aria-label="Set play order">
-          <span><b>Set play order:</b> click arrows in the order they should play. Shift-click plays one with the previous step (4a, 4b); click again to take it out.</span>
+          <span><b>Set play order:</b> click arrows in turn · Shift-click: same step (4a, 4b) · click again: remove</span>
           <button className="btn small" title="Order the arrows by the numbers at the start of their labels (1, 2, 4a, 4b…)" onClick={playInLabelOrder}>From labels</button>
+          <button className={`btn small ${doc.animation.captions ? 'on' : ''}`} aria-pressed={!!doc.animation.captions} title="Show each step's arrow labels as a subtitle while it plays" onClick={() => setAnimation({ captions: !doc.animation.captions })}>Captions</button>
+          <button className={`btn small ${doc.animation.stepFocus ? 'on' : ''}`} aria-pressed={!!doc.animation.stepFocus} title="Make the shapes in the playing step glow and dim the rest" onClick={() => setAnimation({ stepFocus: !doc.animation.stepFocus })}>Highlight</button>
           <button className="btn small" onClick={clearAllPlayOrder}>Clear</button>
           <button className="btn small primary" onClick={endPlayOrder}>Done</button>
         </div>

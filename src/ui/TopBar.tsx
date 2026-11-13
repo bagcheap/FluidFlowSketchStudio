@@ -132,6 +132,8 @@ export function TopBar() {
       { label: 'Play in label order', note: '1, 2, 4a+4b…', run: cmd.playInLabelOrder },
       { label: 'Play messages in order', note: 'one after another', run: cmd.playMessagesInOrder },
       { label: 'Play arrows together', run: cmd.playArrowsTogether },
+      { label: 'Step captions', note: 'labels as subtitles', checked: !!a.captions, run: anim({ captions: !a.captions }) },
+      { label: 'Highlight each step', note: 'its shapes glow', checked: !!a.stepFocus, run: anim({ stepFocus: !a.stepFocus }) },
       { label: 'Default arrow flow (document)', sub: Object.entries(cmd.ARROW_PRESETS).map(([k, v]) => ({ label: k, checked: a.connector.mode === v.mode, run: () => cmd.setAnimation({ connector: { ...a.connector, ...v } }) })) },
       { label: 'Reset selected to document defaults', run: cmd.resetAnimSelected, disabled: !hasSel },
       { sep: true },

@@ -88,6 +88,8 @@ export interface AnimationSettings {
   intensityScale: number; // global squiggle multiplier 0..2
   speedScale: number; // global shape speed multiplier
   arrowSpeedScale: number;
+  captions?: boolean; // arrows playing in order: the playing step's arrow labels as a subtitle (schema v12)
+  stepFocus?: boolean; // arrows playing in order: the playing step's shapes glow, the rest dims (schema v12)
   shape: ShapeAnim; // document defaults
   connector: ConnectorAnim;
 }
@@ -205,7 +207,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 11; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth) · v11: arrowhead size (headSize)
+export const SCHEMA_VERSION = 12; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth) · v11: arrowhead size (headSize) · v12: step captions and step focus (animation.captions / stepFocus)
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).

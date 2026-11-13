@@ -159,4 +159,48 @@ export function drawFrame(ctx: Ctx, frame: Frame, o: DrawOptions) {
   ctx.setTransform(o.scale, 0, 0, o.scale, -o.originX * o.scale, -o.originY * o.scale);
   for (const it of frame.items) drawItem(ctx, it, o.images);
   ctx.restore();
+  if (frame.caption && frame.caption.alpha > 0.01) drawCaption(ctx, frame.caption.text, frame.caption.alpha);
+}
+
+/**
+ * A step caption: a dark, rounded subtitle bar near the bottom of whatever is being drawn (the live view, an export
+ * frame or the HTML player), sized to the output, at most two lines.
+ */
+function drawCaption(ctx: Ctx, text: string, alpha: number) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const fs = Math.round(Math.min(40, Math.max(12, Math.min(W, H) * 0.032)));
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`;
+  const maxW = W * 0.82, padX = fs * 0.9, padY = fs * 0.55, lh = fs * 1.3;
+  // wrap into at most two lines
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let cur = '';
+  for (const w of words) {
+    const next = cur ? cur + ' ' + w : w;
+    if (ctx.measureText(next).width <= maxW - padX * 2 || !cur) cur = next;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  if (lines.length > 2) {
+    let last = lines.slice(1).join(' ');
+    while (last.length > 1 && ctx.measureText(last + '…').width > maxW - padX * 2) last = last.slice(0, -1);
+    lines.splice(1, lines.length - 1, last.trimEnd() + '…');
+  }
+  const textW = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const boxW = Math.min(maxW, textW + padX * 2), boxH = lines.length * lh + padY * 2;
+  const x = (W - boxW) / 2, y = H - boxH - Math.max(fs, H * 0.04);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = 'rgba(17, 24, 39, 0.82)';
+  const r = Math.min(fs * 0.6, boxH / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + boxW, y, x + boxW, y + boxH, r); ctx.arcTo(x + boxW, y + boxH, x, y + boxH, r);
+  ctx.arcTo(x, y + boxH, x, y, r); ctx.arcTo(x, y, x + boxW, y, r); ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, y + padY + lh * (i + 0.5)));
+  ctx.restore();
 }

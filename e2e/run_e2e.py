@@ -714,9 +714,9 @@ def main():
             app.js('() => window.__flowsketch.setView({x: 5000, y: 15000, zoom: 1})')  # empty area
             h0 = app.js('() => window.__flowsketch.history()')['past']
             app.tool('r')
-            for i in range(4): app.drag((5100 + i * 220, 15100), (5220 + i * 220, 15160))
+            for i in range(4): app.drag((5100 + i * 220, 15300), (5220 + i * 220, 15360))
             app.tool('a')
-            for i in range(3): app.drag((5160 + i * 220, 15130), (5380 + i * 220, 15130))
+            for i in range(3): app.drag((5160 + i * 220, 15330), (5380 + i * 220, 15330))
             app.key('Escape')
             cs = app.els('connector')[-3:]
             page.get_by_role('menuitem', name='Animation').click()
@@ -771,6 +771,50 @@ def main():
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tlabelorder()
+
+        @test('Step captions and highlighted boxes: switched on from the Animation menu, shown while each step plays')
+        def tcaptions():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 29000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            n0 = len(app.els())
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('graph LR\n  A[Browser] -->|1. Sign in| B[Portal]\n  B -->|2. Ask the agent| C[Agent]\n  C -->|3. Answer| D[Model]')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            app.key('Escape')
+            for name in ('Step captions', 'Highlight each step'):
+                page.get_by_role('menuitem', name='Animation').click()
+                page.get_by_role('menuitemcheckbox', name=name).click() if page.get_by_role('menuitemcheckbox', name=name).count() else page.get_by_role('menuitem', name=name).click()
+                page.wait_for_timeout(60)
+            a = app.doc()['animation']
+            assert a.get('captions') is True and a.get('stepFocus') is True, a
+            L = a['duration']
+            seen = []
+            for i in range(40):
+                f = app.js('(t) => window.__flowsketch.frame(t)', L * (i + 0.5) / 40)
+                c = f.get('caption')
+                if c and c['alpha'] > 0.9 and (not seen or seen[-1] != c['text']): seen.append(c['text'])
+            assert seen == ['1. Sign in', '2. Ask the agent', '3. Answer'], seen
+            # mid step 2, the Portal and Agent glow and the Browser is dimmed
+            new = app.els()[n0:]
+            shapes = {e['text']: e for e in new if e['type'] == 'shape'}
+            t2 = None
+            for i in range(80):
+                t = L * i / 80
+                f = app.js('(t) => window.__flowsketch.frame(t)', t)
+                if f.get('caption') and f['caption']['text'] == '2. Ask the agent' and f['caption']['alpha'] == 1: t2 = t; break
+            assert t2 is not None
+            items = {it['id']: it for it in f['items']}
+            assert items[shapes['Browser']['id']]['opacity'] < 0.9 and items[shapes['Agent']['id']]['opacity'] == 1, (items[shapes['Browser']['id']]['opacity'], items[shapes['Agent']['id']]['opacity'])
+            app.js('(t) => window.__flowsketch.pause(t)', t2); page.wait_for_timeout(200)
+            page.screenshot(path=f'{OUT}/step-captions.png')
+            page.get_by_test_id('play').click()
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tcaptions()
 
         @test('Diagram from text remembers the last script; Route arrows around shapes keeps arrows out of shapes')
         def tmermaidmem():
@@ -1253,7 +1297,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 11
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 12
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()
