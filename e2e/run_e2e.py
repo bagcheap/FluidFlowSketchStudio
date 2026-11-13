@@ -688,6 +688,44 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tmermaidmem()
 
+        @test('Moving an arrow end drops its old waypoints; an elbow arrow then routes round shapes from where it was dropped')
+        def tendmove():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 19000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('r')
+            app.drag((5100, 19250), (5220, 19310)); app.drag((5360, 19210), (5440, 19350)); app.drag((5580, 19250), (5700, 19310)); app.drag((5580, 19470), (5700, 19530))
+            a, mid, b, d = app.els('shape')[-4:]
+            app.tool('a'); app.drag((5160, 19280), (5640, 19280))
+            c = app.els('connector')[-1]
+            page.get_by_role('radiogroup', name='Routing').get_by_role('radio', name='Elbow').click(); page.wait_for_timeout(60)
+            page.get_by_role('menuitem', name='Arrange').click()
+            page.get_by_role('menuitem', name='Route arrows around shapes').click(); page.wait_for_timeout(100)
+            old = [e for e in app.els() if e['id'] == c['id']][0]['bends']
+            assert old, 'not routed'
+            # drag the arrow's end from b to the top-middle snap point of d
+            ends = app.js('(id) => window.__flowsketch.connectorEnds(id)', c['id'])
+            page.keyboard.press('Escape')
+            # select the arrow by clicking on its route (the first segment leaves a's right side)
+            app.click((ends['s']['x'] + 8, ends['s']['y']))
+            assert app.ui()['selection'] == [c['id']], app.ui()['selection']
+            before = app.js('() => window.__flowsketch.history()')['past']
+            app.drag((ends['e']['x'], ends['e']['y']), (d['x'] + d['w'] / 2, d['y'] + 1), steps=12)
+            r = [e for e in app.els() if e['id'] == c['id']][0]
+            assert r['end']['elementId'] == d['id'] and r['end']['anchor'] == {'x': 0.5, 'y': 0}, r['end']
+            assert r['bends'] != old, 'kept the old waypoints'
+            assert app.js('() => window.__flowsketch.history()')['past'] == before + 1, 'not one undo step'
+            f = app.js('(id) => window.__flowsketch.frame(0).items.find((i) => i.id === id)', c['id'])
+            pts = [p for part in f['parts'] if part['k'] == 'line' for p in zip(part['pts'][0::2], part['pts'][1::2])]
+            for s_ in (a, mid, b, d):
+                assert not any(s_['x'] + 2 < x < s_['x'] + s_['w'] - 2 and s_['y'] + 2 < y < s_['y'] + s_['h'] - 2 for x, y in pts), ('through a shape', s_['id'])
+            page.screenshot(path=f'{OUT}/end-moved.png')
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tendmove()
+
         @test('Quick-connect: hover handles add a connected copy (click), connect shapes or drop a copy (drag), Ctrl+Arrow')
         def tquick():
             app.key('Escape')

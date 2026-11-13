@@ -45,6 +45,13 @@ function sidePoint(el: BoxElement, side: Side, t: number): { anchor: Point; end:
   throw new Error('unreachable');
 }
 
+/** The route end at a saved anchor on the shape's outline (a snap point the user chose). */
+function anchorPoint(el: BoxElement, anchor: Point): { anchor: Point; end: RouteEnd; side: Side } {
+  const side = sideOfAnchor(anchor), dir = OUT[side];
+  const w = toWorld(el, STILL, { x: anchor.x * el.w, y: anchor.y * el.h });
+  return { anchor, side, end: { p: { x: w.x + dir.x * GAP, y: w.y + dir.y * GAP }, dir } };
+}
+
 interface Plan { c: ConnectorElement; a: BoxElement; b: BoxElement; sa: Side; sb: Side; pts: Point[] }
 
 /**
@@ -52,7 +59,12 @@ interface Plan { c: ConnectorElement; a: BoxElement; b: BoxElement; sa: Side; sb
  * unrotated shapes/icons/pictures are routed; locked ones and activation bars are left alone. They become elbow
  * arrows. Returns the new document and how many arrows were routed.
  */
-export function routeArrowsAround(doc: FlowDocument, ids: string[]): { doc: FlowDocument; routed: number } {
+export function routeArrowsAround(doc: FlowDocument, ids: string[], opts: { keepAnchors?: boolean } = {}): { doc: FlowDocument; routed: number } {
+  // keepAnchors: an end already on a snap point stays exactly there (an end the user just dropped); others are chosen
+  const kept = (c: ConnectorElement, end: 'start' | 'end') => {
+    const a = c[end].anchor;
+    return opts.keepAnchors && a && a.x >= -0.001 && a.x <= 1.001 && a.y >= -0.001 && a.y <= 1.001 ? a : null;
+  };
   const byId = new Map(doc.elements.map((e) => [e.id, e]));
   const boxes = doc.elements.filter(isObstacle);
   const obstacles = boxes.map(bounds);
@@ -65,8 +77,10 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[]): { doc: Flow
     const a = c.start.elementId ? byId.get(c.start.elementId) : undefined, b = c.end.elementId ? byId.get(c.end.elementId) : undefined;
     if (!a || !b || a === b || !isObstacle(a) || !isObstacle(b) || a.rotation % 360 || b.rotation % 360) continue;
     let best: Plan | null = null, bestCost = Infinity;
-    for (const sa of [0, 1, 2, 3] as Side[]) for (const sb of [0, 1, 2, 3] as Side[]) {
-      const r = routeOrtho(sidePoint(a, sa, 0.5).end, sidePoint(b, sb, 0.5).end, obstacles, used);
+    const ka = kept(c, 'start'), kb = kept(c, 'end');
+    const sidesA: Side[] = ka ? [anchorPoint(a, ka).side] : [0, 1, 2, 3], sidesB: Side[] = kb ? [anchorPoint(b, kb).side] : [0, 1, 2, 3];
+    for (const sa of sidesA) for (const sb of sidesB) {
+      const r = routeOrtho(ka ? anchorPoint(a, ka).end : sidePoint(a, sa, 0.5).end, kb ? anchorPoint(b, kb).end : sidePoint(b, sb, 0.5).end, obstacles, used);
       if (r && r.cost < bestCost) { bestCost = r.cost; best = { c, a, b, sa, sb, pts: r.pts }; }
     }
     if (best) { plans.push(best); markUsed(used, best.pts, obstacles); }
@@ -75,6 +89,7 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[]): { doc: Flow
   const slots = new Map<string, { plan: Plan; end: 'a' | 'b'; along: number }[]>();
   for (const plan of plans) {
     for (const end of ['a', 'b'] as const) {
+      if (kept(plan.c, end === 'a' ? 'start' : 'end')) continue; // stays where it was put
       const el = plan[end], side = end === 'a' ? plan.sa : plan.sb, other = end === 'a' ? plan.b : plan.a;
       const ob = bounds(other), along = side === 0 || side === 2 ? (ob.x0 + ob.x1) / 2 : (ob.y0 + ob.y1) / 2;
       const k = `${el.id}:${side}`;
@@ -90,7 +105,9 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[]): { doc: Flow
   const used2 = new Map<string, number>();
   const done = new Map<string, Partial<ConnectorElement>>();
   for (const plan of plans) {
-    const A = sidePoint(plan.a, plan.sa, tOf.get(`${plan.c.id}:a`) ?? 0.5), B = sidePoint(plan.b, plan.sb, tOf.get(`${plan.c.id}:b`) ?? 0.5);
+    const ka = kept(plan.c, 'start'), kb = kept(plan.c, 'end');
+    const A = ka ? anchorPoint(plan.a, ka) : sidePoint(plan.a, plan.sa, tOf.get(`${plan.c.id}:a`) ?? 0.5);
+    const B = kb ? anchorPoint(plan.b, kb) : sidePoint(plan.b, plan.sb, tOf.get(`${plan.c.id}:b`) ?? 0.5);
     const r = routeOrtho(A.end, B.end, obstacles, used2);
     if (!r) continue;
     markUsed(used2, r.pts, obstacles);

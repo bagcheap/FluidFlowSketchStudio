@@ -74,4 +74,17 @@ describe('route arrows around shapes', () => {
     const walls = [wall(180, -200, 200, 200), wall(180, -200, 600, -180), wall(180, 180, 600, 200), wall(580, -200, 600, 200)];
     expect(routeOrtho({ p: { x: 0, y: 0 }, dir: { x: 1, y: 0 } }, { p: { x: 400, y: 0 }, dir: { x: -1, y: 0 } }, walls)).toBeNull();
   });
+
+  it('keepAnchors: an end on a snap point stays exactly there; the route goes round from it', () => {
+    const a = box(0, 0), mid = box(250, -40, 120, 140), b = box(500, 0);
+    const c = { ...arrow(a, b), end: { x: 0, y: 0, elementId: b.id, anchor: { x: 0.25, y: 1 } } }; // bottom-left quarter of b
+    const r = routeArrowsAround({ ...newDocument(), elements: [a, mid, b, c] }, [c.id], { keepAnchors: true });
+    const out = r.doc.elements.find((e) => e.id === c.id) as ConnectorElement;
+    expect(out.end.anchor).toEqual({ x: 0.25, y: 1 });
+    const path = connectorPath(out, makeLookup(r.doc, null));
+    expect(simplifyRoute(path.control).slice(1, -1)).toEqual(out.bends);
+    const last = path.control[path.control.length - 1];
+    expect(last.x).toBeCloseTo(530); expect(last.y).toBeGreaterThan(60); // comes up into b's bottom, a quarter along
+    for (const p of path.pts) expect(inside(p, mid)).toBe(false);
+  });
 });
