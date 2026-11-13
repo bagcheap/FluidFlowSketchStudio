@@ -12,6 +12,7 @@ import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
 import { connectorPath, isHorizontal, labelPlacement, moveElbowSegment, pointAt, tidyElbow } from '../engine/connectors';
 import { readPlaySteps } from '../store/sequence';
+import { routeArrowsAround } from '../layout/routeArrows';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, connectorLabelBox, hitTest, isLifeline, lifelineAt, nearestPort, portAnchors, portPositions } from './hitTest';
@@ -37,7 +38,7 @@ type Interaction =
   | { k: 'resizeMulti'; ids: string[]; handle: Handle; box: { x: number; y: number; w: number; h: number }; orig: FlowDocument }
   | { k: 'rotate'; id: string; orig: BoxElement; startAngle: number }
   | { k: 'marquee'; start: Point; cur: Point; additive: string[] }
-  | { k: 'endpoint'; id: string; which: 'start' | 'end' }
+  | { k: 'endpoint'; id: string; which: 'start' | 'end'; moved?: boolean }
   | { k: 'bend'; id: string; index: number }
   | { k: 'label'; id: string; start: Point; center: Point; orig: FlowDocument; moved: boolean } // dragging an arrow's label
   | { k: 'labelWidth'; id: string; cx: number; side: number } // a label's side handle: its width (symmetric about its centre)
@@ -655,7 +656,9 @@ export function Canvas() {
         const onLifeline = !target && !e.altKey ? lifelineAt(D.doc, p, u.view.zoom) : null; // a sequence-diagram lifeline: attach at this height
         const ep: Endpoint = target ? attachEndpoint(target, p, null) : onLifeline ?? { x: p.x, y: p.y, elementId: null, anchor: null };
         setOverlay((o) => ({ ...o, target: ep.elementId }));
-        D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), [it.which]: ep })));
+        it.moved = true;
+        // moving an end drops the old waypoints: the arrow takes a fresh route instead of bending back to them
+        D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), [it.which]: ep, bends: [] })));
         return;
       }
       case 'bend': {
@@ -873,6 +876,15 @@ export function Canvas() {
       case 'label':
         if (it.moved) D.end(); else D.cancel();
         return;
+      case 'endpoint': {
+        // an elbow arrow between two shapes then finds its way round the shapes (keeping the snap point it was dropped on)
+        if (it.moved) D.live((d) => {
+          const c = getElement(d, it.id);
+          return c?.type === 'connector' && c.routing === 'elbow' && c.start.elementId && c.end.elementId ? routeArrowsAround(d, [c.id], { keepAnchors: true }).doc : d;
+        });
+        D.end();
+        return;
+      }
       case 'segment': {
         if (!it.moved) { D.cancel(); return; }
         // drop corners that ended up on a straight run (a segment dragged into line with its neighbour)

@@ -4,6 +4,16 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.26] - 2026-11-13
+
+### Added
+- **Diagram from text remembers your last script:** the box opens with the last Mermaid text you inserted (or pasted onto the canvas), so you can tweak it and insert again. It's kept in this browser (and separately in the desktop app).
+- **Arrange ▸ Route arrows around shapes** (also on the right-click menus): the selected arrows, or all arrows on the page, become elbow arrows that go round shapes instead of through them, and arrows meeting the same side of a shape spread out along it. The routes are saved as ordinary waypoints, so you can still drag the segment bars, and **Reset route** on an arrow goes back to the automatic route. One undo step.
+
+### Changed
+- **Moving an arrow's end gives it a fresh route.** Dragging the start or end of an arrow drops its old waypoints, so it no longer twists back through them. When you let go, an elbow arrow between two shapes finds its way round the shapes again, starting from the snap point you dropped it on.
+- **Flowcharts from Mermaid are laid out more like Mermaid does:** a subgraph's `direction` is only used when none of its shapes link outside it (Mermaid's own rule), so a group of targets fed from one side stacks up and down instead of lining up behind each other; shapes are placed in the order they appear in the text (so the first one, like an End User, comes first); and the gaps between shapes grow to fit the arrows' labels. If your arrows are elbow arrows, they're also routed around shapes straight away.
+
 ## [0.1.25] - 2026-11-13
 
 ### Changed

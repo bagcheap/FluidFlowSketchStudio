@@ -46,6 +46,7 @@ function selectionItems(): MenuItem[] {
     ] } as MenuItem, { label: 'Match size', sub: matchSizeItems(ui.prefs.matchSizeKeepsProportions) }, { label: 'Auto-layout selection', sub: AUTO_LAYOUT_ITEMS } as MenuItem as MenuItem] : []),
     ...(els.some((e) => e.type === 'connector') ? [
       { label: 'Swap direction', run: () => cmd.swapDirection() } as MenuItem,
+      { label: 'Route around shapes', run: cmd.routeArrows } as MenuItem,
       { label: 'Set play order…', note: 'click arrows in turn', run: cmd.startPlayOrder } as MenuItem,
       els.some((e) => e.type === 'connector' && e.anim?.window)
         ? { label: 'Play arrows together', run: cmd.playArrowsTogether } as MenuItem
@@ -81,6 +82,7 @@ function canvasItems(): MenuItem[] {
     { label: 'Select all', shortcut: `${MOD}A`, run: cmd.selectAll, disabled: !doc.elements.length },
     { label: 'Diagram from text…', run: () => ui.openDialog('mermaid') },
     { label: 'Auto-layout diagram', sub: AUTO_LAYOUT_ITEMS, disabled: !doc.elements.length },
+    { label: 'Route arrows around shapes', run: cmd.routeArrows, disabled: !doc.elements.some((e) => e.type === 'connector') },
     { sep: true },
     { label: 'Grid', sub: (['dots', 'lines', 'none'] as const).map((g) => ({ label: g === 'none' ? 'Plain' : g === 'dots' ? 'Dot grid' : 'Line grid', checked: doc.canvas.grid === g, run: () => setGrid(g) })) },
     { label: 'Snap to grid', checked: ui.prefs.snapToGrid, run: () => ui.updatePrefs({ snapToGrid: !ui.prefs.snapToGrid }) },

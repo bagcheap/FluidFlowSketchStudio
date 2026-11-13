@@ -66,3 +66,20 @@ export async function saveCustomTemplate(doc: FlowDocument): Promise<void> {
 export async function deleteCustomTemplate(id: string): Promise<void> {
   if (store) await del(`tpl:${id}`, store);
 }
+
+// The last text inserted with Diagram from text (or pasted as a diagram), shown again next time the dialog opens.
+// localStorage: a convenience for this browser only. Read back as plain text and capped; it is parsed like any
+// other untrusted Mermaid input when inserted.
+const LAST_MERMAID = 'flowsketch:lastMermaid';
+const MAX_MERMAID_CHARS = 100_000;
+
+export function rememberMermaid(text: string): void {
+  try { if (text.trim() && text.length <= MAX_MERMAID_CHARS) localStorage.setItem(LAST_MERMAID, text); } catch { /* storage unavailable: nothing to remember */ }
+}
+
+export function lastMermaid(): string | null {
+  try {
+    const t = localStorage.getItem(LAST_MERMAID);
+    return typeof t === 'string' && t.trim() && t.length <= MAX_MERMAID_CHARS ? t : null;
+  } catch { return null; }
+}

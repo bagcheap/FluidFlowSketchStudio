@@ -6,6 +6,7 @@ import { parseMermaid } from '../../import/mermaid';
 import { isSequence, parseSequence } from '../../import/mermaidSequence';
 import type { LayoutDir } from '../../layout/layered';
 import { Modal } from './Modal';
+import { lastMermaid } from '../../persistence/storage';
 import { Segmented } from '../controls';
 
 const EXAMPLE = `flowchart LR
@@ -19,7 +20,7 @@ const EXAMPLE = `flowchart LR
 type DirChoice = 'auto' | LayoutDir;
 
 export function MermaidDialog() {
-  const [text, setText] = useState(EXAMPLE);
+  const [text, setText] = useState(() => lastMermaid() ?? EXAMPLE); // the last script inserted, if any
   const [dir, setDir] = useState<DirChoice>('auto');
   const seq = useMemo(() => isSequence(text), [text]);
   const g = useMemo(() => parseMermaid(seq ? '' : text), [text, seq]);
