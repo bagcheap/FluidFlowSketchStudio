@@ -29,13 +29,26 @@ import { updateMembership, withMembers } from '../store/containers';
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 const HANDLES: [Handle, number, number][] = [['nw', 0, 0], ['n', 0.5, 0], ['ne', 1, 0], ['e', 1, 0.5], ['se', 1, 1], ['s', 0.5, 1], ['sw', 0, 1], ['w', 0, 0.5]];
 
+/**
+ * Elbow arrows with a set route (waypoints) attached to the shapes being moved or resized, but not moving with them:
+ * they drop their waypoints while the shapes move and are routed round the shapes again on release, instead of
+ * bending back to waypoints that no longer fit.
+ */
+function attachedElbows(d: FlowDocument, moving: Iterable<string>): string[] {
+  const set = new Set(moving);
+  return d.elements.filter((c) => c.type === 'connector' && c.routing === 'elbow' && c.bends.length > 0 && !set.has(c.id)
+    && ((!!c.start.elementId && set.has(c.start.elementId)) || (!!c.end.elementId && set.has(c.end.elementId)))).map((c) => c.id);
+}
+const clearBends = (d: FlowDocument, ids: string[]): FlowDocument =>
+  ids.length ? mapElements(d, ids, (c) => ({ ...(c as ConnectorElement), bends: [] })) : d;
+
 type Interaction =
   | { k: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { k: 'create'; id: string; start: Point; moved: boolean; onExisting: boolean; cycled?: { key: string; ts: ToolStyle } } // cycled: Cmd-drawn, fill moved to the next colour
   | { k: 'connect'; id: string; start: Point; moved: boolean }
-  | { k: 'move'; ids: string[]; top: string[]; start: Point; orig: FlowDocument; moved: boolean; dupDone: boolean; shiftToggle?: string[] } // ids = top + everything inside moved containers; shiftToggle: a Shift-click without a drag deselects these
-  | { k: 'resize'; id: string; handle: Handle; orig: BoxElement }
-  | { k: 'resizeMulti'; ids: string[]; handle: Handle; box: { x: number; y: number; w: number; h: number }; orig: FlowDocument }
+  | { k: 'move'; ids: string[]; top: string[]; start: Point; orig: FlowDocument; moved: boolean; dupDone: boolean; shiftToggle?: string[]; reroute: string[] } // ids = top + everything inside moved containers; shiftToggle: a Shift-click without a drag deselects these
+  | { k: 'resize'; id: string; handle: Handle; orig: BoxElement; reroute: string[] }
+  | { k: 'resizeMulti'; ids: string[]; handle: Handle; box: { x: number; y: number; w: number; h: number }; orig: FlowDocument; reroute: string[] }
   | { k: 'rotate'; id: string; orig: BoxElement; startAngle: number }
   | { k: 'marquee'; start: Point; cur: Point; additive: string[] }
   | { k: 'endpoint'; id: string; which: 'start' | 'end'; moved?: boolean }
@@ -290,8 +303,8 @@ export function Canvas() {
           if (h.kind === 'rotate' && singleBox) {
             const c = { x: singleBox.x + singleBox.w / 2, y: singleBox.y + singleBox.h / 2 };
             inter.current = { k: 'rotate', id: singleBox.id, orig: singleBox, startAngle: Math.atan2(p.y - c.y, p.x - c.x) };
-          } else if (h.kind === 'resize' && singleBox) inter.current = { k: 'resize', id: singleBox.id, handle: h.handle!, orig: singleBox };
-          else if (h.kind === 'multi' && multiBox) inter.current = { k: 'resizeMulti', ids: selection, handle: h.handle!, box: multiBox, orig: d };
+          } else if (h.kind === 'resize' && singleBox) inter.current = { k: 'resize', id: singleBox.id, handle: h.handle!, orig: singleBox, reroute: attachedElbows(d, withMembers(d, [singleBox.id])) };
+          else if (h.kind === 'multi' && multiBox) inter.current = { k: 'resizeMulti', ids: selection, handle: h.handle!, box: multiBox, orig: d, reroute: attachedElbows(d, selection) };
           else if (h.kind === 'endpoint' && singleConn) inter.current = { k: 'endpoint', id: singleConn.id, which: h.which! };
           else if (h.kind === 'bend' && singleConn) inter.current = { k: 'bend', id: singleConn.id, index: h.index! };
           else if (h.kind === 'segment' && singleConn) {
@@ -333,7 +346,8 @@ export function Canvas() {
           if (ids.every((id) => getElement(d, id)?.locked)) return;
           D.begin();
           const top = useUI.getState().selection.filter((id) => !getElement(d, id)?.locked);
-          inter.current = { k: 'move', ids: withMembers(d, top), top, start: p, orig: d, moved: false, dupDone: false, shiftToggle };
+          const moving = withMembers(d, top);
+          inter.current = { k: 'move', ids: moving, top, start: p, orig: d, moved: false, dupDone: false, shiftToggle, reroute: attachedElbows(d, moving) };
           return;
         }
         inter.current = { k: 'marquee', start: p, cur: p, additive: e.shiftKey ? u.selection : [] };
@@ -693,6 +707,7 @@ export function Canvas() {
         if (!it.moved && (e.altKey || isCycleKey(e)) && !it.dupDone) {
           // ⌘-drag (Ctrl-drag on Windows/Linux, like Visio) or Alt/Option-drag duplicates: originals stay, copies move
           it.dupDone = true;
+          it.reroute = []; // the originals stay put: their arrows keep their routes
           const clones = cloneElements(it.orig, it.ids.map((id) => getElement(it.orig, id)!), 0, 0);
           D.live((d) => ({ ...d, elements: [...d.elements, ...clones] }));
           const cloneOf = new Map(it.ids.map((id, i) => [id, clones[i].id]));
@@ -707,17 +722,17 @@ export function Canvas() {
         dx = snapped.dx; dy = snapped.dy;
         setOverlay((o) => ({ ...o, guides: snapped.guides }));
         const ids = new Set(it.ids);
-        D.live(() => mapElements(it.orig, ids, (el) => {
+        D.live(() => clearBends(mapElements(it.orig, ids, (el) => {
           if (el.type === 'connector') {
             const mv = (q: Endpoint) => (q.elementId ? q : { ...q, x: q.x + dx, y: q.y + dy });
             return { ...el, start: mv(el.start), end: mv(el.end), bends: el.bends.map((b) => ({ x: b.x + dx, y: b.y + dy })) };
           }
           return { ...el, x: el.x + dx, y: el.y + dy };
-        }));
+        }), it.reroute));
         return;
       }
       case 'resize': {
-        D.live((d) => mapElements(d, [it.id], () => resizeBox(it.orig, it.handle, p, e.shiftKey || it.orig.type === 'image' && !e.altKey)));
+        D.live((d) => clearBends(mapElements(d, [it.id], () => resizeBox(it.orig, it.handle, p, e.shiftKey || it.orig.type === 'image' && !e.altKey)), it.reroute));
         return;
       }
       case 'resizeMulti': {
@@ -727,13 +742,13 @@ export function Canvas() {
         if (e.shiftKey) { const s = Math.max(sx, sy); sx = s; sy = s; }
         const ids = new Set(it.ids);
         const fx = (x: number) => ax + (x - ax) * sx, fy = (y: number) => ay + (y - ay) * sy;
-        D.live(() => mapElements(it.orig, ids, (el) => {
+        D.live(() => clearBends(mapElements(it.orig, ids, (el) => {
           if (el.type === 'connector') {
             const mv = (q: Endpoint) => (q.elementId ? q : { ...q, x: fx(q.x), y: fy(q.y) });
             return { ...el, start: mv(el.start), end: mv(el.end), bends: el.bends.map((q) => ({ x: fx(q.x), y: fy(q.y) })) };
           }
           return { ...el, x: fx(el.x), y: fy(el.y), w: el.w * sx, h: el.h * sy };
-        }));
+        }), it.reroute));
         return;
       }
       case 'rotate': {
@@ -873,6 +888,7 @@ export function Canvas() {
         }
         // dropped shapes join the container they land in, or leave the one they were dragged out of
         D.live((d) => updateMembership(d, it.top));
+        if (it.reroute.length) D.live((d) => routeArrowsAround(d, it.reroute).doc); // their arrows find a fresh way round
         D.end();
         return;
       case 'label':
@@ -903,6 +919,7 @@ export function Canvas() {
       case 'resize':
       case 'resizeMulti':
         D.live((d) => updateMembership(d, it.k === 'resize' ? [it.id] : it.ids));
+        if (it.reroute.length) D.live((d) => routeArrowsAround(d, it.reroute).doc);
         D.end();
         return;
       default:

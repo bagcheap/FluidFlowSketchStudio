@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.30] - 2026-11-13
+
+### Fixed
+- **Moving a shape re-routes its arrows.** Elbow arrows with a set route (from Route arrows around shapes, a Mermaid import or dragging their segments) no longer cling to their old waypoints when you move or resize a shape they're attached to, which gave kinks and arrows running along a shape's side. While you drag they follow the shape directly, and when you let go they find a fresh way round the shapes and meet each shape straight on. Arrows that move along with the shapes keep their route.
+
 ## [0.1.29] - 2026-11-13
 
 ### Fixed
