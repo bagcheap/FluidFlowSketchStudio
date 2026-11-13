@@ -14,6 +14,7 @@ import { SHAPE_LABELS } from '../engine/shapes';
 import { iconTitle } from '../icons/sets';
 import { VENDORS } from '../icons/zipImport';
 import { SHAPE_KINDS } from '../model/schema';
+import { playStepLabels, readPlaySteps } from '../store/sequence';
 
 const ROUGH = [{ v: 0, label: 'Precise' }, { v: 0.7, label: 'Slight' }, { v: 1.5, label: 'Sketchy' }, { v: 2.6, label: 'Wild' }] as const;
 
@@ -290,11 +291,10 @@ export function Inspector() {
                 <Toggle label="Pulse arrowhead" checked={ca.arrowPulse} onChange={(v) => setConnAnim({ arrowPulse: v })} />
                 {conn?.anim?.window && (() => {
                   // message-by-message playback: which step this arrow is
-                  const [a, b] = conn.anim.window;
-                  const steps = Math.max(1, Math.round(0.85 / (b - a)));
-                  const step = Math.min(steps, Math.round(a * steps) + 1);
+                  const all = readPlaySteps(useDoc.getState().doc);
+                  const step = playStepLabels(all).get(conn.id) ?? '?';
                   return (
-                    <p className="note">Plays as step {step} of {steps}, one after another. <button className="btn small" onClick={cmd.playArrowsTogether}>Play together</button></p>
+                    <p className="note">Plays as step {step} of {all.length}, one after another. <button className="btn small" onClick={cmd.playArrowsTogether}>Play together</button></p>
                   );
                 })()}
               </>}

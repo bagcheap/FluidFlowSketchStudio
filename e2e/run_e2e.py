@@ -682,6 +682,30 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tplayorder()
 
+        @test('Numbered labels: an imported flowchart plays 1, 2, 3, 4a+4b, 5; badges show 4a and 4b')
+        def tlabelorder():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 21000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            n0 = len(app.els())
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('graph LR\n  A -->|1. one| B\n  B -->|2. two| C\n  C -->|3. three| D\n  D -->|4a. up| E\n  D -->|4b. down| F\n  E -->|5. five| G')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            arrows = [e for e in app.els()[n0:] if e['type'] == 'connector']
+            starts = {e['text']: e['anim']['window'][0] for e in arrows}
+            assert starts['4a. up'] == starts['4b. down'] and starts['3. three'] < starts['4a. up'] < starts['5. five'], starts
+            page.get_by_role('menuitem', name='Animation').click()
+            page.get_by_role('menuitem', name='Set play order…').click(); page.wait_for_timeout(100)
+            badges = page.eval_on_selector_all('svg.stage-overlay text', 'els => els.map((e) => e.textContent)')
+            assert sorted(badges) == ['1', '2', '3', '4a', '4b', '5'], badges
+            page.screenshot(path=f'{OUT}/label-order.png')
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tlabelorder()
+
         @test('Diagram from text remembers the last script; Route arrows around shapes keeps arrows out of shapes')
         def tmermaidmem():
             app.key('Escape')

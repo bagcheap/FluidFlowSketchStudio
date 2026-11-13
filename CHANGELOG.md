@@ -4,11 +4,17 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.28] - 2026-11-13
 
 ### Fixed
 - **Save writes back to your file again after reopening.** FlowSketch now remembers which file each diagram came from, so File ▸ Save keeps saving to that file after the app (or the browser tab) is closed and reopened, or when you reopen the diagram from Recents, instead of asking where to save as if it were Save as. In the desktop app the permission to write files you chose is now kept between launches. In Chrome and Edge, the first Save after reopening may ask once whether FlowSketch may edit the file. (Safari can't write back to files at all, so there Save always downloads a copy — use the desktop app or Chrome to save in place.)
 - **Shift-drag keeps a move straight.** Holding Shift while dragging a selected shape (or selection) now moves it only horizontally or vertically, as in Visio and PowerPoint, instead of deselecting it. Shift-click still adds a shape to the selection, or takes it out.
+
+## [0.1.27] - 2026-11-13
+
+### Added
+- **Play in label order:** Animation ▸ **Play in label order** (also **From labels** on the Set play order bar) reads the step numbers at the start of your arrow labels — "1.", "2.", "4a.", "4b." — and plays the arrows in that order. Arrows with the same number and different letters (4a, 4b) play together; arrows without a number keep animating all the time. Flowcharts you import from Mermaid with numbered labels play in that order straight away.
+- **Sub-step badges:** in Set play order, arrows that play together are shown as 4a, 4b, 4c… instead of all showing 4, and the Inspector says "Plays as step 4b of 7".
 
 ## [0.1.26] - 2026-11-13
 
