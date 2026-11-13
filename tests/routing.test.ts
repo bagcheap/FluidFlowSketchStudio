@@ -22,8 +22,9 @@ const bulge = (pts: { x: number; y: number }[]) => {
 };
 
 describe('arrow routing', () => {
-  it('new arrows are straight by default; curved arrows really curve', () => {
-    expect(makeConnector({ x: 0, y: 0, elementId: null }, { x: 1, y: 0, elementId: null }, defaultToolStyle('arrow')).routing).toBe('straight');
+  it('the arrow tool draws elbow arrows by default (lines stay straight); curved arrows really curve', () => {
+    expect(makeConnector({ x: 0, y: 0, elementId: null }, { x: 1, y: 0, elementId: null }, defaultToolStyle('arrow')).routing).toBe('elbow');
+    expect(makeConnector({ x: 0, y: 0, elementId: null }, { x: 1, y: 0, elementId: null }, defaultToolStyle('line')).routing).toBe('straight');
     expect(bulge(twoBoxes({ routing: 'straight' }).pts)).toBeLessThan(0.01);
     expect(bulge(twoBoxes({ routing: 'curved', curvature: 0.3 }).pts)).toBeGreaterThan(20);
   });

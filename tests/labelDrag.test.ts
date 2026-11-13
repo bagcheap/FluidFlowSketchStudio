@@ -8,7 +8,7 @@ import type { FlowDocument, Point } from '../src/model/types';
 
 const free = (p: Point) => ({ x: p.x, y: p.y, elementId: null, anchor: null });
 function arrow(a: Point, b: Point, bends: Point[] = []) {
-  const c = { ...makeConnector(free(a), free(b), defaultToolStyle('arrow')), text: 'label', bends };
+  const c = { ...makeConnector(free(a), free(b), { ...defaultToolStyle('arrow'), routing: 'straight' }), text: 'label', bends };
   const doc: FlowDocument = { ...newDocument(), elements: [c] };
   return { c, doc, path: connectorPath(c, makeLookup(doc, null)) };
 }
