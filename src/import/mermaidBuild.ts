@@ -45,6 +45,7 @@ export function buildMermaid(doc: FlowDocument, g: MGraph, tools: BuildTools, di
     const plain = e.startHead === 'none' && e.endHead === 'none';
     const c = makeConnector(attached(a), attached(b), plain ? tools.line : tools.arrow);
     c.startHead = e.startHead; c.endHead = e.endHead; c.text = e.label;
+    if (e.startHead !== 'none' && e.endHead !== 'none') c.anim = { ...c.anim, direction: 'roundTrip' }; // <--> plays out and back
     if (e.stroke === 'dotted') c.style = { ...c.style, strokeStyle: 'dashed' };
     if (e.stroke === 'thick') c.style = { ...c.style, strokeWidth: Math.max(3, c.style.strokeWidth + 1.5) };
     return [c];

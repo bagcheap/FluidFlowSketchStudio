@@ -950,7 +950,7 @@ def main():
             n0 = len(app.els())
             page.get_by_role('menuitem', name='Insert').click()
             page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
-            page.get_by_label('Flowchart text').fill('sequenceDiagram\n  A->>B: one\n  B->>C: two\n  C-->>A: three')
+            page.get_by_label('Flowchart text').fill('sequenceDiagram\n  A->>B: one\n  B->>C: two\n  C-->>B: three')
             page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
             new = app.els()[n0:]
             msgs = sorted([e for e in new if e['type'] == 'connector' and e.get('anim', {}).get('window')], key=lambda e: e['anim']['window'][0])

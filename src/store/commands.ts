@@ -4,7 +4,7 @@ import { SCHEMA_VERSION } from '../model/types';
 import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { useUI } from './uiStore';
-import { contentBounds } from '../engine/render';
+import { contentBounds, playSchedule } from '../engine/render';
 import { fileToAsset } from '../engine/images';
 import { openDocumentFile, pickFile, resetFileHandle, saveDocumentFile } from '../persistence/files';
 import { DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
@@ -382,7 +382,7 @@ function importSequence(text: string): boolean {
   }, screenToWorld(stage.w / 2, stage.h / 2));
   // its messages play one after another, in order
   const ordered = seq.setPlayOrder(r.doc, r.messageIds);
-  D().commit(() => fitLoopTo(ordered.doc, ordered.steps));
+  D().commit(() => fitLoopToPlay(ordered.doc));
   u.setTool('select');
   u.select(r.ids);
   const b = selectionBounds(D().doc, r.ids);
@@ -392,13 +392,14 @@ function importSequence(text: string): boolean {
   return true;
 }
 
-/** Seconds each message gets when messages play one after another. */
-const STEP_SECONDS = 1.2;
-
-/** Make the loop long enough for `steps` messages one after another (never shorter). Returns the new length or null. */
-function fitLoopTo(d: FlowDocument, steps: number): FlowDocument {
-  if (d.animation.duration >= steps * 0.9) return d;
-  return { ...d, animation: { ...d.animation, duration: Math.min(120, Math.round(steps * STEP_SECONDS * 2) / 2), loop: true, seamless: true } };
+/**
+ * Arrows playing one after another set the loop length: long enough for every step at the shared arrow speed (more or
+ * longer arrows, a longer loop). Nothing changes when no arrow is in an order.
+ */
+function fitLoopToPlay(d: FlowDocument): FlowDocument {
+  const s = playSchedule(d).seconds;
+  if (!s) return d;
+  return { ...d, animation: { ...d.animation, duration: Math.min(120, Math.max(1, Math.ceil(s * 10) / 10)), loop: true, seamless: true } };
 }
 
 /**
@@ -412,9 +413,9 @@ export function playMessagesInOrder() {
   if (!ids.length) { U().toast('Select some arrows, or add a sequence diagram, first'); return; }
   const before = doc.animation.duration;
   const r = seq.setPlayOrder(doc, ids);
-  D().commit(() => fitLoopTo(r.doc, r.steps));
+  D().commit(() => fitLoopToPlay(r.doc));
   const after = D().doc.animation.duration;
-  U().toast(`${r.steps} arrow${r.steps === 1 ? '' : 's'} now play one after another${after !== before ? ` (loop lengthened to ${after} s)` : ''}`);
+  U().toast(`${r.steps} arrow${r.steps === 1 ? '' : 's'} now play one after another${after !== before ? ` (loop is now ${after} s)` : ''}`);
 }
 
 /** Animation ▸ Play arrows together: undo "in order" for the selected arrows (or all on the page). */
@@ -443,7 +444,7 @@ export function playOrderClick(id: string, together: boolean) {
   const c = getElement(doc, id);
   if (!c || c.type !== 'connector' || c.bar || c.locked) return;
   const steps = seq.togglePlayStep(seq.readPlaySteps(doc), id, together);
-  D().commit(() => fitLoopTo(seq.applyPlaySteps(doc, steps), steps.length));
+  D().commit(() => fitLoopToPlay(seq.applyPlaySteps(doc, steps)));
 }
 
 /** In "Set play order": start again, with every arrow animating all the time. */

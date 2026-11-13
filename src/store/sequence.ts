@@ -92,9 +92,10 @@ export function addParticipant(doc: FlowDocument, at: Point, actor: boolean, too
   return { doc: { ...doc, elements: [...doc.elements, lifeline, box] }, id: box.id };
 }
 
-/** A message's highlight travels the way its arrow points: a remembered round trip becomes one-way. */
-export function oneWay(anim: ConnectorElement['anim']): ConnectorElement['anim'] {
-  return anim?.direction === 'roundTrip' ? { ...anim, direction: 'forward' } : anim;
+/** A highlight travels the way its arrow points: out and back on a two-headed arrow; otherwise a remembered round trip becomes one-way. */
+export function flowDirection(c: Pick<ConnectorElement, 'anim' | 'startHead' | 'endHead'>): ConnectorElement['anim'] {
+  if (c.startHead !== 'none' && c.endHead !== 'none') return { ...c.anim, direction: 'roundTrip' }; // heads at both ends: out and back
+  return c.anim?.direction === 'roundTrip' ? { ...c.anim, direction: 'forward' } : c.anim;
 }
 
 /** Style a message arrow between two participants: straight and level, label above; or a loop for a self-message. */
@@ -106,7 +107,7 @@ export function asMessage(c: ConnectorElement, from: BoxElement, to: BoxElement)
     routing: self ? 'curved' : 'straight',
     curvature: self ? -1 : 0, // a loop out to the right
     labelPos: 0.5,
-    anim: oneWay(c.anim), // a message flows from sender to receiver, even if the arrow tool is set to a round trip
+    anim: flowDirection(c), // a message flows from sender to receiver (out and back if it has two heads), whatever the arrow tool remembers
     labelOffset: self ? -(c.text.length * c.textStyle.fontSize * 0.275 + 40) : dx >= 0 ? -14 : 14, // above the arrow; beside a loop
   };
 }
@@ -239,7 +240,7 @@ export function setPlayOrder(doc: FlowDocument, ids: string[]): { doc: FlowDocum
         const i = slot.get(e.id);
         if (i === undefined || e.type !== 'connector' || e.locked) return e;
         // a small pause after each message before the next one starts
-        return { ...e, anim: { ...oneWay(e.anim), mode: 'travel', window: [i / n, (i + 0.85) / n] as [number, number] } };
+        return { ...e, anim: { ...flowDirection(e), mode: 'travel', window: [i / n, (i + 0.85) / n] as [number, number] } };
       }),
     },
     steps: n,
@@ -273,7 +274,7 @@ export function applyPlaySteps(doc: FlowDocument, steps: string[][]): FlowDocume
     elements: doc.elements.map((e) => {
       if (e.type !== 'connector' || e.locked) return e;
       const k = slot.get(e.id);
-      if (k !== undefined) return { ...e, anim: { ...oneWay(e.anim), mode: 'travel', window: [k / n, (k + 0.85) / n] as [number, number] } };
+      if (k !== undefined) return { ...e, anim: { ...flowDirection(e), mode: 'travel', window: [k / n, (k + 0.85) / n] as [number, number] } };
       if (!e.anim?.window) return e;
       const { window: _w, ...rest } = e.anim;
       void _w;

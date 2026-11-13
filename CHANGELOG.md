@@ -4,6 +4,12 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.25] - 2026-11-13
+
+### Changed
+- **Arrows that play one after another now all move at the same speed.** Before, every arrow got the same amount of time, so long arrows rushed and short ones crawled. Each step now lasts as long as its arrow needs, with the same short pause between steps, and the loop length is set from that whenever you change the order: more (or longer) arrows mean a longer loop. Moving shapes afterwards keeps the speeds even.
+- **Arrows with heads at both ends play out and back.** Imported two-headed arrows (`<-->` in flowcharts, `<<->>` in sequence diagrams) get the round-trip highlight, and so does any two-headed arrow you put in a play order.
+
 ## [0.1.24] - 2026-11-12
 
 ### Added

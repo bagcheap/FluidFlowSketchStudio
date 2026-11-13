@@ -6,7 +6,7 @@
 import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, Endpoint, FlowDocument, Point, ShapeKind, ToolStyle } from '../model/types';
 import { baseFields, makeConnector, makeShape } from '../model/defaults';
 import { moveElements } from '../store/containers';
-import { activeLevel, lifelineFor, makeBar, messageEnd, MIN_BAR, oneWay, SELF_H } from '../store/sequence';
+import { activeLevel, flowDirection, lifelineFor, makeBar, messageEnd, MIN_BAR, SELF_H } from '../store/sequence';
 import type { SGraph } from './mermaidSequence';
 
 export interface SeqTools {
@@ -84,7 +84,7 @@ export function buildSequence(doc: FlowDocument, g: SGraph, tools: SeqTools, at:
       const start = on(s.from, y), end = on(s.to, self ? y + SELF_H : y);
       const c = makeConnector(start, end, s.endHead === 'none' && s.startHead === 'none' ? tools.line : tools.arrow);
       c.startHead = s.startHead; c.endHead = s.endHead;
-      c.anim = oneWay(c.anim); // flows the way the arrow points
+      c.anim = flowDirection(c); // flows the way the arrow points; out and back with two heads
       c.text = (g.autonumber ? `${++n}. ` : '') + s.text;
       c.routing = self ? 'curved' : 'straight';
       c.curvature = self ? -1 : 0; // a loop out to the right
