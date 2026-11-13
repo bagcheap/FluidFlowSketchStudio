@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 - **Save writes back to your file again after reopening.** FlowSketch now remembers which file each diagram came from, so File ▸ Save keeps saving to that file after the app (or the browser tab) is closed and reopened, or when you reopen the diagram from Recents, instead of asking where to save as if it were Save as. In the desktop app the permission to write files you chose is now kept between launches. In Chrome and Edge, the first Save after reopening may ask once whether FlowSketch may edit the file. (Safari can't write back to files at all, so there Save always downloads a copy — use the desktop app or Chrome to save in place.)
+- **Moving a shape re-routes its arrows.** Elbow arrows with a set route (from Route arrows around shapes, a Mermaid import or dragging their segments) no longer cling to their old waypoints when you move or resize a shape they're attached to, which gave kinks and arrows running along a shape's side. While you drag they follow the shape directly, and when you let go they find a fresh way round the shapes and meet each shape straight on. Arrows that move along with the shapes keep their route.
 - **Shift-drag keeps a move straight.** Holding Shift while dragging a selected shape (or selection) now moves it only horizontally or vertically, as in Visio and PowerPoint, instead of deselecting it. Shift-click still adds a shape to the selection, or takes it out.
 
 ## [0.1.26] - 2026-11-13

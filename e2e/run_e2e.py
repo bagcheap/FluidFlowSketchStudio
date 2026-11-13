@@ -575,6 +575,48 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tshiftmove()
 
+        @test('Moving a shape re-routes its routed elbow arrows round the shapes; they meet the shape straight on')
+        def treroute():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 25000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.tool('r')
+            app.drag((5100, 25250), (5220, 25310)); app.drag((5360, 25210), (5440, 25350)); app.drag((5580, 25250), (5700, 25310))
+            a, mid, b = app.els('shape')[-3:]
+            app.tool('a'); app.drag((5160, 25280), (5640, 25280))
+            c = app.els('connector')[-1]
+            page.get_by_role('radiogroup', name='Routing').get_by_role('radio', name='Elbow').click(); page.wait_for_timeout(60)
+            page.get_by_role('menuitem', name='Arrange').click()
+            page.get_by_role('menuitem', name='Route arrows around shapes').click(); page.wait_for_timeout(100)
+            old = [e for e in app.els() if e['id'] == c['id']][0]
+            assert old['bends'], 'not routed'
+            app.key('Escape')
+            before = app.js('() => window.__flowsketch.history()')['past']
+            app.drag((5640, 25280), (5240, 25480), steps=12)  # b goes below and to the left, under a
+            nb = [e for e in app.els() if e['id'] == b['id']][0]
+            assert abs(nb['y'] - (b['y'] + 200)) < 2, 'b did not move'
+            r = [e for e in app.els() if e['id'] == c['id']][0]
+            assert r['bends'] != old['bends'], 'kept the old waypoints'
+            assert app.js('() => window.__flowsketch.history()')['past'] == before + 1, 'not one undo step'
+            f = app.js('(id) => window.__flowsketch.frame(0).items.find((i) => i.id === id)', c['id'])
+            pts = [p for part in f['parts'] if part['k'] == 'line' for p in zip(part['pts'][0::2], part['pts'][1::2])]
+            for s_ in (a, mid, nb):
+                assert not any(s_['x'] + 3 < x < s_['x'] + s_['w'] - 3 and s_['y'] + 3 < y < s_['y'] + s_['h'] - 3 for x, y in pts), ('through a shape', s_['id'])
+            # it meets b straight on: the end segment runs across b's side, not along it
+            ends = app.js('(id) => window.__flowsketch.connectorEnds(id)', c['id'])
+            an = r['end']['anchor']
+            near = [(x, y) for x, y in pts if abs(x - ends['e']['x']) + abs(y - ends['e']['y']) < 18]
+            if an['y'] in (0, 1):
+                assert max(abs(x - ends['e']['x']) for x, y in near) < 4, ('not straight into the top/bottom', an, near)
+            else:
+                assert max(abs(y - ends['e']['y']) for x, y in near) < 4, ('not straight into the side', an, near)
+            page.screenshot(path=f'{OUT}/reroute-on-move.png')
+            app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        treroute()
+
         @test('Elbow waypoints: drag a segment bar to slide it; Reset route; double-click removes a waypoint')
         def twaypoints():
             app.key('Escape')
