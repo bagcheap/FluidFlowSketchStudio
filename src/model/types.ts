@@ -119,6 +119,10 @@ interface ElementBase {
   style: Style;
   text: string;
   textStyle: TextStyle;
+  /** Interactive player: clicking this item goes to the page with this id (schema v14). */
+  link?: string;
+  /** Interactive player: plain-text note shown when pointing at this item (schema v14). */
+  note?: string;
 }
 
 export interface ShapeElement extends ElementBase {
@@ -208,7 +212,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 13; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth) · v11: arrowhead size (headSize) · v12: step captions and step focus (animation.captions / stepFocus) · v13: camera moves (animation.camera)
+export const SCHEMA_VERSION = 14; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth) · v11: arrowhead size (headSize) · v12: step captions and step focus (animation.captions / stepFocus) · v13: camera moves (animation.camera) · v14: page links and hover notes on items (link / note)
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).

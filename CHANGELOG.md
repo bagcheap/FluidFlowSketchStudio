@@ -4,6 +4,16 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Interactive HTML player:** the exported HTML file now has controls at the top: play/pause, start again, and, when arrows play in order, **Previous** / **Next** to go through the flow one step at a time (also the ← → keys; Space plays and pauses), with a step counter. Each Next plays one step and pauses.
+- **Links between pages:** in the Inspector's new **Interactive player** section, **Link to page** makes an item clickable in the HTML player: clicking it opens that page (for example from an overview to a detail page), and **Back** (or Backspace) returns. Linked items show a small blue badge. Files with several pages also get a page menu in the player.
+- **Notes on hover:** **Note on hover** (same section) is shown as a tooltip when someone points at the item in the HTML player.
+
+### Changed
+- Files now use format version 14 (links and notes are saved with the diagram). Older files open as before, but files saved with this version need this version of FlowSketch or later.
+
 ## [0.1.36] - 2026-11-14
 
 ### Added

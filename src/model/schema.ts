@@ -14,6 +14,14 @@ export const MAX_ELEMENTS = 5000; // per page
 export const MAX_PAGES = 50;
 export const MAX_TOTAL_ELEMENTS = 20000; // across all pages
 export const MAX_TEXT = 5000;
+/** Longest hover note (characters). */
+export const MAX_NOTE = 1000;
+
+/** A note is plain text: control, zero-width and bidi-override characters are removed (line breaks stay). */
+export function cleanNote(v: unknown): string {
+  if (typeof v !== 'string') return '';
+  return v.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000B-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g, '').slice(0, MAX_NOTE);
+}
 export const MAX_ASSET_BYTES = 8 * 1024 * 1024;
 
 export class DocumentError extends Error {}
@@ -153,6 +161,9 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
     style: style(v.style),
     text: str(v.text, '', MAX_TEXT),
     textStyle: textStyle(v.textStyle),
+    // page links are checked once every page is known (dangling ones are dropped)
+    ...(typeof v.link === 'string' && v.link ? { link: v.link.slice(0, 100) } : {}),
+    ...(cleanNote(v.note).trim() ? { note: cleanNote(v.note) } : {}),
   };
   const sAnim = isObj(v.anim) ? { anim: sanitizeShapeAnim(v.anim, true) } : {};
   switch (type) {
@@ -380,6 +391,10 @@ export function migrate(raw: Obj): Obj {
     // v12 -> v13: camera moves switch (animation.camera, off by default); nothing to convert
     version = 13;
   }
+  if (version === 13) {
+    // v13 -> v14: items may link to a page and carry a hover note (link / note); nothing to convert
+    version = 14;
+  }
   raw.schemaVersion = version;
   return raw;
 }
@@ -487,6 +502,10 @@ export function parseDocument(input: string | unknown): ParseResult {
     pages.push({ id, name: str(rp.name, '', 60).trim() || `Page ${i + 1}`, elements: readElements(rp.elements) });
   }
   if (!pages.length) pages.push({ id: uid('page'), name: 'Page 1', elements: readElements(o.elements) });
+  // a link must go to another page of this document
+  for (const pg of pages) for (const e of pg.elements) {
+    if (e.link !== undefined && (!pageIds.has(e.link) || e.link === pg.id)) { delete e.link; warn('Removed a link to a page that is not in this file.'); }
+  }
   const active = pages.find((pg) => pg.id === o.activePage) ?? pages[0];
   doc.pages = pages.map((pg) => (pg === active ? { ...pg, elements: [] } : pg));
   doc.activePage = active.id;

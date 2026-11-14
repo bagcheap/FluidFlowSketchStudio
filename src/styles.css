@@ -383,3 +383,7 @@ code { font-size: 12px; }
 .seq-cell:hover { background: var(--panel-2); color: var(--fg); }
 .seq-cell.on { background: var(--accent-soft); color: var(--accent); }
 @media (max-width: 720px) { .seq-pop { position: fixed; top: auto; bottom: 120px; } }
+
+/* Inspector: hover note for the interactive player */
+.note-field { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.note-field textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 54px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); font-size: 13px; }

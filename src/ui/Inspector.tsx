@@ -303,6 +303,21 @@ export function Inspector() {
             </Section>
           )}
 
+          {els.length === 1 && (
+            <Section title="Interactive player" defaultOpen={!!(first.link || first.note)}>
+              <Row label="Link to page" hint="In the exported HTML player, clicking this goes to that page (Back returns)">
+                <Select label="Link to page" value={first.link && doc.pages.some((p) => p.id === first.link) ? first.link : ''}
+                  options={[{ v: '', label: 'None' }, ...doc.pages.filter((p) => p.id !== doc.activePage).map((p) => ({ v: p.id, label: p.name }))]}
+                  onChange={(v) => cmd.setLink(ids, v || null)} />
+              </Row>
+              <label className="note-field">
+                <span className="row-label">Note on hover</span>
+                <textarea aria-label="Note on hover" rows={3} maxLength={1000} placeholder="Shown when pointing at this in the HTML player"
+                  value={first.note ?? ''} onChange={(e) => cmd.setNote(ids, e.target.value)} />
+              </label>
+            </Section>
+          )}
+
           {singleBox && (
             <Section title="Position & size" defaultOpen={false}>
               <div className="grid2">
