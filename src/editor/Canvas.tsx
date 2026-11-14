@@ -7,7 +7,7 @@ import { colorLabel } from '../ui/colorNames';
 import { cycleFill, makeConnector, makeShape, makeText, newSeed, seqStyleKey, SHAPE_DEFAULT_SIZE, styleKey, uid } from '../model/defaults';
 import { deleteElements, getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
-import { renderDocumentAtTime, makeLookup, boxCorners, MIN_LABEL_W } from '../engine/render';
+import { renderDocumentAtTime, makeLookup, boxCorners, hasCamera, MIN_LABEL_W } from '../engine/render';
 import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
 import { connectorPath, isHorizontal, labelPlacement, moveElbowSegment, pointAt, tidyElbow } from '../engine/connectors';
@@ -21,6 +21,7 @@ import { activeLevel, addBar, addFrameBehind, addParticipant, addSelfMessage, as
 import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { Copy } from 'lucide-react';
+import { liveCameraView } from '../store/commands';
 import { applyStyle, clearAllPlayOrder, playInLabelOrder, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
@@ -85,6 +86,9 @@ export function Canvas() {
   const editingId = useUI((s) => s.editingId);
   const playOrderMode = useUI((s) => s.playOrderMode);
   const presentation = useUI((s) => s.presentation);
+  const playing = useUI((s) => s.playing);
+  // camera moves: while playing, the camera decides what the canvas shows, so the editing overlay is hidden
+  const cameraLive = playing && hasCamera(doc);
   const [size, setSize] = useState({ w: 1200, h: 800 });
   const [overlay, setOverlay] = useState<Overlay>({});
   const [spaceDown, setSpaceDown] = useState(false);
@@ -135,7 +139,9 @@ export function Canvas() {
       const it = inter.current;
       const susp = u.prefs.suspendWhileDragging && it && (it.k === 'move' || it.k === 'resize' || it.k === 'rotate' || it.k === 'resizeMulti')
         ? new Set(it.k === 'move' || it.k === 'resizeMulti' ? it.ids : [it.id]) : undefined;
-      const key = `${d.revision}|${u.time.toFixed(4)}|${u.view.x},${u.view.y},${u.view.zoom}|${stage.w}x${stage.h}|${u.editingId}|${susp ? [...susp].join() : ''}`;
+      const cam = liveCameraView(d.doc, u.time);
+      const view = cam ?? u.view;
+      const key = `${d.revision}|${u.time.toFixed(4)}|${view.x},${view.y},${view.zoom}|${stage.w}x${stage.h}|${u.editingId}|${susp ? [...susp].join() : ''}`;
       if (key === lastKey && !redraw.current) return;
       lastKey = key; redraw.current = false;
       const c = canvasRef.current;
@@ -147,13 +153,13 @@ export function Canvas() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = d.doc.canvas.background;
       ctx.fillRect(0, 0, W, H);
-      if (!u.presentation) drawGrid(ctx, d.doc, u.view, dpr);
+      if (!u.presentation) drawGrid(ctx, d.doc, view, dpr);
       const frame = renderDocumentAtTime(d.doc, u.time, {
         flags: { suspended: susp },
         hide: u.editingId ? new Set([u.editingId]) : undefined,
-        cull: { x: u.view.x, y: u.view.y, w: stage.w / u.view.zoom, h: stage.h / u.view.zoom },
+        cull: { x: view.x, y: view.y, w: stage.w / view.zoom, h: stage.h / view.zoom },
       });
-      drawFrame(ctx, frame, { images: imageMap(d.doc.assets), originX: u.view.x, originY: u.view.y, scale: u.view.zoom * dpr });
+      drawFrame(ctx, frame, { images: imageMap(d.doc.assets), originX: view.x, originY: view.y, scale: view.zoom * dpr });
     };
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); off(); };
@@ -262,6 +268,8 @@ export function Canvas() {
     clearQcTimer();
     if (qcPop) setQcPop(null);
     const u = useUI.getState();
+    // the camera is showing a step, not the editor's view: a click pauses, back to the view you were editing in
+    if (!u.presentation && u.playing && hasCamera(useDoc.getState().doc)) { u.setPlaying(false); return; }
     if (u.editingId) { (document.activeElement as HTMLElement)?.blur?.(); }
     wrapRef.current!.setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1184,15 +1192,16 @@ export function Canvas() {
       aria-label="Diagram canvas"
     >
       <canvas ref={canvasRef} className="stage-canvas" style={{ width: size.w, height: size.h }} />
-      <svg className="stage-overlay" width={size.w} height={size.h} aria-hidden>
+      <svg className="stage-overlay" width={size.w} height={size.h} aria-hidden style={cameraLive ? { display: 'none' } : undefined}>
         <g transform={`scale(${z}) translate(${-view.x} ${-view.y})`}>{overlayEls}</g>
       </svg>
       {playOrderMode && !presentation && (
         <div className="order-bar no-canvas" role="toolbar" aria-label="Set play order">
-          <span><b>Set play order:</b> click arrows in turn · Shift-click: same step (4a, 4b) · click again: remove</span>
+          <span><b>Play order:</b> click arrows in turn · Shift: same step · again: remove</span>
           <button className="btn small" title="Order the arrows by the numbers at the start of their labels (1, 2, 4a, 4b…)" onClick={playInLabelOrder}>From labels</button>
           <button className={`btn small ${doc.animation.captions ? 'on' : ''}`} aria-pressed={!!doc.animation.captions} title="Show each step's arrow labels as a subtitle while it plays" onClick={() => setAnimation({ captions: !doc.animation.captions })}>Captions</button>
           <button className={`btn small ${doc.animation.stepFocus ? 'on' : ''}`} aria-pressed={!!doc.animation.stepFocus} title="Make the shapes in the playing step glow and dim the rest" onClick={() => setAnimation({ stepFocus: !doc.animation.stepFocus })}>Highlight</button>
+          <button className={`btn small ${doc.animation.camera ? 'on' : ''}`} aria-pressed={!!doc.animation.camera} title="Zoom to each step as it plays, then back out to the whole picture" onClick={() => setAnimation({ camera: !doc.animation.camera })}>Camera</button>
           <button className="btn small" onClick={clearAllPlayOrder}>Clear</button>
           <button className="btn small primary" onClick={endPlayOrder}>Done</button>
         </div>

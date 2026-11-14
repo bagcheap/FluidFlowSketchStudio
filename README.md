@@ -201,7 +201,7 @@ Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excal
 
 1. ✅ *Built in 0.1.34.* **Step captions.** Each play-order step gets a short caption (for example "3. Client sends the token to the Agent"), shown as a subtitle bar during playback, in GIF/video exports and in the HTML player. It can be filled in from the arrow labels.
 2. ✅ *Built in 0.1.34.* **Highlight the boxes, not just the arrows.** When a step plays, its sender and receiver shapes glow too, and everything else can dim slightly, so the flow is obvious in large diagrams.
-3. **Camera moves (scenes).** A step, or group of steps, zooms and pans to the part of the diagram it concerns, then pulls back to the whole picture, like a presentation.
+3. ✅ *Built in 0.1.36.* **Camera moves (scenes).** A step, or group of steps, zooms and pans to the part of the diagram it concerns, then pulls back to the whole picture, like a presentation.
 4. **Interactive HTML player.** Next/previous buttons to step through the flow, clicking a shape to jump to a linked page (drill down from overview to detail), and notes on hover. A self-contained, shareable walkthrough.
 
 ### 2. Everyday editing

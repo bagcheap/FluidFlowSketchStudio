@@ -10,6 +10,7 @@ import { displace, easeInOut, fract, hash01, snapFreq, type DeformField } from '
 import { roughSets, type OpSet } from './rough';
 import { geometryFor } from './shapes';
 import { cssFont, layoutText } from './text';
+import { CAM_CLOSE, CAM_MOVE, CAM_OPEN, cameraAt, groupShots, type CamKey, type CamRect } from './camera';
 
 /** A colour, or a gradient with the bounding box of the path it fills (for bounding-box gradients). */
 export type PartPaint = string | (IconGradient & { box?: [number, number, number, number] }) | null;
@@ -303,7 +304,7 @@ export const PLAY_SPEED = 250;
 /** …with this pause (seconds) after each step. */
 export const STEP_PAUSE = 0.35;
 
-interface PlaySchedule { win: Map<string, [number, number]>; seconds: number; steps: { ids: string[]; start: number }[] }
+interface PlaySchedule { win: Map<string, [number, number]>; seconds: number; steps: { ids: string[]; start: number }[]; camera: CamKey[] }
 const schedules = new WeakMap<FlowDocument, PlaySchedule>();
 
 /**
@@ -329,18 +330,65 @@ export function playSchedule(doc: FlowDocument): PlaySchedule {
     steps.set(k, s);
   }
   const ordered = [...steps.entries()].sort((x, y) => x[0] - y[0]).map(([, s]) => s);
-  const total = ordered.reduce((t, s) => t + s.secs + STEP_PAUSE, 0);
+  // camera moves: steps grouped into shots; time is added to move in, between shots and back out
+  const cam = doc.animation.camera && ordered.length ? groupShots(ordered.map((s) => stepArea(doc, s.ids, lookup))) : null;
   const win = new Map<string, [number, number]>();
   const stepList: { ids: string[]; start: number }[] = [];
-  let at = 0;
-  for (const s of ordered) {
-    for (const id of s.ids) win.set(id, [at / total, (at + s.secs) / total]);
-    stepList.push({ ids: s.ids, start: at / total });
+  const keys: { at: number; shot: CamRect | null }[] = cam ? [{ at: 0, shot: null }, { at: CAM_OPEN, shot: null }] : [];
+  let at = cam ? CAM_OPEN : 0;
+  ordered.forEach((s, k) => {
+    if (cam && (k === 0 || cam.of[k] !== cam.of[k - 1])) {
+      at += CAM_MOVE;
+      keys.push({ at, shot: cam.shots[cam.of[k]] });
+    }
+    for (const id of s.ids) win.set(id, [at, at + s.secs]);
+    stepList.push({ ids: s.ids, start: at });
     at += s.secs + STEP_PAUSE;
-  }
-  const out = { win, seconds: total, steps: stepList };
+    if (cam && (k === ordered.length - 1 || cam.of[k + 1] !== cam.of[k])) keys.push({ at, shot: cam.shots[cam.of[k]] }); // hold until it moves on
+  });
+  if (cam) { at += CAM_MOVE; keys.push({ at, shot: null }); at += CAM_CLOSE; keys.push({ at, shot: null }); }
+  const total = at;
+  for (const [id, [a, b]] of win) win.set(id, [a / total, b / total]);
+  for (const st of stepList) st.start /= total;
+  const out = { win, seconds: total, steps: stepList, camera: keys.map((k) => ({ p: k.at / total, shot: k.shot })) };
   schedules.set(doc, out);
   return out;
+}
+
+/** The part of the diagram a step concerns: its arrows and the shapes at their ends (static geometry). */
+function stepArea(doc: FlowDocument, ids: string[], lookup: Lookup): CamRect {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const add = (x: number, y: number) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
+  const ends = new Set<string>();
+  for (const id of ids) {
+    const c = doc.elements.find((e) => e.id === id);
+    if (c?.type !== 'connector') continue;
+    for (const q of connectorPath(c, lookup).control) add(q.x, q.y);
+    if (c.text) {
+      const path = connectorPath(c, lookup), { pt, tan } = pointAt(path, c.labelPos * path.length), { w, h } = connectorLabelSize(c);
+      const cx = pt.x - tan.y * c.labelOffset, cy = pt.y + tan.x * c.labelOffset;
+      add(cx - w / 2, cy - h / 2); add(cx + w / 2, cy + h / 2);
+    }
+    for (const e of [c.start, c.end]) if (e.elementId) ends.add(e.elementId);
+  }
+  for (const el of doc.elements) if (ends.has(el.id)) { const b = elementBounds(doc, el); add(b.x, b.y); add(b.x + b.w, b.y + b.h); }
+  return x0 === Infinity ? { x: 0, y: 0, w: 1, h: 1 } : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/**
+ * Camera moves: the part of the diagram to show at time t, given the whole picture `base` (already at the output's
+ * aspect ratio). With camera moves off, or nothing playing in order, it is `base`. Used by the live view (while playing
+ * or presenting), every raster export and the HTML player, so they all move the same way.
+ */
+export function hasCamera(doc: FlowDocument): boolean {
+  return !!doc.animation.camera && doc.animation.enabled && playSchedule(doc).camera.length > 0;
+}
+
+export function cameraView(doc: FlowDocument, t: number, base: Rect, aspect: number): Rect {
+  if (!hasCamera(doc)) return base;
+  const { camera } = playSchedule(doc);
+  const L = Math.max(1e-6, doc.animation.duration);
+  return cameraAt(camera, doc.animation.loop ? fract(t / L) : Math.min(1, t / L), base, aspect);
 }
 
 /** How long a step's caption and highlight take to fade in (seconds). */

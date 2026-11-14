@@ -4,6 +4,14 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Camera moves:** when arrows play in order, the view can zoom in on each step (the arrows and the shapes at their ends) and pull back to the whole picture at the end, like a presentation. Steps close together share one shot, so the camera doesn't jump back and forth. It shows while playing, in Present mode, in GIF, video and PNG exports, and in the HTML player. Turn it on with **Animation ▸ Camera follows steps**, or the **Camera** button on the Set play order bar; the loop gets a little longer to make room for the moves. While the camera is playing in the editor, clicking the canvas pauses and returns to your own view.
+
+### Changed
+- Files now use format version 13 (the camera switch is saved with the diagram). Older files open as before, but files saved with this version need this version of FlowSketch or later.
+
 ## [0.1.35] - 2026-11-14
 
 ### Changed
