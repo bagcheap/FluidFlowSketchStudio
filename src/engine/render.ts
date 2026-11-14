@@ -421,7 +421,9 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
   const st = c.style;
   const sw = st.strokeWidth;
   if (c.bar) return [{ id: c.id, opacity: st.opacity, tf: null, parts: barParts(path, st) }];
-  const anim = flags?.still ? { ...resolveConnectorAnim(doc.animation, c), mode: 'none' as const } : resolveConnectorAnim(doc.animation, c);
+  // while arrows play in order, an arrow that isn't in the order stays still (it would otherwise loop all the time)
+  const offOrder = !c.anim?.window && playSchedule(doc).steps.length > 0;
+  const anim = flags?.still || offOrder ? { ...resolveConnectorAnim(doc.animation, c), mode: 'none' as const } : resolveConnectorAnim(doc.animation, c);
   const settings = doc.animation;
   const L = settings.seamless && settings.loop ? settings.duration : null;
   const tt = t; // connectors share the document clock so flow reads consistently

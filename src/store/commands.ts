@@ -364,8 +364,9 @@ export function importMermaid(text: string, dir?: LayoutDir): boolean {
     container: u.toolStyle('container'), fit: fitShapeToText,
   }, dir ?? g.dir, screenToWorld(stage.w / 2, stage.h / 2));
   // arrows numbered in their labels ("1.", "2.", "4a."…) play in that order
-  const numbered = seq.labelSteps(r.doc);
-  const withOrder = numbered.reduce((t, g) => t + g.length, 0) >= 2 ? fitLoopToPlay(seq.applyPlaySteps(r.doc, numbered)) : r.doc;
+  // two or more numbered arrows: play in label order (unnumbered arrows follow the one before them)
+  const numbered = seq.numberedSteps(r.doc).reduce((t, g) => t + g.length, 0);
+  const withOrder = numbered >= 2 ? fitLoopToPlay(seq.applyPlaySteps(r.doc, seq.labelSteps(r.doc))) : r.doc;
   D().commit(() => withOrder);
   u.setTool('select');
   u.select(r.ids);
@@ -459,11 +460,12 @@ export function playOrderClick(id: string, together: boolean) {
  */
 export function playInLabelOrder() {
   const doc = D().doc;
+  const numbered = seq.numberedSteps(doc);
   const steps = seq.labelSteps(doc);
-  if (!steps.length) { U().toast('No arrow labels start with a step number, like "1.", "2." or "4a."', 'error'); return; }
+  if (!numbered.length) { U().toast('No arrow labels start with a step number, like "1.", "2." or "4a."', 'error'); return; }
   D().commit(() => fitLoopToPlay(seq.applyPlaySteps(doc, steps)));
-  const n = steps.reduce((t, g) => t + g.length, 0);
-  U().toast(`${n} numbered arrow${n === 1 ? '' : 's'} now play in label order (${steps.length} step${steps.length === 1 ? '' : 's'}, loop ${D().doc.animation.duration} s)`);
+  const n = numbered.reduce((t, g) => t + g.length, 0), f = steps.reduce((t, g) => t + g.length, 0) - n;
+  U().toast(`${n} numbered arrow${n === 1 ? '' : 's'}${f ? ` (+${f} following)` : ''} now play in label order (${steps.length} step${steps.length === 1 ? '' : 's'}, loop ${D().doc.animation.duration} s)`);
 }
 
 /** In "Set play order": start again, with every arrow animating all the time. */

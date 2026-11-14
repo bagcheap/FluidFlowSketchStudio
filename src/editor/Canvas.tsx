@@ -1143,7 +1143,7 @@ export function Canvas() {
       overlayEls.push(<rect key="mq" x={m.x} y={m.y} width={m.w} height={m.h} fill={accent} fillOpacity={0.07} stroke={accent} strokeWidth={1 / z} />);
     }
     if (playOrderMode) {
-      // a numbered badge on every arrow: its step in the play order (hollow = not in the order, animates all the time)
+      // a numbered badge on every arrow: its step in the play order (hollow = not in the order, stays still while there is an order)
       const stepOf = playStepLabels(readPlaySteps(doc)); // "4", or "4a", "4b" for arrows that play together
       for (const el of doc.elements) {
         if (el.type !== 'connector' || el.bar) continue;
