@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.34] - 2026-11-14
 
 ### Added
 - **Step captions:** when arrows play in order, the playing step's arrow labels can show as a subtitle at the bottom ("2. Ask the agent"; arrows in the same step are joined with " · "). They appear in playback and in GIF, video, PNG and HTML player exports. Turn them on with **Animation ▸ Step captions**, or the **Captions** button on the Set play order bar.
