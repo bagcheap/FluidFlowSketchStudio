@@ -89,6 +89,7 @@ code { font-size: 12px; }
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: 0; background: none; color: var(--fg-2); }
 .icon-btn:hover:not(:disabled) { background: var(--panel-2); color: var(--fg); }
 .icon-btn.on { color: var(--accent); background: var(--accent-soft); }
+.btn.on { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
 .icon-btn.sm { width: 26px; height: 26px; border-radius: 7px; }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel); font-weight: 500; white-space: nowrap; }
 .btn:hover:not(:disabled) { background: var(--panel-2); }

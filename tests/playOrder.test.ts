@@ -54,11 +54,13 @@ describe('set play order', () => {
     expect(at(0.8)).toEqual([false, true, false, false]); // step 3
   });
 
-  it('arrows left out of the order animate as usual; Clear takes every arrow out', () => {
+  it('arrows left out of the order stay still while there is one; Clear takes every arrow out', () => {
     const { doc, ids } = fourArrows();
     const d = applyPlaySteps(doc, [[ids[0]], [ids[1]]]);
     const anim = (x: FlowDocument, id: string) => (x.elements.find((e) => e.id === id) as ConnectorElement).anim;
     expect(anim(d, ids[2])?.window).toBeUndefined();
+    for (let t = 0; t < 6; t += 0.25) expect(lit(d, ids[2], t)).toBe(false); // no highlight at any time
+    expect([0.5, 1, 1.5, 2].some((t) => lit(doc, ids[2], t))).toBe(true); // without an order it animates as usual
     const cleared = applyPlaySteps(d, []);
     expect(ids.every((id) => !anim(cleared, id)?.window)).toBe(true);
   });
@@ -130,12 +132,13 @@ describe('set play order', () => {
     for (const t of ['2FA check', 'v2 API', 'Login', '', '1234. too long', '4ab. two letters']) expect(labelStep(t), t).toBeNull();
   });
 
-  it('label order: numbers in order, same number with letters together; unnumbered arrows left out', () => {
+  it('label order: numbers in order, same number with letters together; an unnumbered arrow follows the one before it', () => {
     const { doc, ids } = fourArrows();
     const named = ['6b. later', '4a. first', 'not numbered', '6a. later too'];
     const d = { ...doc, elements: doc.elements.map((e) => { const i = ids.indexOf(e.id); return i < 0 ? e : { ...e, text: named[i] }; }) } as FlowDocument;
-    expect(labelSteps(d)).toEqual([[ids[1]], [ids[3], ids[0]]]); // step 4: 4a; step 6: 6a then 6b
-    expect(playStepLabels(labelSteps(d))).toEqual(new Map([[ids[1], '1'], [ids[3], '2a'], [ids[0], '2b']]));
+    // step 4: 4a; then the unnumbered arrow out of the shape 4a leads into; step 6: 6a then 6b
+    expect(labelSteps(d)).toEqual([[ids[1]], [ids[2]], [ids[3], ids[0]]]);
+    expect(playStepLabels(labelSteps(d))).toEqual(new Map([[ids[1], '1'], [ids[2], '2'], [ids[3], '3a'], [ids[0], '3b']]));
   });
 
   it('badges name arrows that share a step with letters', () => {
@@ -147,10 +150,10 @@ describe('set play order', () => {
     importMermaid('graph LR\n  A -->|1. one| B\n  B -->|2. two| C\n  C -->|3. three| D\n  D -->|4a. left| E\n  D -->|4b. right| F\n  E -->|5. five| G\n  G --> H');
     const doc = useDoc.getState().doc;
     const byText = (t: string) => doc.elements.find((e) => e.type === 'connector' && e.text === t)!.id;
-    const want = [[byText('1. one')], [byText('2. two')], [byText('3. three')], [byText('4a. left'), byText('4b. right')], [byText('5. five')]];
-    expect(readPlaySteps(doc)).toEqual(want); // ordered on import
     const plain = doc.elements.find((e) => e.type === 'connector' && !e.text) as ConnectorElement;
-    expect(plain.anim?.window).toBeUndefined(); // the unnumbered arrow keeps animating all the time
+    // the unnumbered G --> H follows step 5 (which leads into G)
+    const want = [[byText('1. one')], [byText('2. two')], [byText('3. three')], [byText('4a. left'), byText('4b. right')], [byText('5. five')], [plain.id]];
+    expect(readPlaySteps(doc)).toEqual(want); // ordered on import
     // after Clear, the command puts the same order back
     clearAllPlayOrder();
     expect(readPlaySteps(useDoc.getState().doc)).toEqual([]);
@@ -160,5 +163,32 @@ describe('set play order', () => {
     useDoc.getState().replace((d) => ({ ...d, elements: [] }));
     importMermaid('graph LR\n  A -->|1. only| B\n  B --> C');
     expect(readPlaySteps(useDoc.getState().doc)).toEqual([]);
+  });
+
+  it('unnumbered arrows fanning out after a numbered one play together right after it; ones with nothing numbered leading in stay still', () => {
+    useDoc.getState().replace((d) => ({ ...d, elements: [] }));
+    importMermaid('flowchart LR\n  U <-->|1. Ask| A\n  A <-->|2a. Query| G\n  A <-->|2b. Query| S\n  G -->|Enforces ACLs| P & Q & R\n  P --> Z\n  X -->|Unrelated| Y\n  A -->|3. Answer| U');
+    const doc = useDoc.getState().doc;
+    const conns = doc.elements.filter((e): e is ConnectorElement => e.type === 'connector');
+    const by = (t: string) => conns.filter((c) => c.text === t).map((c) => c.id);
+    const name = (id: string) => (doc.elements.find((e) => e.id === id) as { text: string }).text;
+    const pz = conns.find((c) => !c.text)!.id; // P --> Z follows the fan-out in turn
+    expect(readPlaySteps(doc)).toEqual([by('1. Ask'), [...by('2a. Query'), ...by('2b. Query')], by('Enforces ACLs'), [pz], by('3. Answer')]);
+    const lone = by('Unrelated')[0];
+    expect(name(lone)).toBe('Unrelated');
+    expect(conns.find((c) => c.id === lone)!.anim?.window).toBeUndefined();
+    const hl = (id: string, t: number) => {
+      const c = conns.find((x) => x.id === id)!;
+      const colour = resolveConnectorAnim(doc.animation, c).highlightColor;
+      return renderDocumentAtTime(doc, t).items.find((i) => i.id === id)!.parts.some((p) => p.k === 'line' && (p as { color: string }).color === colour);
+    };
+    const L = doc.animation.duration;
+    for (let k = 0; k < 40; k++) expect(hl(lone, (k / 40) * L)).toBe(false); // never lights up
+    // the fan-out arrows light up together, after step 2 and before step 3
+    const { win } = playSchedule(doc);
+    const fan = by('Enforces ACLs');
+    expect(new Set(fan.map((id) => win.get(id)![0])).size).toBe(1);
+    expect(win.get(fan[0])![0]).toBeGreaterThan(win.get(by('2a. Query')[0])![0]);
+    expect(win.get(fan[0])![0]).toBeLessThan(win.get(by('3. Answer')[0])![0]);
   });
 });

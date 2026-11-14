@@ -263,7 +263,7 @@ export function readPlaySteps(doc: FlowDocument): string[][] {
 
 /**
  * Give the arrows in `steps` play windows in that order (one window per step, a short pause after each), and take
- * the window off any other arrow, so they go back to animating all the time. Locked arrows are left as they are.
+ * the window off any other arrow, so they stay still while an order exists (and animate as usual once there is none). Locked arrows are left as they are.
  */
 export function applyPlaySteps(doc: FlowDocument, steps: string[][]): FlowDocument {
   const n = steps.length;
@@ -315,9 +315,15 @@ export function labelStep(text: string): { n: number; sub: string } | null {
 
 /**
  * A play order from the arrows' labels: numbered arrows play in number order, arrows with the same number play
- * together (8a, 8b, 8c), and arrows without a number aren't in the order.
+ * together (8a, 8b, 8c). An arrow without a number follows the arrow before it (`withFollowers`); one with nothing
+ * numbered leading in isn't in the order.
  */
 export function labelSteps(doc: FlowDocument): string[][] {
+  return withFollowers(doc, numberedSteps(doc));
+}
+
+/** The numbered arrows alone, in label order (no followers). */
+export function numberedSteps(doc: FlowDocument): string[][] {
   const notLifeline = (e: DiagramElement): boolean => !isLifeline(e);
   const byNum = new Map<number, { id: string; sub: string }[]>();
   for (const e of doc.elements) {
@@ -326,6 +332,51 @@ export function labelSteps(doc: FlowDocument): string[][] {
     if (s) byNum.set(s.n, [...(byNum.get(s.n) ?? []), { id: e.id, sub: s.sub }]);
   }
   return [...byNum.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => g.sort((x, y) => x.sub.localeCompare(y.sub)).map((x) => x.id));
+}
+
+/**
+ * Arrows not in the order follow the arrow before them: an arrow starting from a shape that an arrow in step k leads
+ * into (the end it points at; either end of a two-headed arrow) plays in a step of its own right after step k, together
+ * with any others that follow step k. The earliest such step wins; chains (an unnumbered arrow after another) follow
+ * on in turn. Arrows with nothing in the order leading in stay out of it.
+ */
+export function withFollowers(doc: FlowDocument, steps: string[][]): string[][] {
+  const notLifeline = (e: DiagramElement): boolean => !isLifeline(e);
+  const byId = new Map(doc.elements.map((e) => [e.id, e]));
+  const out = steps.map((g) => [...g]);
+  const placed = new Set(out.flat());
+  /** The shapes an arrow leads into. */
+  const into = (c: ConnectorElement): string[] => {
+    const r: string[] = [];
+    if (c.end.elementId && (c.endHead !== 'none' || c.startHead === 'none')) r.push(c.end.elementId);
+    if (c.start.elementId && c.startHead !== 'none') r.push(c.start.elementId);
+    return r;
+  };
+  /** The shapes an arrow starts from (either end of a two-headed arrow). */
+  const from = (c: ConnectorElement): string[] => {
+    const r: string[] = [];
+    if (c.start.elementId) r.push(c.start.elementId);
+    if (c.end.elementId && c.startHead !== 'none' && c.endHead !== 'none') r.push(c.end.elementId);
+    return r;
+  };
+  let free = doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && !e.bar && !e.locked && notLifeline(e) && !placed.has(e.id) && !!e.start.elementId && !!e.end.elementId && e.start.elementId !== e.end.elementId);
+  for (let pass = 0; pass < 100 && free.length; pass++) {
+    // the earliest step leading into each free arrow's start
+    const reach = new Map<string, number>(); // shape id -> earliest step leading into it
+    out.forEach((g, k) => g.forEach((id) => { const c = byId.get(id); if (c?.type === 'connector') for (const s of into(c)) if (!reach.has(s)) reach.set(s, k); }));
+    const after = new Map<number, string[]>();
+    const left: ConnectorElement[] = [];
+    for (const c of free) {
+      const ks = from(c).map((s) => reach.get(s)).filter((k): k is number => k !== undefined);
+      if (!ks.length) { left.push(c); continue; }
+      const k = Math.min(...ks);
+      after.set(k, [...(after.get(k) ?? []), c.id]);
+    }
+    if (!after.size) break;
+    for (const k of [...after.keys()].sort((a, b) => b - a)) out.splice(k + 1, 0, after.get(k)!);
+    free = left;
+  }
+  return out;
 }
 
 /** Back to all arrows animating together: remove play windows. */

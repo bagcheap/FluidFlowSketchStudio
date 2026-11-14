@@ -4,6 +4,16 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.34] - 2026-11-14
+
+### Added
+- **Step captions:** when arrows play in order, the playing step's arrow labels can show as a subtitle at the bottom ("2. Ask the agent"; arrows in the same step are joined with " · "). They appear in playback and in GIF, video, PNG and HTML player exports. Turn them on with **Animation ▸ Step captions**, or the **Captions** button on the Set play order bar.
+- **Highlight each step:** the shapes at both ends of the playing step's arrows glow in the arrow's highlight colour while everything else dims a little, so the flow is easy to follow in a big diagram. Containers stay as they are. Turn it on with **Animation ▸ Highlight each step**, or the **Highlight** button on the Set play order bar.
+
+### Changed
+- **Arrows without a step number** no longer loop non-stop while the rest of the diagram plays in order. With **Play in label order** (and Mermaid imports with numbered labels), an unnumbered arrow plays right after the numbered arrow that leads into the shape it starts from — for example, arrows fanning out from a shape play together straight after the step that reached it. Arrows outside the play order otherwise stay still.
+- Files now use format version 12 (both switches are saved with the diagram). Older files open as before, but files saved with this version need this version of FlowSketch or later.
+
 ## [0.1.33] - 2026-11-13
 
 ### Changed

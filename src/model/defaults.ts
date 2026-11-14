@@ -85,6 +85,8 @@ export const DEFAULT_ANIMATION: AnimationSettings = {
   intensityScale: 1,
   speedScale: 1,
   arrowSpeedScale: 1,
+  captions: false,
+  stepFocus: false,
   shape: DEFAULT_SHAPE_ANIM,
   connector: DEFAULT_CONNECTOR_ANIM,
 };

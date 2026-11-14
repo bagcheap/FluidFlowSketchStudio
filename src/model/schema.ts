@@ -372,6 +372,10 @@ export function migrate(raw: Obj): Obj {
     // v10 -> v11: arrows may have an arrowhead size (headSize); nothing to convert
     version = 11;
   }
+  if (version === 11) {
+    // v11 -> v12: step captions and step focus switches (animation.captions / stepFocus, off by default); nothing to convert
+    version = 12;
+  }
   raw.schemaVersion = version;
   return raw;
 }
@@ -418,6 +422,8 @@ export function parseDocument(input: string | unknown): ParseResult {
       intensityScale: num(anim.intensityScale, 1, 0, 3),
       speedScale: num(anim.speedScale, 1, 0, 5),
       arrowSpeedScale: num(anim.arrowSpeedScale, 1, 0, 5),
+      captions: bool(anim.captions, false),
+      stepFocus: bool(anim.stepFocus, false),
       shape: sanitizeShapeAnim(anim.shape, false),
       connector: sanitizeConnectorAnim(anim.connector, false),
     },
