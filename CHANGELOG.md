@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Changed
+- **Highlight each step** is now easy to see: the shapes in the playing step get a solid outline and glow in the arrow's highlight colour, and everything else fades back further. It was too faint to notice before, especially zoomed out.
+
 ## [0.1.34] - 2026-11-14
 
 ### Added

@@ -373,7 +373,7 @@ export function stepCaption(doc: FlowDocument, ids: string[]): string {
 }
 
 /** How much the shapes that aren't in the playing step are dimmed (0..1). */
-export const STEP_DIM = 0.5;
+export const STEP_DIM = 0.7;
 
 /**
  * Step focus: the shapes at the ends of the playing step's arrows glow in that arrow's highlight colour; every other
@@ -396,7 +396,14 @@ function applyStepFocus(doc: FlowDocument, items: Item[], ids: string[], fade: n
       if (it.id === el.id && glow.has(el.id) && el.type !== 'connector') {
         const outline = el.type === 'shape' ? geometryFor(el).poly : [{ x: 0, y: 0 }, { x: el.w, y: 0 }, { x: el.w, y: el.h }, { x: 0, y: el.h }];
         const pts = [...outline, outline[0]].flatMap((q) => [q.x, q.y]);
-        it.parts = [...halo(pts, glow.get(el.id)!, el.style.strokeWidth + 4, fade * 1.6), ...it.parts];
+        // a soft wide glow under the shape and a solid outline in the arrow's colour over it, plainly visible even zoomed out
+        const colour = glow.get(el.id)!, sw = el.style.strokeWidth;
+        it.parts = [
+          { k: 'line', pts, color: colour, width: sw + 22, alpha: 0.18 * fade, cap: 'round', dash: null },
+          { k: 'line', pts, color: colour, width: sw + 12, alpha: 0.3 * fade, cap: 'round', dash: null },
+          ...it.parts,
+          { k: 'line', pts, color: colour, width: sw + 2.5, alpha: 0.95 * fade, cap: 'round', dash: null },
+        ];
       }
       continue;
     }
