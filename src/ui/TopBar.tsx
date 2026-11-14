@@ -23,7 +23,8 @@ export function TopBar() {
   const prefs = useUI((s) => s.prefs);
   const ui = useUI.getState();
   const [title, setTitle] = useState(doc.title);
-  useEffect(() => setTitle(doc.title), [doc.title]);
+  // follow the document's title (undo, opening a file) but never overwrite the field while it is being typed in
+  useEffect(() => { if (!document.activeElement?.classList.contains('doc-title')) setTitle(doc.title); }, [doc.title]);
   const a = doc.animation;
   const hasSel = sel.length > 0;
   const selConnector = doc.elements.some((e) => e.type === 'connector' && sel.includes(e.id));
@@ -199,9 +200,9 @@ export function TopBar() {
         className="doc-title"
         aria-label="Document title"
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onBlur={() => title.trim() && title !== doc.title ? cmd.renameDocument(title) : setTitle(doc.title)}
-        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setTitle(doc.title); (e.target as HTMLInputElement).blur(); } }}
+        onChange={(e) => { setTitle(e.target.value); if (e.target.value.trim()) cmd.renameDocument(e.target.value); }}
+        onBlur={() => setTitle(doc.title)}
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') (e.target as HTMLInputElement).blur(); }}
       />
       <MenuBar menus={menus} />
       <div className="topbar-right">

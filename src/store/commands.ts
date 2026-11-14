@@ -822,7 +822,7 @@ export async function newDiagram() {
 }
 
 export function loadDocument(doc: FlowDocument, fileName: string | null = null, dirty = false) {
-  void restoreFileFor(doc.id); // Save writes back to the file this diagram last came from or went to, if known
+  void restoreFileFor(doc.id, doc.title); // Save writes back to the file this diagram last came from or went to, if known
   D().load(doc, { fileName, dirty });
   U().select([]);
   U().setTime(0);

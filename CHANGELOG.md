@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Fixed
+- **Renaming a diagram and saving:** after you change the name in the header, the next **Save** asks where to save and suggests a file with the new name (instead of quietly writing to the file with the old name); after that, Save writes back to the new file. The name now takes effect as you type, and ⌘S now works while you're still typing in the name field (or any other field).
+
 ## [0.1.37] - 2026-11-14
 
 ### Added

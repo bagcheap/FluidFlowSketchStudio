@@ -1487,6 +1487,35 @@ def main():
             pc.close()
         tinteractive()
 
+        @test('Renaming the diagram: the next Save asks where, suggesting the new name, even with the title field still focused')
+        def trenamesave():
+            c4 = browser.new_context(viewport={'width': 1440, 'height': 900})
+            # a stand-in for Chrome's save picker: records the suggested names, writes nowhere
+            c4.add_init_script("""window.__picks = []; window.showSaveFilePicker = async (o) => { window.__picks.push(o.suggestedName);
+              return { name: o.suggestedName, createWritable: async () => ({ write: async () => {}, close: async () => {} }) }; };""")
+            pg = c4.new_page(); errs = []
+            pg.on('pageerror', lambda e: errs.append(str(e)))
+            pg.goto(BASE); pg.wait_for_function('() => !!window.__flowsketch'); pg.wait_for_timeout(300)
+            ap = App(pg)
+            if pg.get_by_test_id('start-blank').count(): pg.get_by_test_id('start-blank').click()
+            ap.reset_view(); ap.tool('r'); ap.drag((100, 100), (260, 190)); ap.key('Escape')
+            m = 'Meta' if 'Mac' in pg.evaluate('navigator.platform') else 'Control'
+            picks = lambda: pg.evaluate('() => window.__picks')
+            ap.key(f'{m}+s'); pg.wait_for_timeout(200)
+            assert picks() == ['Untitled diagram.flowsketch'], picks()
+            ap.key(f'{m}+s'); pg.wait_for_timeout(200)
+            assert len(picks()) == 1, picks()  # writes back, no dialog
+            t = pg.get_by_label('Document title')
+            t.click(); t.press(f'{m}+a'); t.type('Gemini Enterprise Flow')  # spaces survive typing
+            t.press(f'{m}+s'); pg.wait_for_timeout(200)  # still in the field
+            assert picks()[-1] == 'Gemini Enterprise Flow.flowsketch', picks()
+            assert ap.doc()['title'] == 'Gemini Enterprise Flow'
+            ap.key(f'{m}+s'); pg.wait_for_timeout(200)
+            assert len(picks()) == 2, picks()  # saved under the new name: writes back again
+            assert not errs, errs
+            c4.close()
+        trenamesave()
+
         ctx.close()
 
         @test('7b · Reload app, open saved file: everything preserved')
