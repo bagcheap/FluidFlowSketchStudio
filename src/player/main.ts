@@ -1,6 +1,6 @@
 // Standalone player embedded in exported HTML files. Same engine as the editor.
 import { parseDocument } from '../model/schema';
-import { contentBounds, renderDocumentAtTime } from '../engine/render';
+import { cameraView, contentBounds, renderDocumentAtTime } from '../engine/render';
 import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
 import { resetTextMetrics } from '../engine/text';
@@ -35,8 +35,11 @@ function frame(now: number) {
   if (canvas.width !== Math.round(W * dpr)) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); }
   const b = contentBounds(doc) ?? { x: 0, y: 0, w: 100, h: 100 };
   const pad = 32;
-  const z = Math.min((W - pad * 2) / b.w, (H - pad * 2) / b.h, 3);
-  const ox = b.x + b.w / 2 - W / 2 / z, oy = b.y + b.h / 2 - H / 2 / z;
+  const z0 = Math.min((W - pad * 2) / b.w, (H - pad * 2) / b.h, 3);
+  // the whole picture at this window's shape; camera moves (if on) zoom within it
+  const base = { x: b.x + b.w / 2 - W / 2 / z0, y: b.y + b.h / 2 - H / 2 / z0, w: W / z0, h: H / z0 };
+  const r = cameraView(doc, t, base, W / H);
+  const z = W / r.w, ox = r.x, oy = r.y;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = doc.canvas.background;
   ctx.fillRect(0, 0, canvas.width, canvas.height);

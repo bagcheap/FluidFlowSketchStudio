@@ -4,7 +4,8 @@ import { SCHEMA_VERSION } from '../model/types';
 import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { useUI } from './uiStore';
-import { contentBounds, playSchedule } from '../engine/render';
+import { cameraView, contentBounds, hasCamera, playSchedule } from '../engine/render';
+import { toAspect } from '../engine/camera';
 import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
 import { openDocumentFile, pickFile, resetFileHandle, restoreFileFor, saveDocumentFile } from '../persistence/files';
@@ -48,14 +49,37 @@ export function zoomAt(factor: number, sx = stage.w / 2, sy = stage.h / 2) {
   U().setView({ zoom: z, x: wx - sx / z, y: wy - sy / z });
 }
 
+/** The part of the stage not covered by the toolbar and inspector (all of it when presenting). */
+export function visibleArea(): { top: number; w: number; h: number } {
+  const u = U();
+  const right = !u.presentation && u.prefs.showInspector && stage.w > 720 ? 310 : 0;
+  const top = u.presentation ? 0 : 64;
+  return { top, w: stage.w - right, h: stage.h - top };
+}
+
+/**
+ * Camera moves in the live view: while playing or presenting, a diagram with camera moves on is shown through the
+ * camera (the whole picture fitted to the visible area, then each step's shot). Returns the view to draw with, or null
+ * when the camera isn't in charge (then the editor's own view is used).
+ */
+export function liveCameraView(doc: FlowDocument, t: number): { x: number; y: number; zoom: number } | null {
+  const u = U();
+  if (!(u.playing || u.presentation) || !hasCamera(doc)) return null;
+  const { top, w, h } = visibleArea();
+  const b = contentBounds(doc);
+  if (!b || w < 10 || h < 10) return null;
+  const pad = Math.min(40, w * 0.05);
+  const base = toAspect({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad }, w / h);
+  const r = cameraView(doc, t, base, w / h);
+  const zoom = w / r.w;
+  return { x: r.x, y: r.y - top / zoom, zoom };
+}
+
 export function fitRect(r: { x: number; y: number; w: number; h: number } | null, pad = 60, maxZoom = 2) {
   if (!r) { U().setView({ x: -stage.w / 2 + 300, y: -stage.h / 2 + 200, zoom: 1 }); return; }
   // leave room for the floating toolbar and inspector so content isn't hidden under them
-  const u = U();
   pad = Math.min(pad, stage.w * 0.05 + 8);
-  const right = !u.presentation && u.prefs.showInspector && stage.w > 720 ? 310 : 0;
-  const top = u.presentation ? 0 : 64;
-  const aw = stage.w - right, ah = stage.h - top;
+  const { top, w: aw, h: ah } = visibleArea();
   const z = Math.min(maxZoom, Math.max(0.1, Math.min((aw - pad * 2) / Math.max(1, r.w), (ah - pad * 2) / Math.max(1, r.h))));
   U().setView({ zoom: z, x: r.x + r.w / 2 - aw / 2 / z, y: r.y + r.h / 2 - (top + ah / 2) / z });
 }
@@ -764,7 +788,11 @@ export function resetDocAnimation() {
 }
 
 export function setAnimation(patch: Partial<FlowDocument['animation']>, key = 'anim-settings') {
-  D().commit((d) => ({ ...d, animation: { ...d.animation, ...patch } }), key);
+  D().commit((d) => {
+    const next = { ...d, animation: { ...d.animation, ...patch } };
+    // camera moves add time to the play order (moving in, between shots and back out): fit the loop to it
+    return 'camera' in patch && patch.camera !== d.animation.camera && playSchedule(next).steps.length ? fitLoopToPlay(next) : next;
+  }, key);
 }
 
 // ---- playback --------------------------------------------------------------------
