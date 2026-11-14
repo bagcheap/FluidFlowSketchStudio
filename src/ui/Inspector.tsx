@@ -388,6 +388,7 @@ function CanvasPanel() {
             <Segmented label="Grid" value={doc.canvas.grid} onChange={(v) => setCanvas({ grid: v })} options={[{ v: 'dots', label: 'Dots' }, { v: 'lines', label: 'Lines' }, { v: 'none', label: 'Plain' }]} />
           </Row>
           <Slider label="Grid size" value={doc.canvas.gridSize} min={8} max={80} step={2} unit="px" onChange={(v) => setCanvas({ gridSize: v })} />
+          <Toggle label="Line jumps" hint="Where arrows cross, the upper one hops over the lower" checked={!!doc.canvas.lineJumps} onChange={(v) => setCanvas({ lineJumps: v })} />
         </Section>
         <Section title="Animation (document)">
           <Toggle label="Animation enabled" checked={a.enabled} onChange={(v) => cmd.setAnimation({ enabled: v })} />

@@ -395,6 +395,10 @@ export function migrate(raw: Obj): Obj {
     // v13 -> v14: items may link to a page and carry a hover note (link / note); nothing to convert
     version = 14;
   }
+  if (version === 14) {
+    // v14 -> v15: line jumps (canvas.lineJumps); older files keep their look (off)
+    version = 15;
+  }
   raw.schemaVersion = version;
   return raw;
 }
@@ -426,6 +430,8 @@ export function parseDocument(input: string | unknown): ParseResult {
       background: color(isObj(o.canvas) ? o.canvas.background : undefined, base.canvas.background),
       grid: oneOf(isObj(o.canvas) ? o.canvas.grid : undefined, ['none', 'dots', 'lines'] as const, 'dots'),
       gridSize: num(isObj(o.canvas) ? o.canvas.gridSize : undefined, 20, 4, 200),
+      // files from before line jumps keep their look: off unless the file turns them on
+      lineJumps: bool(isObj(o.canvas) ? o.canvas.lineJumps : undefined, false),
     },
     animation: {
       enabled: bool(anim.enabled, da.enabled),

@@ -1336,7 +1336,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 14
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 15
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()
@@ -1515,6 +1515,35 @@ def main():
             assert not errs, errs
             c4.close()
         trenamesave()
+
+        @test('Line jumps: View menu switch draws a hop where two arrows cross; one undo step')
+        def tjumps():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 36000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            on0 = bool(app.doc()['canvas'].get('lineJumps'))
+            try:
+                app.tool('l'); app.drag((5200, 36200), (5200, 36500)); app.key('Escape')  # a vertical line…
+                app.tool('a'); app.drag((5050, 36350), (5350, 36350)); app.key('Escape')  # …then an arrow across it
+                ids = [e['id'] for e in app.doc()['elements'][-2:]]
+                def hopped():
+                    f = app.js('() => window.__flowsketch.frame(0)')
+                    it = next(i for i in f['items'] if i['id'] == ids[1])
+                    main = next(p for p in it['parts'] if p['k'] == 'line')  # the arrow's own line (not its head)
+                    ys = [main['pts'][k + 1] for k in range(0, len(main['pts']), 2) if abs(main['pts'][k] - 5200) < 3]
+                    return bool(ys) and min(ys) < 36350 - 6
+                if not on0:
+                    page.get_by_role('menuitem', name='View').click(); page.get_by_role('menuitemcheckbox', name='Line jumps').click()
+                assert app.doc()['canvas']['lineJumps'] is True and hopped()
+                page.get_by_role('menuitem', name='View').click(); page.get_by_role('menuitemcheckbox', name='Line jumps').click()
+                assert app.doc()['canvas']['lineJumps'] is False and not hopped()
+                app.key('Control+z')
+                assert app.doc()['canvas']['lineJumps'] is True
+            finally:
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+        tjumps()
 
         ctx.close()
 

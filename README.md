@@ -206,7 +206,7 @@ Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excal
 
 ### 2. Everyday editing
 
-5. **Line jumps (hop-overs).** Where two arrows cross, one hops over the other, as in Visio and draw.io.
+5. ✅ *Built in 0.1.39.* **Line jumps (hop-overs).** Where two arrows cross, one hops over the other, as in Visio and draw.io.
 6. **Swimlanes and tables.** Lanes per team or system that shapes snap into (cross-functional flowcharts), and a simple table shape.
 7. **Find (and replace).** ⌘F to find text across all pages and jump to it.
 8. **Equal-spacing guides.** While dragging, show when gaps between shapes are equal (Figma-style), alongside the existing alignment guides.
