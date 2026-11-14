@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.37] - 2026-11-14
 
 ### Added
 - **Interactive HTML player:** the exported HTML file now has controls at the top: play/pause, start again, and, when arrows play in order, **Previous** / **Next** to go through the flow one step at a time (also the ← → keys; Space plays and pauses), with a step counter. Each Next plays one step and pauses.
