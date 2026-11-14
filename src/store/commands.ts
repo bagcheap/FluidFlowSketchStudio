@@ -941,3 +941,8 @@ export function setNote(ids: string[], note: string) {
     }),
   }), `note:${ids.join()}`);
 }
+
+/** View ▸ Line jumps: where arrows cross, the upper one hops over the lower (this diagram). One undo step. */
+export function toggleLineJumps() {
+  D().commit((d) => ({ ...d, canvas: { ...d.canvas, lineJumps: !d.canvas.lineJumps } }));
+}

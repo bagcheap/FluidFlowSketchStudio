@@ -10,6 +10,7 @@ import { displace, easeInOut, fract, hash01, snapFreq, type DeformField } from '
 import { roughSets, type OpSet } from './rough';
 import { geometryFor } from './shapes';
 import { cssFont, layoutText } from './text';
+import { jumpRadius, withJumps } from './jumps';
 import { CAM_CLOSE, CAM_MOVE, CAM_OPEN, cameraAt, groupShots, type CamKey, type CamRect } from './camera';
 
 /** A colour, or a gradient with the bounding box of the path it fills (for bounding-box gradients). */
@@ -464,8 +465,8 @@ export function playPhase(t: number, loop: number, [a, b]: [number, number]): nu
   return p >= a && p < b ? (p - a) / (b - a) : null;
 }
 
-function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, lookup: Lookup, flags: PreviewFlags | undefined, background: string, hideLabel: boolean, cull?: Rect): Item[] {
-  const path = connectorPath(c, lookup);
+function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, lookup: Lookup, flags: PreviewFlags | undefined, background: string, hideLabel: boolean, cull?: Rect, jumped?: ConnectorPath): Item[] {
+  const path = jumped ?? connectorPath(c, lookup);
   if (path.length < 1) return [];
   if (cull) {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -590,6 +591,21 @@ export function computeMotions(doc: FlowDocument, t: number, flags?: PreviewFlag
   return out;
 }
 
+/**
+ * Line jumps: this frame's paths of the arrows that hop over others (stacking order: later arrows hop over earlier
+ * ones). Lifelines, activation bars and arrows from a shape to itself neither hop nor get hopped over.
+ */
+export function lineJumps(doc: FlowDocument, lookup: Lookup): Map<string, ConnectorPath> {
+  const list: { id: string; path: ConnectorPath; r: number; endGap: number }[] = [];
+  for (const c of doc.elements) {
+    if (c.type !== 'connector' || c.bar || (c.start.elementId && c.start.elementId === c.end.elementId)) continue;
+    const sw = c.style.strokeWidth;
+    // no hop within an arrowhead's length plus a little of either end, so arrows always arrive straight
+    list.push({ id: c.id, path: connectorPath(c, lookup), r: jumpRadius(sw), endGap: 18 + Math.min(34, 9 + sw * 3) * (c.headSize ?? 1) });
+  }
+  return withJumps(list);
+}
+
 export function makeLookup(doc: FlowDocument, motions: Map<string, Motion> | null): Lookup {
   const byId = new Map<string, BoxElement>();
   for (const el of doc.elements) if (el.type !== 'connector') byId.set(el.id, el);
@@ -604,6 +620,7 @@ export function renderDocumentAtTime(doc: FlowDocument, t: number, opts: RenderO
   const lookup = makeLookup(doc, motions);
   const loopLen = doc.animation.seamless && doc.animation.loop ? doc.animation.duration : null;
   const items: Item[] = [];
+  const jumps = doc.canvas.lineJumps ? lineJumps(doc, lookup) : null;
   for (const el of doc.elements) {
     if (opts.only && !opts.only.has(el.id)) continue;
     const hide = !!opts.hide?.has(el.id);
@@ -622,7 +639,7 @@ export function renderDocumentAtTime(doc: FlowDocument, t: number, opts: RenderO
       case 'image':
         items.push({ id: el.id, opacity: el.style.opacity, tf: { x: el.x + m.tx, y: el.y + m.ty, w: el.w, h: el.h, rot: el.rotation + m.rot }, parts: [{ k: 'image', assetId: el.assetId, x: 0, y: 0, w: el.w, h: el.h }] });
         break;
-      case 'connector': items.push(...connectorItems(doc, el, t, lookup, opts.flags, doc.canvas.background, hide, opts.cull)); break;
+      case 'connector': items.push(...connectorItems(doc, el, t, lookup, opts.flags, doc.canvas.background, hide, opts.cull, jumps?.get(el.id))); break;
     }
   }
   // arrows playing in order: the step's caption and its shapes highlighted

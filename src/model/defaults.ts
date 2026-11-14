@@ -115,7 +115,7 @@ export function newDocument(title = 'Untitled diagram'): FlowDocument {
     title,
     createdAt: now,
     updatedAt: now,
-    canvas: { background: '#fbfaf7', grid: 'dots', gridSize: 20 },
+    canvas: { background: '#fbfaf7', grid: 'dots', gridSize: 20, lineJumps: true },
     animation: structuredClone(DEFAULT_ANIMATION),
     elements: [],
     pages: [{ id: page, name: 'Page 1', elements: [] }],

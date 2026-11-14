@@ -157,6 +157,7 @@ export function TopBar() {
       { label: 'Fullscreen', run: () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => ui.toast('Fullscreen is not available here', 'error')) },
       { sep: true },
       { label: 'Grid', sub: (['dots', 'lines', 'none'] as const).map((g) => ({ label: g === 'none' ? 'Plain' : g === 'dots' ? 'Dot grid' : 'Line grid', checked: doc.canvas.grid === g, run: () => useDoc.getState().commit((d) => ({ ...d, canvas: { ...d.canvas, grid: g } })) })) },
+      { label: 'Line jumps', note: 'arrows hop where they cross', checked: !!doc.canvas.lineJumps, run: cmd.toggleLineJumps },
       { label: 'Alignment guides', checked: prefs.smartGuides, run: toggle('smartGuides') },
       { label: 'Show inspector', checked: prefs.showInspector, run: toggle('showInspector') },
       { label: 'Show timeline', checked: prefs.showTimeline, run: toggle('showTimeline') },

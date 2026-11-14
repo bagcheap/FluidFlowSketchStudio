@@ -4,6 +4,14 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Line jumps:** where two arrows cross, the one on top hops over the other with a small arc (up, or to the left on an upright line), as in Visio and draw.io, so crossings are easy to read. Crossings close together share one wider hop, and there are no hops right next to an arrowhead or on sequence-diagram lifelines. The hops follow moving shapes and appear in every export and the HTML player. On for new diagrams; turn them on or off with **View ▸ Line jumps**, the canvas right-click menu, or the Inspector's Background section. Diagrams made before this version keep their look until you turn them on.
+
+### Changed
+- Files now use format version 15 (the line-jumps switch is saved with the diagram). Older files open as before, but files saved with this version need this version of FlowSketch or later.
+
 ## [0.1.38] - 2026-11-14
 
 ### Fixed
