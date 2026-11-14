@@ -18,6 +18,8 @@ let currentHandle: Handle | null = null;
 let currentPath: string | null = null;
 /** The diagram the handle/path above belongs to (so a restore never overrides a file just opened). */
 let currentDocId: string | null = null;
+/** The diagram's title when it was last opened or saved: renamed since then, Save asks where (with the new name). */
+let fileTitle: string | null = null;
 
 // The file each diagram belongs to is remembered across restarts, so Save still writes back after the app or the
 // tab is reopened (the last diagram is restored from autosave, or one is opened from Recents). Browser: the file
@@ -49,9 +51,9 @@ function rememberFile(docId: string) {
 }
 
 /** A diagram was loaded: Save goes back to the file it last came from or went to, if that's known. */
-export async function restoreFileFor(docId: string): Promise<void> {
+export async function restoreFileFor(docId: string, title: string): Promise<void> {
   if (currentDocId === docId) return; // just opened or saved: already known
-  currentDocId = docId; currentHandle = null; currentPath = null;
+  currentDocId = docId; currentHandle = null; currentPath = null; fileTitle = title;
   if (isDesktopApp) { currentPath = readPaths()[docId] ?? null; return; }
   if (!handles) return;
   try {
@@ -70,7 +72,7 @@ async function mayWrite(h: Handle): Promise<boolean> {
 const w = typeof window !== 'undefined' ? (window as unknown as Record<string, unknown>) : {};
 export const hasFSAccess = typeof w.showSaveFilePicker === 'function';
 
-export function resetFileHandle() { currentHandle = null; currentPath = null; currentDocId = null; }
+export function resetFileHandle() { currentHandle = null; currentPath = null; currentDocId = null; fileTitle = null; }
 
 export function safeFileName(title: string, ext: string) {
   const base = title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').trim().slice(0, 80) || 'diagram';
@@ -93,6 +95,8 @@ export function downloadBlob(blob: Blob, name: string) {
 /** Save. Returns the file name used, or null if the user cancelled. */
 export async function saveDocumentFile(doc: FlowDocument, saveAs = false): Promise<string | null> {
   const json = serializeDocument(doc);
+  // renamed since it was opened or last saved: ask where to save, suggesting the new name
+  if (fileTitle !== null && doc.title !== fileTitle && (currentPath || currentHandle)) saveAs = true;
   if (isDesktopApp) {
     // Save writes back to the file it came from; Save as (or a new diagram) asks where
     let path = !currentPath || saveAs ? await pickSavePath(safeFileName(doc.title, 'flowsketch')) : currentPath;
@@ -105,6 +109,7 @@ export async function saveDocumentFile(doc: FlowDocument, saveAs = false): Promi
       await writeToPath(path, json);
     }
     currentPath = path;
+    fileTitle = doc.title;
     rememberFile(doc.id);
     return baseName(path);
   }
@@ -120,6 +125,7 @@ export async function saveDocumentFile(doc: FlowDocument, saveAs = false): Promi
       const ws = await currentHandle.createWritable();
       await ws.write(blob);
       await ws.close();
+      fileTitle = doc.title;
       rememberFile(doc.id);
       return currentHandle.name;
     } catch (e) {
@@ -145,6 +151,7 @@ export async function openDocumentFile(): Promise<(ParseResult & { name: string 
     if (f.text.length > MAX_FILE_BYTES) throw new DocumentError('File is too large to open (limit 25 MB).');
     const r = { ...parseDocument(f.text), name: f.name };
     currentPath = f.path;
+    fileTitle = r.doc.title;
     rememberFile(r.doc.id);
     return r;
   }
@@ -155,6 +162,7 @@ export async function openDocumentFile(): Promise<(ParseResult & { name: string 
       });
       const r = await readFile(await h.getFile());
       currentHandle = h;
+      fileTitle = r.doc.title;
       rememberFile(r.doc.id);
       return r;
     } catch (e) {

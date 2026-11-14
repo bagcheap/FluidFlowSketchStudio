@@ -32,6 +32,13 @@ const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isCon
 export function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (editable(e.target) && (e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 's') {
+        // ⌘S / ⌘⇧S work from any field too: finish the edit (leaving the field commits it), then save
+        e.preventDefault();
+        (e.target as HTMLElement).blur();
+        void cmd.save(e.shiftKey);
+        return;
+      }
       if (editable(e.target)) {
         // Esc leaves an inspector field (not the text editor, which handles Esc itself) and continues below
         if (e.key !== 'Escape' || (e.target as HTMLElement).classList.contains('text-editor')) return;
