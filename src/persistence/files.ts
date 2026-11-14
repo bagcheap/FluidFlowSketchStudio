@@ -99,7 +99,8 @@ export async function saveDocumentFile(doc: FlowDocument, saveAs = false): Promi
     if (!path) return null;
     try { await writeToPath(path, json); } catch (e) {
       if (path !== currentPath || saveAs) throw e;
-      // no longer allowed to write there (moved, or permission lost): ask where instead
+      // no longer allowed to write there (moved, or permission lost): say why, then ask where instead
+      useUI.getState().toast(`Couldn't save back to ${baseName(path)} (${(e as Error)?.message ?? e}). Choose where to save it.`, 'error');
       path = await pickSavePath(safeFileName(doc.title, 'flowsketch'));
       if (!path) return null;
       await writeToPath(path, json);
@@ -111,7 +112,9 @@ export async function saveDocumentFile(doc: FlowDocument, saveAs = false): Promi
   const blob = new Blob([json], { type: 'application/json' });
   if (hasFSAccess) {
     try {
-      if (!currentHandle || saveAs || !(await mayWrite(currentHandle))) {
+      const writable = !!currentHandle && !saveAs && (await mayWrite(currentHandle));
+      if (currentHandle && !saveAs && !writable) useUI.getState().toast(`No permission to save back to ${currentHandle.name}. Choose where to save it.`, 'info');
+      if (!currentHandle || !writable) {
         currentHandle = await (w.showSaveFilePicker as (o: unknown) => Promise<Handle>)({
           suggestedName: safeFileName(doc.title, 'flowsketch'),
           types: [{ description: 'FlowSketch diagram', accept: { 'application/json': ['.flowsketch'] } }],

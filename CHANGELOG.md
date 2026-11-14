@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Fixed
+- **Save** now says why when it can't write back to the file a diagram came from (for example when the app lost permission to that file), instead of quietly asking where to save as if you'd chosen Save as.
+
 ## [0.1.35] - 2026-11-14
 
 ### Changed
