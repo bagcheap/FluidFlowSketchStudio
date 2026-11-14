@@ -10,6 +10,7 @@ import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
 import { openDocumentFile, pickFile, resetFileHandle, restoreFileFor, saveDocumentFile } from '../persistence/files';
 import { rememberMermaid } from '../persistence/storage';
+import { findMatches, replaceAll, replaceOne } from './find';
 import { cleanNote, DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
 import { geometryFor, SHAPE_LABELS } from '../engine/shapes';
@@ -945,4 +946,62 @@ export function setNote(ids: string[], note: string) {
 /** View ▸ Line jumps: where arrows cross, the upper one hops over the lower (this diagram). One undo step. */
 export function toggleLineJumps() {
   D().commit((d) => ({ ...d, canvas: { ...d.canvas, lineJumps: !d.canvas.lineJumps } }));
+}
+
+// ---- find and replace ------------------------------------------------------------------------------------------
+
+/** The matches for the find bar as it is now. */
+export function currentMatches() {
+  const f = U().find;
+  return f ? findMatches(D().doc, f.query, f) : [];
+}
+
+/** ⌘F: open the find bar (with the replace row when asked), or focus it if it is open. */
+export function openFind(replace = false) {
+  const u = U();
+  u.setFind(u.find ? { showReplace: u.find.showReplace || replace } : { showReplace: replace, index: -1 });
+  requestAnimationFrame(() => (document.querySelector('.find-bar input') as HTMLInputElement | null)?.select());
+}
+export const closeFind = () => U().setFind(null);
+
+/** Show match k: its page, selected, and scrolled into view. */
+export function goToMatch(k: number) {
+  const ms = currentMatches();
+  if (!ms.length) return;
+  const i = ((k % ms.length) + ms.length) % ms.length, m = ms[i];
+  U().setFind({ index: i });
+  if (m.pageId !== D().doc.activePage) goToPage(m.pageId);
+  U().setTool('select');
+  U().select([m.id]);
+  const b = selectionBounds(D().doc, [m.id]);
+  if (b) {
+    const v = U().view, vw = stage.w / v.zoom, vh = stage.h / v.zoom, pad = 80 / v.zoom;
+    if (b.x < v.x + pad || b.y < v.y + pad || b.x + b.w > v.x + vw - pad || b.y + b.h > v.y + vh - pad) {
+      // centre it if it is off screen (keeping the zoom)
+      U().setView({ x: b.x + b.w / 2 - vw / 2, y: b.y + b.h / 2 - vh / 2 });
+    }
+  }
+}
+export const findNext = (dir: 1 | -1 = 1) => { const i = U().find?.index ?? -1; goToMatch(i < 0 ? (dir > 0 ? 0 : -1) : i + dir); };
+
+/** Replace the current match, then go on to the next. One undo step. */
+export function replaceCurrent() {
+  const f = U().find, ms = currentMatches();
+  if (!f || !ms.length) return;
+  const m = ms[Math.min(Math.max(0, f.index), ms.length - 1)];
+  const next = replaceOne(D().doc, m, f.query, f.replace, f.matchCase);
+  if (!next) { U().toast('That item is locked, so its text was not changed.', 'info'); findNext(1); return; }
+  D().commit(() => next);
+  if (currentMatches().length) goToMatch(Math.max(0, f.index)); // the next match now has this index
+}
+
+/** Replace every match (this page or all pages). One undo step. */
+export function replaceAllMatches() {
+  const f = U().find;
+  if (!f || !f.query) return;
+  const r = replaceAll(D().doc, f.query, f.replace, f);
+  if (r.count) D().commit(() => r.doc);
+  const lockedNote = r.locked ? ` (${r.locked} in locked items left as they were)` : '';
+  U().toast(r.count ? `Replaced ${r.count} match${r.count === 1 ? '' : 'es'}${lockedNote}` : `Nothing replaced${lockedNote}`, r.count ? 'success' : 'info');
+  U().setFind({ index: -1 });
 }

@@ -7,7 +7,7 @@ import { colorLabel } from '../ui/colorNames';
 import { cycleFill, makeConnector, makeShape, makeText, newSeed, seqStyleKey, SHAPE_DEFAULT_SIZE, styleKey, uid } from '../model/defaults';
 import { deleteElements, getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
-import { renderDocumentAtTime, makeLookup, boxCorners, hasCamera, MIN_LABEL_W } from '../engine/render';
+import { renderDocumentAtTime, makeLookup, boxCorners, elementBounds, hasCamera, MIN_LABEL_W } from '../engine/render';
 import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
 import { connectorPath, isHorizontal, labelPlacement, moveElbowSegment, pointAt, tidyElbow } from '../engine/connectors';
@@ -25,6 +25,8 @@ import { liveCameraView } from '../store/commands';
 import { applyStyle, clearAllPlayOrder, playInLabelOrder, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
+import { FindBar } from '../ui/FindBar';
+import { findMatches } from '../store/find';
 import { updateMembership, withMembers } from '../store/containers';
 
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -87,6 +89,7 @@ export function Canvas() {
   const playOrderMode = useUI((s) => s.playOrderMode);
   const presentation = useUI((s) => s.presentation);
   const playing = useUI((s) => s.playing);
+  const find = useUI((s) => s.find);
   // camera moves: while playing, the camera decides what the canvas shows, so the editing overlay is hidden
   const cameraLive = playing && hasCamera(doc);
   const [size, setSize] = useState({ w: 1200, h: 800 });
@@ -1071,6 +1074,21 @@ export function Canvas() {
   const hs = 8 / z;
   const accent = 'var(--accent)';
   const overlayEls: JSX.Element[] = [];
+  if (!presentation && find?.query) {
+    // find: every match on this page outlined, the current one stronger
+    const ms = findMatches(doc, find.query, find);
+    const cur = find.index >= 0 ? ms[Math.min(find.index, ms.length - 1)] : undefined;
+    const seen = new Set<string>();
+    for (const m of ms) {
+      if (m.pageId !== doc.activePage || seen.has(m.id)) continue;
+      seen.add(m.id);
+      const el = getElement(doc, m.id);
+      if (!el) continue;
+      const b = elementBounds(doc, el), on = cur?.id === m.id, pad = 5 / z;
+      overlayEls.push(<rect key={'find' + m.id} x={b.x - pad} y={b.y - pad} width={b.w + 2 * pad} height={b.h + 2 * pad} rx={6 / z}
+        fill={on ? 'rgba(250, 176, 5, .16)' : 'rgba(250, 204, 21, .10)'} stroke={on ? '#f08c00' : '#fab005'} strokeWidth={(on ? 2.5 : 1.5) / z} />);
+    }
+  }
   if (!presentation) {
     for (const el of selEls) {
       if (el.type === 'connector') continue;
@@ -1195,6 +1213,7 @@ export function Canvas() {
       <svg className="stage-overlay" width={size.w} height={size.h} aria-hidden style={cameraLive ? { display: 'none' } : undefined}>
         <g transform={`scale(${z}) translate(${-view.x} ${-view.y})`}>{overlayEls}</g>
       </svg>
+      {!presentation && <FindBar />}
       {playOrderMode && !presentation && (
         <div className="order-bar no-canvas" role="toolbar" aria-label="Set play order">
           <span><b>Play order:</b> click arrows in turn · Shift: same step · again: remove</span>

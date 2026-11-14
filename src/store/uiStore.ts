@@ -120,7 +120,11 @@ interface UIState {
   welcomeDismissed: boolean;
   contextMenu: { x: number; y: number; pageId?: string } | null; // right-click menu position (screen px); pageId: a page tab's menu
   playOrderMode: boolean; // "Set play order": clicking arrows numbers them
+  /** Find and replace bar (⌘F): null when closed. `index` is the current match (-1: none yet, Enter goes to the first). */
+  find: FindState | null;
 }
+
+export interface FindState { query: string; replace: string; matchCase: boolean; allPages: boolean; showReplace: boolean; index: number }
 
 interface UIActions {
   setTool(tool: ToolId, shape?: ShapeKind, seq?: SeqKind): void;
@@ -128,6 +132,7 @@ interface UIActions {
   setView(v: Partial<Viewport>): void;
   setEditing(id: string | null, seed?: string): void;
   setPlaying(p: boolean): void;
+  setFind(f: Partial<FindState> | null): void;
   setTime(t: number): void;
   openDialog(d: DialogId): void;
   setPresentation(p: boolean): void;
@@ -170,6 +175,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   welcomeDismissed: false,
   contextMenu: null,
   playOrderMode: false,
+  find: null,
   reducedMotionOS: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
 
   setTool(tool, shape, seq) { set((s) => ({ tool, shapeKind: shape ?? s.shapeKind, seqKind: seq ?? s.seqKind, selection: tool === 'select' ? s.selection : [], editingId: null, welcomeDismissed: s.welcomeDismissed || (tool !== 'select' && tool !== 'hand') })); },
@@ -217,6 +223,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   setMenuOpen(m) { set({ menuOpen: m }); },
   setContextMenu(at) { set({ contextMenu: at, menuOpen: null }); },
   setPlayOrderMode(on) { set({ playOrderMode: on }); },
+  setFind(f) { set((s) => ({ find: f === null ? null : { ...(s.find ?? { query: '', replace: '', matchCase: false, allPages: true, showReplace: false, index: -1 }), ...f } })); },
   ask(message, ok = 'Continue') {
     get().confirmReq?.resolve(false);
     return new Promise<boolean>((resolve) => set({ confirmReq: { message, ok, resolve: (v) => { set({ confirmReq: null }); resolve(v); } }, menuOpen: null }));

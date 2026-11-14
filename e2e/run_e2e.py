@@ -1545,6 +1545,57 @@ def main():
                 app.js('(v) => window.__flowsketch.setView(v)', v)
         tjumps()
 
+        @test('Find and replace: Cmd+F finds text and selects each match in turn; replace all is one undo step; Esc closes')
+        def tfind():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 39000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            m = 'Meta' if 'Mac' in page.evaluate('navigator.platform') else 'Control'
+            try:
+                page.get_by_role('menuitem', name='Insert').click()
+                page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+                page.get_by_label('Flowchart text').fill('graph LR\n  A[Zebra portal] -->|zebra call| B[Gateway]\n  B --> C[Second zebra]')
+                page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(200)
+                app.key('Escape')
+                app.key(f'{m}+f'); page.wait_for_timeout(150)
+                box = page.get_by_label('Find', exact=True)
+                assert box.is_visible()
+                box.fill('ZEBRA'); page.wait_for_timeout(100)
+                count = lambda: page.locator('.find-bar .find-count').inner_text()
+                n = int(count().split(' ')[0])
+                assert n >= 3 and 'matches' in count(), count()  # (other tests' shapes on this page may also say zebra)
+                box.press('Enter'); page.wait_for_timeout(100)
+                assert count().startswith(f'1 of {n}'), count()  # the first Enter goes to the first match
+                first = app.ui()['selection']
+                assert len(first) == 1 and 'zebra' in next(e for e in app.els() if e['id'] == first[0])['text'].lower()
+                box.press('Enter'); page.wait_for_timeout(100)
+                assert app.ui()['selection'] != first
+                page.screenshot(path=f'{OUT}/e2e-find.png')
+                # case sensitive: no capital ZEBRA anywhere
+                page.locator('.find-bar button', has_text='Aa').click(); page.wait_for_timeout(100)
+                assert count() == 'No matches', count()
+                page.locator('.find-bar button', has_text='Aa').click()
+                # replace every "zebra" with "lion"
+                page.get_by_role('button', name='Show replace').click()
+                page.get_by_label('Replace with').fill('lion')
+                before = app.js('() => window.__flowsketch.history()')['past']
+                page.locator('.find-bar button', has_text='Replace all').click(); page.wait_for_timeout(150)
+                texts = [e['text'] for e in app.els()]
+                assert 'Lion portal' not in texts and 'lion portal' in texts and 'Second lion' in texts and 'lion call' in texts, [t for t in texts if 'lion' in t.lower()]
+                assert not any('zebra' in t.lower() for t in texts)
+                assert app.js('() => window.__flowsketch.history()')['past'] == before + 1
+                assert count() == 'No matches'
+                app.key(f'{m}+z'); page.wait_for_timeout(100)
+                assert any(e['text'] == 'Zebra portal' for e in app.els())
+                page.get_by_label('Find', exact=True).press('Escape'); page.wait_for_timeout(100)
+                assert page.locator('.find-bar').count() == 0
+            finally:
+                if page.locator('.find-bar').count(): page.keyboard.press('Escape')
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+        tfind()
+
         ctx.close()
 
         @test('7b · Reload app, open saved file: everything preserved')

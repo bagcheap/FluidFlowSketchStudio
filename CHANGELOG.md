@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Find and replace:** **Edit ▸ Find…** (⌘F) opens a find bar that searches the text of shapes, text boxes, arrow labels, container titles, icon labels and hover notes, on every page or just this one, with an optional **Aa** (match case). It shows how many matches there are; Enter (or ⌘G) goes to the next one, ⇧Enter (⇧⌘G) to the previous one, switching page when needed, selecting it and bringing it into view, and every match on the page is outlined. **Edit ▸ Find and replace…** (⌥⌘F) adds a replace row: **Replace** changes the current match and moves on, **Replace all** changes them all (each is one undo step; locked items are left alone). Esc closes the bar.
+
 ## [0.1.39] - 2026-11-14
 
 ### Added
