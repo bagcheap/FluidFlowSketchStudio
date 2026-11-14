@@ -108,6 +108,7 @@ src/icons/       svgToIcon.ts (SVG → icon path data, allowlist only) · pathBo
 - Every user-visible change adds a line under `## [Unreleased]` at the top (create the section when it is missing; never leave it empty), written for users, not developers (developer-only changes such as tests or tooling are left out).
 - A version bump (`npm version x.y.z --no-git-tag-version`) renames `[Unreleased]` to `[x.y.z] - <date>`. `tests/changelog.test.ts` fails if the `package.json` version has no dated entry.
 - The About dialog reads the version from `package.json`; never hard-code it.
+- **Tags are automatic:** `.github/workflows/tag-release.yml` runs on every push to `main` and, if `v<package.json version>` has no tag yet, creates it with a GitHub release whose notes are that version's `CHANGELOG.md` section. So after merging a release ("merge it as x.y.z"), the tag appears by itself within a minute or two; there's no need to give tagging steps. If it ever doesn't (check the repo's Actions tab), give the manual steps straight after the merge without being asked. Actions ▸ Tag release ▸ Run workflow re-runs it by hand.
 
 ## Testing conventions
 
