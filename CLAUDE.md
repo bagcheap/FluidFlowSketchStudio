@@ -122,7 +122,7 @@ src/icons/       svgToIcon.ts (SVG → icon path data, allowlist only) · pathBo
 ## Known limitations / deferred work
 
 - 60 FPS with 100 shapes + 150 connectors was not demonstrated. It measured about 22 FPS in headless software rendering; this needs checking on real hardware. Dragging while playing a huge document is slow.
-- Deferred: AI text-to-diagram (intended to plug into `store/commands.ts` as structured, validated edits — Mermaid import is the natural target format; it must never execute generated code), keyframes, easing, timeline tracks, Find, rotating multi-selections, per-word bold/italic.
+- Deferred: AI text-to-diagram (intended to plug into `store/commands.ts` as structured, validated edits — Mermaid import is the natural target format; it must never execute generated code), keyframes, easing, timeline tracks, rotating multi-selections, per-word bold/italic.
 - Transparent GIFs use 1-bit alpha (faint fringe on edges). Video export records in real time.
 - Hachure fills regenerate when a shape is resized.
 
