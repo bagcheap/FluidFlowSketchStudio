@@ -816,6 +816,41 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tcaptions()
 
+        @test('Camera moves: switched on from the Animation menu, the presentation zooms in on a step and back out')
+        def tcamera():
+            from PIL import Image, ImageChops
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 33000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('graph LR\n  A[Browser] -->|1. Sign in| B[Portal]\n  B -->|2. Ask| C[Agent]\n  C -->|3. Answer| D[Model]')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            app.key('Escape')
+            L0 = app.doc()['animation']['duration']
+            page.get_by_role('menuitem', name='Animation').click()
+            page.get_by_role('menuitemcheckbox', name='Camera follows steps').click()
+            a = app.doc()['animation']
+            assert a.get('camera') is True and a['duration'] > L0 + 3, (L0, a['duration'])
+            L = a['duration']
+            m = 'Meta' if 'Mac' in page.evaluate('navigator.platform') else 'Control'
+            app.key(f'{m}+Shift+p'); page.wait_for_timeout(400)
+            shots = []
+            for f in (0.0, 0.5):
+                app.js('(t) => window.__flowsketch.pause(t)', L * f); page.wait_for_timeout(250)
+                path = f'{OUT}/camera-{int(f * 100)}.png'; page.screenshot(path=path); shots.append(Image.open(path).convert('L'))
+            # whole picture at the start, a close-up mid-loop: the two frames differ a lot
+            diff = ImageChops.difference(shots[0], shots[1]).point(lambda q: 255 if q > 40 else 0)
+            changed = sum(diff.histogram()[255:]) / (diff.width * diff.height)
+            assert changed > 0.02, changed
+            page.keyboard.press('Escape'); page.wait_for_timeout(200)
+            assert page.locator('.topbar').count() == 1
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            assert not app.doc()['animation'].get('camera')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tcamera()
+
         @test('Diagram from text remembers the last script; Route arrows around shapes keeps arrows out of shapes')
         def tmermaidmem():
             app.key('Escape')
@@ -1297,7 +1332,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 12
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 13
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()

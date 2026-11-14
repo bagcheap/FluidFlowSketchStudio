@@ -376,6 +376,10 @@ export function migrate(raw: Obj): Obj {
     // v11 -> v12: step captions and step focus switches (animation.captions / stepFocus, off by default); nothing to convert
     version = 12;
   }
+  if (version === 12) {
+    // v12 -> v13: camera moves switch (animation.camera, off by default); nothing to convert
+    version = 13;
+  }
   raw.schemaVersion = version;
   return raw;
 }
@@ -424,6 +428,7 @@ export function parseDocument(input: string | unknown): ParseResult {
       arrowSpeedScale: num(anim.arrowSpeedScale, 1, 0, 5),
       captions: bool(anim.captions, false),
       stepFocus: bool(anim.stepFocus, false),
+      camera: bool(anim.camera, false),
       shape: sanitizeShapeAnim(anim.shape, false),
       connector: sanitizeConnectorAnim(anim.connector, false),
     },

@@ -1,6 +1,6 @@
 // Shared offscreen rendering for every raster export (PNG/JPEG/GIF/video/clipboard).
 import type { FlowDocument } from '../model/types';
-import { contentBounds, renderDocumentAtTime, type Rect } from '../engine/render';
+import { cameraView, contentBounds, renderDocumentAtTime, type Rect } from '../engine/render';
 import { drawFrame } from '../engine/canvasRenderer';
 import { preloadImages } from '../engine/images';
 import { stage } from '../store/commands';
@@ -54,7 +54,9 @@ export async function frameRenderer(doc: FlowDocument, rect: Rect, W: number, H:
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (background) { ctx.fillStyle = background; ctx.fillRect(0, 0, canvas.width, canvas.height); }
       const frame = renderDocumentAtTime(doc, t, { only: onlyIds });
-      drawFrame(ctx, frame, { images, originX: rect.x, originY: rect.y, scale });
+      // camera moves: the export frames the whole picture (rect) and the camera zooms within it
+      const r = cameraView(doc, t, rect, rect.w / rect.h);
+      drawFrame(ctx, frame, { images, originX: r.x, originY: r.y, scale: r === rect ? scale : canvas.width / r.w });
     },
   };
 }
