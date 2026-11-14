@@ -123,12 +123,14 @@ describe('set play order', () => {
   });
 
   it('reads step numbers at the start of labels', () => {
-    expect(labelStep('1. Access Portal')).toEqual({ n: 1, sub: '' });
-    expect(labelStep('8a. Live MS Graph')).toEqual({ n: 8, sub: 'a' });
-    expect(labelStep('  12B) Thing')).toEqual({ n: 12, sub: 'b' });
-    expect(labelStep('3: call')).toEqual({ n: 3, sub: '' });
-    expect(labelStep('4 - go')).toEqual({ n: 4, sub: '' });
-    expect(labelStep('7')).toEqual({ n: 7, sub: '' });
+    expect(labelStep('1. Access Portal')).toEqual({ n: 1, sub: '', depth: 0, path: '' });
+    expect(labelStep('8a. Live MS Graph')).toEqual({ n: 8, sub: 'a', depth: 0, path: '' });
+    expect(labelStep('  12B) Thing')).toEqual({ n: 12, sub: 'b', depth: 0, path: '' });
+    expect(labelStep('3: call')).toEqual({ n: 3, sub: '', depth: 0, path: '' });
+    expect(labelStep('4 - go')).toEqual({ n: 4, sub: '', depth: 0, path: '' });
+    expect(labelStep('7')).toEqual({ n: 7, sub: '', depth: 0, path: '' });
+    expect(labelStep('8a.1. Query & Enforce SPO ACLs')).toEqual({ n: 8, sub: 'a', depth: 1, path: '.1' });
+    expect(labelStep('4.2.1 deeper')).toEqual({ n: 4, sub: '', depth: 2, path: '.2.1' });
     for (const t of ['2FA check', 'v2 API', 'Login', '', '1234. too long', '4ab. two letters']) expect(labelStep(t), t).toBeNull();
   });
 
@@ -190,5 +192,14 @@ describe('set play order', () => {
     expect(new Set(fan.map((id) => win.get(id)![0])).size).toBe(1);
     expect(win.get(fan[0])![0]).toBeGreaterThan(win.get(by('2a. Query')[0])![0]);
     expect(win.get(fan[0])![0]).toBeLessThan(win.get(by('3. Answer')[0])![0]);
+  });
+
+  it('dotted sub-steps (8a.1, 8a.2…) play together after step 8 and before 9', () => {
+    useDoc.getState().replace((d) => ({ ...d, elements: [] }));
+    importMermaid('flowchart LR\n  A -->|7. seven| B\n  B <-->|8a. Graph| G\n  G <-->|8a.2. OneDrive| OD\n  G <-->|8a.1. SPO| SPO\n  B <-->|8b. SNOW| S\n  G <-->|8a.10. Tenth| X\n  B -->|9. nine| A');
+    const doc = useDoc.getState().doc;
+    const txt = (id: string) => (doc.elements.find((e) => e.id === id) as { text: string }).text;
+    // (arrows in one step play together; compare each step as a set)
+    expect(readPlaySteps(doc).map((g) => g.map(txt).sort())).toEqual([['7. seven'], ['8a. Graph', '8b. SNOW'], ['8a.1. SPO', '8a.10. Tenth', '8a.2. OneDrive'], ['9. nine']]);
   });
 });

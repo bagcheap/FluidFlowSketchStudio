@@ -304,18 +304,21 @@ export function playStepLabels(steps: string[][]): Map<string, string> {
 }
 
 /**
- * The step number at the start of an arrow's label: "8a. Live MS Graph…" → { n: 8, sub: 'a' }; "3) Ask" → { n: 3 }.
- * The number must be followed by an optional letter and then a full stop, bracket, colon, dash, space or the end, so
- * "2FA check" or "v2 API" don't count. Up to 999.
+ * The step number at the start of an arrow's label: "8a. Live MS Graph…" → { n: 8, sub: 'a', depth: 0 };
+ * "3) Ask" → { n: 3, sub: '', depth: 0 }; "8a.1. Query SPO" → { n: 8, sub: 'a', depth: 1, path: '.1' } (a dotted
+ * sub-step). The number must be followed by an optional letter, any ".1"-style levels, and then a full stop, bracket,
+ * colon, dash, space or the end, so "2FA check" or "v2 API" don't count. Up to 999.
  */
-export function labelStep(text: string): { n: number; sub: string } | null {
-  const m = /^\s*(\d{1,3})([a-z]?)(?=$|[\s.):\-])/i.exec(text);
-  return m ? { n: Number(m[1]), sub: m[2].toLowerCase() } : null;
+export function labelStep(text: string): { n: number; sub: string; depth: number; path: string } | null {
+  const m = /^\s*(\d{1,3})([a-z]?)((?:\.\d{1,3}[a-z]?){0,5})(?=$|[\s.):\-])/i.exec(text);
+  if (!m) return null;
+  const path = m[3].toLowerCase();
+  return { n: Number(m[1]), sub: m[2].toLowerCase(), depth: (path.match(/\./g) ?? []).length, path };
 }
 
 /**
  * A play order from the arrows' labels: numbered arrows play in number order, arrows with the same number play
- * together (8a, 8b, 8c). An arrow without a number follows the arrow before it (`withFollowers`); one with nothing
+ * together (8a, 8b, 8c), and dotted sub-steps (8a.1, 8a.2…) play together right after them, before 9. An arrow without a number follows the arrow before it (`withFollowers`); one with nothing
  * numbered leading in isn't in the order.
  */
 export function labelSteps(doc: FlowDocument): string[][] {
@@ -325,13 +328,18 @@ export function labelSteps(doc: FlowDocument): string[][] {
 /** The numbered arrows alone, in label order (no followers). */
 export function numberedSteps(doc: FlowDocument): string[][] {
   const notLifeline = (e: DiagramElement): boolean => !isLifeline(e);
-  const byNum = new Map<number, { id: string; sub: string }[]>();
+  // one step per number and dotted level: 8a, 8b together; then 8a.1, 8a.2… together; then 9
+  const byKey = new Map<string, { n: number; depth: number; arrows: { id: string; order: string }[] }>();
   for (const e of doc.elements) {
     if (e.type !== 'connector' || e.bar || e.locked || !notLifeline(e)) continue;
     const s = labelStep(e.text);
-    if (s) byNum.set(s.n, [...(byNum.get(s.n) ?? []), { id: e.id, sub: s.sub }]);
+    if (!s) continue;
+    const k = `${s.n}:${s.depth}`;
+    const g = byKey.get(k) ?? { n: s.n, depth: s.depth, arrows: [] };
+    g.arrows.push({ id: e.id, order: `${s.sub}${s.path.replace(/\d+/g, (d) => d.padStart(3, '0'))}` });
+    byKey.set(k, g);
   }
-  return [...byNum.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => g.sort((x, y) => x.sub.localeCompare(y.sub)).map((x) => x.id));
+  return [...byKey.values()].sort((a, b) => a.n - b.n || a.depth - b.depth).map((g) => g.arrows.sort((x, y) => x.order.localeCompare(y.order)).map((x) => x.id));
 }
 
 /**

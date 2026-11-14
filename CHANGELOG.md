@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 - **Highlight each step** is now easy to see: the shapes in the playing step get a solid outline and glow in the arrow's highlight colour, and everything else fades back further. It was too faint to notice before, especially zoomed out.
+- **Dotted sub-steps in label order:** arrows numbered like "8a.1", "8a.2", "8a.3" now play together right *after* step 8 (8a, 8b, 8c) and before 9, instead of at the same time as 8a. Each extra level (8a.1.1…) plays after the one above it.
 
 ## [0.1.34] - 2026-11-14
 
