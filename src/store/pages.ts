@@ -53,7 +53,9 @@ export function deletePage(doc: FlowDocument, id: string): FlowDocument {
   if (i < 0) return doc;
   let out = doc;
   if (id === doc.activePage) out = switchPage(doc, doc.pages[i + 1]?.id ?? doc.pages[i - 1].id);
-  return pruneData({ ...out, pages: out.pages.filter((p) => p.id !== id) });
+  // links to the deleted page go too
+  const unlink = (els: FlowDocument['elements']) => els.map((e) => (e.link === id ? (({ link: _l, ...rest }) => rest)(e) as typeof e : e));
+  return pruneData({ ...out, elements: unlink(out.elements), pages: out.pages.filter((p) => p.id !== id).map((p) => ({ ...p, elements: unlink(p.elements) })) });
 }
 
 /** Drop icon and picture data no page uses any more. */

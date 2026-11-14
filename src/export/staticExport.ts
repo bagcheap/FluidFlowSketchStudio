@@ -98,11 +98,22 @@ export async function exportHtmlPlayer() {
 <title>${esc(doc.title)}</title>
 <style>${fonts}
 html,body{margin:0;height:100%;background:${esc(doc.canvas.background)};font-family:system-ui,sans-serif}
-#fs-player{position:fixed;inset:0;display:block;width:100%;height:100%;cursor:pointer}
+#fs-player{position:fixed;inset:0;display:block;width:100%;height:100%}
 #fs-hint{position:fixed;bottom:12px;right:14px;font:12px system-ui;color:#888;opacity:.8}
+#fs-bar{position:fixed;top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:5px 6px;border-radius:12px;background:rgba(255,255,255,.92);box-shadow:0 2px 14px rgba(20,20,40,.16);font:13px system-ui,sans-serif;color:#1d1d27;opacity:.55;transition:opacity .2s;max-width:calc(100vw - 20px);flex-wrap:wrap;justify-content:center}
+#fs-bar:hover,#fs-bar:focus-within{opacity:1}
+#fs-bar button,#fs-bar select{font:inherit;color:inherit;border:0;background:transparent;border-radius:8px;padding:5px 9px;cursor:pointer;min-width:32px}
+#fs-bar button:hover{background:#eef0fb}
+#fs-bar select{border:1px solid #dcdce4;background:#fff;padding:4px 6px}
+#fs-bar [hidden]{display:none}
+#fs-bar .fs-step{padding:0 8px;color:#555;white-space:nowrap}
+#fs-tip{position:fixed;max-width:320px;padding:8px 10px;border-radius:8px;background:#1d1d27;color:#fff;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap;pointer-events:none;box-shadow:0 4px 18px rgba(0,0,0,.25);z-index:2}
+#fs-tip[hidden]{display:none}
+#fs-tip .fs-go{color:#a5b4fc;margin-top:4px}
+#fs-tip .fs-go:first-child{margin-top:0}
 </style></head><body>
 <canvas id="fs-player" aria-label="${esc(doc.title)} (animated diagram)"></canvas>
-<div id="fs-hint">Click to pause · made with FlowSketch Studio</div>
+<div id="fs-hint">Space: play/pause · ← →: steps · made with FlowSketch Studio</div>
 <script type="application/json" id="fs-doc">${json}</script>
 <script>${playerSource.replace(/<\/script/gi, '<\\/script')}</script>
 </body></html>`;

@@ -10,7 +10,7 @@ import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
 import { openDocumentFile, pickFile, resetFileHandle, restoreFileFor, saveDocumentFile } from '../persistence/files';
 import { rememberMermaid } from '../persistence/storage';
-import { DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
+import { cleanNote, DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
 import { geometryFor, SHAPE_LABELS } from '../engine/shapes';
 import { loadIconSet } from '../icons/sets';
@@ -908,3 +908,36 @@ export async function deletePage(id = D().doc.activePage) {
 }
 export const renamePage = (id: string, name: string) => D().commit((d) => pages.renamePage(d, id, name));
 export const movePage = (id: string, by: -1 | 1) => D().commit((d) => pages.movePage(d, id, by));
+
+// ---- interactive player: page links and hover notes ------------------------------------------------------------
+
+/** Clicking these items in the HTML player goes to page `pageId` (null: no link). One undo step. */
+export function setLink(ids: string[], pageId: string | null) {
+  const want = new Set(ids);
+  D().commit((d) => ({
+    ...d,
+    elements: d.elements.map((e) => {
+      if (!want.has(e.id)) return e;
+      if (pageId && pageId !== d.activePage && d.pages.some((p) => p.id === pageId)) return { ...e, link: pageId };
+      const { link: _l, ...rest } = e;
+      void _l;
+      return rest as typeof e;
+    }),
+  }));
+}
+
+/** The note the HTML player shows when pointing at these items (empty: none). Typing coalesces into one undo step. */
+export function setNote(ids: string[], note: string) {
+  const want = new Set(ids);
+  const n = cleanNote(note);
+  D().commit((d) => ({
+    ...d,
+    elements: d.elements.map((e) => {
+      if (!want.has(e.id)) return e;
+      if (n.trim()) return { ...e, note: n };
+      const { note: _n, ...rest } = e;
+      void _n;
+      return rest as typeof e;
+    }),
+  }), `note:${ids.join()}`);
+}

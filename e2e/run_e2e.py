@@ -835,20 +835,24 @@ def main():
             assert a.get('camera') is True and a['duration'] > L0 + 3, (L0, a['duration'])
             L = a['duration']
             m = 'Meta' if 'Mac' in page.evaluate('navigator.platform') else 'Control'
-            app.key(f'{m}+Shift+p'); page.wait_for_timeout(400)
-            shots = []
-            for f in (0.0, 0.5):
-                app.js('(t) => window.__flowsketch.pause(t)', L * f); page.wait_for_timeout(250)
-                path = f'{OUT}/camera-{int(f * 100)}.png'; page.screenshot(path=path); shots.append(Image.open(path).convert('L'))
-            # whole picture at the start, a close-up mid-loop: the two frames differ a lot
-            diff = ImageChops.difference(shots[0], shots[1]).point(lambda q: 255 if q > 40 else 0)
-            changed = sum(diff.histogram()[255:]) / (diff.width * diff.height)
-            assert changed > 0.02, changed
-            page.keyboard.press('Escape'); page.wait_for_timeout(200)
+            try:
+                app.key(f'{m}+Shift+p'); page.wait_for_timeout(400)
+                shots = []
+                for f in (0.0, 0.002, 0.5):
+                    app.js('(t) => window.__flowsketch.pause(t)', L * f); page.wait_for_timeout(250)
+                    path = f'{OUT}/camera-{int(f * 1000)}.png'; page.screenshot(path=path); shots.append(Image.open(path).convert('L'))
+                def changed(a, b):
+                    d = ImageChops.difference(a, b).point(lambda q: 255 if q > 40 else 0)
+                    return sum(d.histogram()[255:]) / (d.width * d.height)
+                # whole picture at the start, a close-up mid-loop: those two differ far more than two frames a moment apart
+                still, moved = changed(shots[0], shots[1]), changed(shots[0], shots[2])
+                assert moved > 0.004 and moved > 5 * still, (still, moved)
+            finally:
+                if page.locator('.topbar').count() == 0: page.keyboard.press('Escape'); page.wait_for_timeout(200)
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
             assert page.locator('.topbar').count() == 1
-            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
             assert not app.doc()['animation'].get('camera')
-            app.js('(v) => window.__flowsketch.setView(v)', v)
         tcamera()
 
         @test('Diagram from text remembers the last script; Route arrows around shapes keeps arrows out of shapes')
@@ -1332,7 +1336,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 13
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 14
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()
@@ -1415,6 +1419,73 @@ def main():
             assert a != b, 'player should animate'
             pg2.close()
         thtml()
+
+        @test('Interactive HTML player: steps with buttons and keys, a note on hover, a link to another page and Back')
+        def tinteractive():
+            from PIL import Image
+            c3, pg, ap, er = fresh(browser)
+            if pg.get_by_test_id('start-blank').count(): pg.get_by_test_id('start-blank').click()
+            pg.get_by_role('menuitem', name='Insert').click()
+            pg.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            pg.get_by_label('Flowchart text').fill('graph LR\n  A[Browser] -->|1. Sign in| B[Portal]\n  B -->|2. Ask| C[Agent]\n  C -->|3. Answer| D[Model]')
+            pg.get_by_test_id('mermaid-insert').click(); pg.wait_for_timeout(200)
+            ap.key('Escape')
+            pg.get_by_role('button', name='Add page').click(); pg.wait_for_timeout(150)
+            ap.reset_view(); ap.tool('r'); ap.drag((100, 100), (260, 190)); ap.key('Escape')
+            detail = ap.doc()['activePage']
+            pg.locator('.page-tab', has_text='Page 1').click(); pg.wait_for_timeout(200)
+            agent = next(e for e in ap.doc()['elements'] if e['type'] == 'shape' and e['text'] == 'Agent')
+            ap.click((agent['x'] + agent['w'] / 2, agent['y'] + agent['h'] / 2))
+            assert ap.ui()['selection'] == [agent['id']], ap.ui()['selection']
+            sec = pg.get_by_role('button', name='Interactive player')
+            if sec.get_attribute('aria-expanded') != 'true': sec.click()
+            pg.get_by_label('Link to page').select_option(label='Page 2')
+            pg.get_by_label('Note on hover').fill('Runs the agent loop')
+            el = next(e for e in ap.doc()['elements'] if e['id'] == agent['id'])
+            assert el.get('link') == detail and el.get('note') == 'Runs the agent loop', el
+            ap.key('Escape')
+            pg.get_by_role('menuitem', name='Export').first.click()
+            with pg.expect_download() as dl:
+                pg.get_by_role('menuitem', name='Standalone HTML player').click()
+            path = f'{OUT}/e2e-interactive.html'; dl.value.save_as(path)
+            c3.close()
+            pc = browser.new_context(viewport={'width': 1200, 'height': 760})
+            pl = pc.new_page(); errs = []
+            pl.on('pageerror', lambda e: errs.append(str(e)))
+            pl.goto('file://' + os.path.abspath(path)); pl.wait_for_timeout(600)
+            label = lambda: pl.locator('#fs-bar .fs-step').inner_text()
+            pl.keyboard.press('Home'); pl.wait_for_timeout(100)
+            assert label().startswith('Start'), label()
+            def step(key, want):
+                pl.keyboard.press(key)
+                for _ in range(100):
+                    pl.wait_for_timeout(100)
+                    if pl.locator('#fs-bar button[aria-label^="Play"]').inner_text() == '▶': break
+                assert label() == want, (key, label(), want)
+            step('ArrowRight', 'Step 1 of 3'); step('ArrowRight', 'Step 2 of 3'); step('ArrowLeft', 'Step 1 of 3')
+            pl.locator('#fs-bar button[aria-label^="Next"]').click(); pl.wait_for_timeout(100)
+            for _ in range(100):
+                pl.wait_for_timeout(100)
+                if label() == 'Step 2 of 3' and pl.locator('#fs-bar button[aria-label^="Play"]').inner_text() == '▶': break
+            assert label() == 'Step 2 of 3', label()
+            # the link badge (blue) marks Agent's top-right corner; point just inside it
+            pl.screenshot(path=f'{OUT}/e2e-interactive.png')
+            im = Image.open(f'{OUT}/e2e-interactive.png').convert('RGB')
+            blue = [(x, y) for y in range(70, im.height, 2) for x in range(0, im.width, 2) if abs(im.getpixel((x, y))[0] - 67) < 12 and abs(im.getpixel((x, y))[1] - 97) < 12 and abs(im.getpixel((x, y))[2] - 238) < 12]
+            assert blue, 'no link badge'
+            bx = sum(p[0] for p in blue) / len(blue); by = sum(p[1] for p in blue) / len(blue)
+            pl.mouse.move(bx - 18, by + 18); pl.wait_for_timeout(150)
+            tip = pl.locator('#fs-tip')
+            assert tip.is_visible() and 'Runs the agent loop' in tip.inner_text() and 'Page 2' in tip.inner_text(), tip.inner_text()
+            pl.mouse.click(bx - 18, by + 18); pl.wait_for_timeout(200)
+            assert pl.locator('#fs-bar select').input_value() == detail
+            assert pl.locator('#fs-bar button', has_text='Back').is_visible()
+            pl.keyboard.press('Backspace'); pl.wait_for_timeout(200)
+            assert pl.locator('#fs-bar select').input_value() != detail
+            assert not pl.locator('#fs-bar button', has_text='Back').is_visible()
+            assert not errs, errs
+            pc.close()
+        tinteractive()
 
         ctx.close()
 
