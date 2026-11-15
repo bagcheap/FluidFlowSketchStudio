@@ -120,6 +120,44 @@ There are three layers of settings, applied in order:
 
 GIFs are limited to 256 colours and compress poorly. For long or large animations, video is usually far smaller.
 
+## Describe a diagram with AI (optional)
+
+Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu). You describe a diagram in plain words and Claude drafts it. You can check or edit the draft, ask for changes, and then insert it. This is the only FlowSketch feature that uses the internet. It is off until you use it, and it needs your own Anthropic API key. Everything else keeps working without one.
+
+### 1. Get an Anthropic API key (one time)
+
+1. Go to **https://platform.claude.com** (the Claude Console; `console.anthropic.com` takes you to the same place). Sign up or sign in. This is separate from a claude.ai chat subscription: API use is billed on its own.
+2. Add credit: open **Billing** (under Settings), add a payment method and buy some prepaid credit. A few dollars is plenty to try it.
+3. Create a key: open **API keys**, choose **Create key**, give it a name such as `FlowSketch`, and create it.
+4. **Copy the key right away** (it starts with `sk-ant-`). The Console shows it only once. If you lose it, delete it there and create a new one.
+5. Keep it private. Don't paste it into files in this repo, chats or screenshots. Anyone who has it can spend your credit. You can delete the key in the Console at any time.
+
+### 2. Use it in FlowSketch
+
+1. Open Insert ▸ **Describe a diagram (AI)…**.
+2. Paste the key into **API key**. Tick **Remember on this computer** if you don't want to paste it again next time. **Forget key** removes it.
+3. Choose a **Model**: Opus (best, the default), Sonnet (faster, cheaper) or Haiku (fastest, cheapest).
+4. Describe the diagram, for example: *"A user signs in through the web app, which checks the auth service, then loads their orders from the API and its database. Number the steps."* Then press **Draw it**. It takes a few seconds to a minute.
+5. A Mermaid draft appears below, and your prompt stays in the box. Now you can:
+   * edit the draft directly;
+   * tweak the prompt and press **Draw again** for a fresh draft from just that prompt;
+   * type a change ("add a cache between the API and the database") and press **Change draft**. Claude gets the current draft plus your change.
+6. Press **Insert diagram**. It's laid out and animated like any diagram from text. Numbered steps play in order.
+7. The dialog remembers your last session on this computer. Open it again later and the prompts you used are listed under **Prompts used for this draft**, and the Mermaid that was drawn (with your edits) is still there. **Edit** next to a prompt puts it back in the box to tweak and try again. **Start over** clears it all.
+
+**What is sent, and where:** only the text you type in this dialog (plus the current draft when you ask for a change). It goes straight from your browser or the desktop app to Anthropic's API, and only when you press **Draw it** or **Change draft**. Your diagram file and anything else on the canvas are never sent. Claude's reply is read only as Mermaid text and goes through the same checks as Mermaid you paste yourself. Nothing in it is ever run.
+
+**Where your prompts and drafts are kept:** in local storage on this computer only, until you press **Start over**. They're never sent anywhere except with a request you make.
+
+**Where the key is kept:** without **Remember**, only in memory until you close the window. With it, in this browser's (or the desktop app's) local storage on this computer, as plain text. It is never saved in `.flowsketch` files or exports.
+
+**Cost:** each request is billed to your Anthropic account at the model's API price. A typical diagram is a few thousand tokens, so usually a few cents or less with Opus and less with Sonnet or Haiku. The Console's **Usage** page shows what you've spent.
+
+**If it doesn't work:**
+- "Did not accept that API key": the key was mistyped, or it was deleted in the Console.
+- "Out of credit": add credit under Billing.
+- "Could not reach Anthropic": check the internet connection, and any firewall or VPN that blocks `api.anthropic.com`.
+
 ## Architecture
 
 ```
@@ -186,7 +224,7 @@ The 60 FPS target for 100+150 objects is **not demonstrated** here, because no G
 * Responsive layout, with the inspector as a bottom sheet on phones
 
 **Deferred / not yet built:**
-* AI text-to-diagram (Phase 2; the document-edit command layer in `store/commands.ts` is the intended integration point)
+* AI edits to an existing diagram (describing a new diagram is built: Insert ▸ Describe a diagram (AI))
 * Keyframes, easing curves and timeline tracks (the timing model already has per-object delay and phase)
 * Find objects; collaboration and accounts
 * Rotating multi-selections as a unit
@@ -221,7 +259,7 @@ Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excal
 
 ### 4. Bigger bets
 
-14. **AI "describe it and I'll draw it".** Type a description and get a diagram, using Mermaid import as the safe, validated path. Opt-in only, since it needs an API key and internet.
+14. ✅ *Built in 0.1.44.* **AI "describe it and I'll draw it".** Type a description and get a diagram, using Mermaid import as the safe, validated path. Opt-in only, since it needs an API key and internet.
 15. **Data-linked shapes.** Shapes carry properties (owner, status, cost) that drive their look, for example red when "down", for living architecture maps.
 
 ### 5. Later

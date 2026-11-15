@@ -889,6 +889,86 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tmermaidmem()
 
+        @test('Describe a diagram (AI): key stays local, draft from Claude (faked), change it, insert it')
+        def tai():
+            app.key('Escape')
+            v = app.ui()['view']
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.js('() => window.__flowsketch.setView({x: 9000, y: 21000, zoom: 1})')
+            sent = []
+            replies = [
+                '```mermaid\nflowchart LR\n  U([User]) -->|1. sign in| W[Web app]\n  W -->|2. check| A[(Auth)]\n```',
+                'Updated:\n```mermaid\nflowchart LR\n  U([User]) -->|1. sign in| W[Web app]\n  W -->|2. check| A[(Auth)]\n  W -->|3. load| C[Cache]\n```',
+                '```mermaid\nflowchart TD\n  U([User]) --> M[Mobile app]\n```',
+            ]
+            def handle(route):
+                req = route.request
+                sent.append({'body': json.loads(req.post_data or '{}'), 'headers': req.headers, 'method': req.method})
+                if req.method == 'OPTIONS':
+                    return route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'})
+                text = replies[min(len([s for s in sent if s['method'] == 'POST']) - 1, 2)]
+                route.fulfill(status=200, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
+                    'id': 'msg_e2e', 'type': 'message', 'role': 'assistant', 'model': 'claude-opus-5-5', 'stop_reason': 'end_turn', 'stop_sequence': None,
+                    'content': [{'type': 'text', 'text': text}], 'usage': {'input_tokens': 1, 'output_tokens': 1}}))
+            page.route('https://api.anthropic.com/**', handle)
+            try:
+                n0 = len(app.els())
+                page.get_by_role('menuitem', name='Insert').click()
+                page.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                assert page.get_by_test_id('ai-draw').is_disabled()  # no key, no description: nothing can be sent
+                page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
+                page.get_by_test_id('ai-prompt').fill('A user signs in to the web app, which checks the auth service')
+                page.get_by_test_id('ai-draw').click()
+                page.get_by_test_id('ai-draft').wait_for(timeout=8000)
+                posts = [s for s in sent if s['method'] == 'POST']
+                assert len(posts) == 1, sent
+                b = posts[0]['body']
+                assert b['messages'] == [{'role': 'user', 'content': 'A user signs in to the web app, which checks the auth service'}], b['messages']
+                assert b['model'] == 'claude-opus-5-5', b['model']
+                assert 'sk-ant-e2e-0123456789' in (posts[0]['headers'].get('authorization', '') + posts[0]['headers'].get('x-api-key', ''))
+                assert 'Web app' in page.get_by_test_id('ai-draft').input_value()
+                # ask for a change: the draft goes back with the request
+                assert page.get_by_test_id('ai-prompt').input_value().startswith('A user signs in'), 'the prompt stays in the box'
+                page.get_by_test_id('ai-prompt').fill('Add a cache the web app loads from')
+                page.get_by_test_id('ai-change').click()
+                page.wait_for_function("() => document.querySelector('[data-testid=ai-draft]')?.value.includes('Cache')", timeout=8000)
+                b2 = [s for s in sent if s['method'] == 'POST'][1]['body']
+                assert [m['role'] for m in b2['messages']] == ['user', 'assistant', 'user'], b2['messages']
+                assert 'Web app' in b2['messages'][1]['content']
+                page.get_by_test_id('ai-insert').click(); page.wait_for_timeout(200)
+                new = app.els()[n0:]
+                texts = sorted(e['text'] for e in new if e['type'] == 'shape')
+                assert texts == ['Auth', 'Cache', 'User', 'Web app'], texts
+                assert len([e for e in new if e['type'] == 'connector']) == 3
+                # the key is not remembered unless asked
+                assert app.js("() => localStorage.getItem('flowsketch:anthropicKey')") is None
+                # reopening shows the prompts used and the Mermaid that was drawn; tweak a prompt and draw again
+                app.key('Escape')
+                page.get_by_role('menuitem', name='Insert').click()
+                page.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                assert 'Cache' in page.get_by_test_id('ai-draft').input_value()
+                assert page.get_by_test_id('ai-prompt').input_value() == 'Add a cache the web app loads from'
+                assert page.locator('.ai-prompt-text').all_inner_texts() == ['A user signs in to the web app, which checks the auth service', 'Add a cache the web app loads from']
+                page.locator('.ai-prompts li').first.get_by_role('button', name='Edit').click()
+                assert page.get_by_test_id('ai-prompt').input_value().startswith('A user signs in')
+                page.get_by_label('API key').fill('sk-ant-e2e-0123456789')  # not remembered, so typed again
+                page.get_by_test_id('ai-prompt').fill('A user signs in to the mobile app')
+                page.get_by_test_id('ai-draw').click()  # Draw again: from this prompt alone
+                page.wait_for_function("() => document.querySelector('[data-testid=ai-draft]')?.value.includes('Mobile')", timeout=8000)
+                b3 = [s for s in sent if s['method'] == 'POST'][2]['body']
+                assert b3['messages'] == [{'role': 'user', 'content': 'A user signs in to the mobile app'}], b3['messages']
+                assert page.locator('.ai-prompt-text').all_text_contents() == ['A user signs in to the mobile app'], page.locator('.ai-prompt-text').all_text_contents()
+                app.key('Escape')
+            finally:
+                page.unroute('https://api.anthropic.com/**')
+                app.js("() => localStorage.removeItem('flowsketch:aiSession')")
+                app.key('Escape')
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+
+        tai()
+
+
         @test('Moving an arrow end drops its old waypoints; an elbow arrow then routes round shapes from where it was dropped')
         def tendmove():
             app.key('Escape')

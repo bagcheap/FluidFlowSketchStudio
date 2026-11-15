@@ -8,7 +8,7 @@ import { sanitizeToolStyle, SHAPE_KINDS } from '../model/schema';
 export type Theme = 'light' | 'dark' | 'system';
 export type DialogId =
   | null | 'gif' | 'image' | 'svg' | 'video' | 'animation' | 'shortcuts' | 'help' | 'templates'
-  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes' | 'whatsnew' | 'iconlibs' | 'mermaid';
+  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes' | 'whatsnew' | 'iconlibs' | 'mermaid' | 'ai';
 
 export interface Prefs {
   toolStyles: Record<string, ToolStyle>;
