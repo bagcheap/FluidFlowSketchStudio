@@ -65,7 +65,7 @@ export function AiDialog() {
       <button className="btn" onClick={close}>{busy ? 'Cancel' : 'Close'}</button>
       <button className="btn primary" data-testid="ai-insert" disabled={busy || !info?.count} onClick={insert}>Insert diagram</button>
     </>}>
-      <p className="note">Describe the diagram in your own words and Claude drafts it. You can check the draft, ask for changes, then insert it. This needs internet and your own <b>Anthropic API key</b> (from console.anthropic.com; usage is billed to your account). Only what you type here is sent to Anthropic, and only when you press <b>{draft ? 'Change draft' : 'Draw it'}</b>.</p>
+      <p className="note">Describe the diagram in your own words and Claude drafts it. You can check the draft, ask for changes, then insert it. This needs internet and your own <b>Anthropic API key</b> (create one at platform.claude.com under API keys; usage is billed to your Anthropic account; see the README for step-by-step help). Only what you type here is sent to Anthropic, and only when you press <b>{draft ? 'Change draft' : 'Draw it'}</b>.</p>
       <div className="ai-row">
         <label className="row-label" htmlFor="ai-key">API key</label>
         <input id="ai-key" className="ai-key" type="password" autoComplete="off" spellCheck={false} placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} />
