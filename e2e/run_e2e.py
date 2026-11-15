@@ -1336,7 +1336,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 15
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 16
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()
@@ -1657,6 +1657,50 @@ def main():
                 while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
                 app.js('(v) => window.__flowsketch.setView(v)', v)
         tsizesnap()
+
+        @test('Notation shapes: Shape library groups; a UML class keeps its sections when typed on; network icons; crow\'s-foot ends')
+        def tnotation():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 48000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            try:
+                app.key('s'); page.wait_for_timeout(200)
+                dlg = page.get_by_role('dialog')
+                assert dlg.get_by_text('UML', exact=True).count() and dlg.get_by_text('Network', exact=True).count()
+                dlg.get_by_role('button', name='UML class').click(); page.wait_for_timeout(100)
+                assert app.ui()['tool'] == 'shape' and app.ui()['shapeKind'] == 'umlClass'
+                app.drag((5100, 48100), (5300, 48230))
+                cls = app.els()[-1]
+                assert cls['shape'] == 'umlClass' and cls['text'].startswith('ClassName\n--\n'), cls['text']
+                # typing on it replaces only the name; the compartments stay
+                page.keyboard.type('Customer'); app.key('Escape'); page.wait_for_timeout(100)
+                cls = next(e for e in app.els() if e['id'] == cls['id'])
+                assert cls['text'].split('\n')[0] == 'Customer' and cls['text'].count('\n--\n') == 2, cls['text']
+                # a server icon from the Network group
+                app.key('Escape'); app.key('s'); page.wait_for_timeout(200)
+                page.get_by_role('dialog').get_by_role('button', name='Server').click()
+                page.wait_for_function("() => window.__flowsketch.doc().elements.some((e) => e.type === 'icon' && e.iconId === 'tabler:server')", timeout=8000)
+                # an ER relationship: two entities and a line with crow's-foot ends
+                app.key('Escape'); app.key('s'); page.wait_for_timeout(200)
+                page.get_by_role('dialog').get_by_role('button', name='ER entity (table)').click()
+                app.drag((5100, 48400), (5300, 48520)); app.key('Escape')
+                app.key('s'); page.wait_for_timeout(200)
+                page.get_by_role('dialog').get_by_role('button', name='ER entity (table)').click()
+                app.drag((5600, 48400), (5800, 48520)); app.key('Escape')
+                app.tool('l'); app.drag((5200, 48460), (5700, 48460)); line = app.els()[-1]
+                assert line['type'] == 'connector' and line['start']['elementId'] and line['end']['elementId']
+                page.get_by_label('End arrowhead').select_option(label='ER: zero or many')
+                page.get_by_label('Start arrowhead').select_option(label='ER: one and only one')
+                line = next(e for e in app.els() if e['id'] == line['id'])
+                assert line['endHead'] == 'erZeroMany' and line['startHead'] == 'erOnlyOne', (line['startHead'], line['endHead'])
+                app.key('Escape')
+                page.screenshot(path=f'{OUT}/e2e-notation.png')
+            finally:
+                if page.get_by_role('dialog').count(): page.keyboard.press('Escape')
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+        tnotation()
 
         @test('Import: File > Open reads draw.io and Excalidraw files; Export > Mermaid writes this page as Mermaid text')
         def tformats():

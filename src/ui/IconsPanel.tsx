@@ -47,7 +47,7 @@ export function IconGlyph({ icon, size = 26 }: { icon: IconAsset; size?: number 
 }
 
 /** Loads a set (or library) when first shown. */
-function useIconSet(id: string): { set: IconSet | null; error: string | null; retry: () => void } {
+export function useIconSet(id: string): { set: IconSet | null; error: string | null; retry: () => void } {
   const [state, setState] = useState<{ set: IconSet | null; error: string | null }>({ set: null, error: null });
   const [attempt, setAttempt] = useState(0);
   const libs = useLibraries((s) => s.libs); // a library's contents change when icons are added to it

@@ -8,7 +8,7 @@ import { STILL, resolveConnectorAnim, shapeMotion } from './animation';
 import { connectorPath, endTangent, pointAt, slice, type ConnectorPath, type Lookup } from './connectors';
 import { displace, easeInOut, fract, hash01, snapFreq, type DeformField } from './noise';
 import { roughSets, type OpSet } from './rough';
-import { geometryFor } from './shapes';
+import { COMPARTMENTS, geometryFor } from './shapes';
 import { cssFont, layoutText } from './text';
 import { jumpRadius, withJumps } from './jumps';
 import { CAM_CLOSE, CAM_MOVE, CAM_OPEN, cameraAt, groupShots, type CamKey, type CamRect } from './camera';
@@ -89,6 +89,51 @@ function labelParts(el: BoxElement | ConnectorElement, box: { x: number; y: numb
   }];
 }
 
+/** A line of just dashes ("--") starts a new compartment. */
+const SECTION_BREAK = /^\s*-{2,}\s*$/;
+
+export interface Compartment { text: string; y: number; h: number; title: boolean }
+
+/**
+ * Compartments of a UML class or ER entity: the text split at lines of "--" into the name (bold, centred) and the
+ * sections below it (left-aligned): each as tall as its text, the last one taking what's left of the shape.
+ * Shared by the renderer, the text-to-size fit and the text editor.
+ */
+export function compartmentLayout(el: Pick<ShapeElement, 'text' | 'textStyle' | 'w' | 'h'>): Compartment[] {
+  const parts: string[][] = [[]];
+  for (const line of el.text.split('\n')) {
+    if (SECTION_BREAK.test(line)) parts.push([]); else parts[parts.length - 1].push(line);
+  }
+  const pad = el.textStyle.padding, inner = Math.max(8, el.w - pad * 2) + 1;
+  const out: Compartment[] = [];
+  let y = 0;
+  parts.forEach((lines, i) => {
+    const text = lines.join('\n');
+    const ts = i === 0 ? { ...el.textStyle, bold: true } : el.textStyle;
+    const lay = layoutText(text || ' ', ts, inner);
+    const h = Math.max(lay.lineHeight, lay.height) + pad * 2;
+    out.push({ text, y, h, title: i === 0 });
+    y += h;
+  });
+  // the last compartment fills the rest of the shape
+  const last = out[out.length - 1];
+  if (last.y + last.h < el.h) last.h = el.h - last.y;
+  return out;
+}
+
+/** A compartment shape's text: the name bold and centred, the other sections left-aligned at their tops. */
+function compartmentParts(el: ShapeElement): { lines: number[]; text: Part[] } {
+  const cs = compartmentLayout(el);
+  const lines = cs.slice(1).map((c) => c.y).filter((y) => y > 0 && y < el.h);
+  const text: Part[] = [];
+  for (const c of cs) {
+    if (!c.text.trim()) continue;
+    const ts: TextStyle = c.title ? { ...el.textStyle, bold: true, align: 'center', vAlign: 'middle' } : { ...el.textStyle, align: el.textStyle.align === 'center' ? 'left' : el.textStyle.align, vAlign: 'top' };
+    text.push(...labelParts({ ...el, text: c.text, textStyle: ts }, { x: 0, y: c.y, w: el.w, h: c.h }, true));
+  }
+  return { lines, text };
+}
+
 function shapeItems(el: ShapeElement, m: Motion, loopLen: number | null, hideLabel: boolean): Item[] {
   const g = geometryFor(el);
   const f = field(el, m, loopLen);
@@ -98,9 +143,15 @@ function shapeItems(el: ShapeElement, m: Motion, loopLen: number | null, hideLab
   for (const d of g.details) {
     parts.push({ k: 'sets', sets: warpSets(roughSets('d' + d, d, el.style, seed + 1, false), f), stroke: el.style.stroke, fill: 'none', sw: el.style.strokeWidth, fillWeight: 1, dash: dashFor(el.style.strokeStyle, el.style.strokeWidth), shadow: false });
   }
+  const comp = COMPARTMENTS.has(el.shape) ? compartmentParts(el) : null;
+  // compartment dividers: hand-drawn like the outline, wobbling with it
+  for (const y of comp?.lines ?? []) {
+    const d = `M0 ${y.toFixed(1)} L${el.w.toFixed(1)} ${y.toFixed(1)}`;
+    parts.push({ k: 'sets', sets: warpSets(roughSets('c' + d, d, el.style, seed + 2, false), f), stroke: el.style.stroke, fill: 'none', sw: el.style.strokeWidth, fillWeight: 1, dash: dashFor(el.style.strokeStyle, el.style.strokeWidth), shadow: false });
+  }
   const items: Item[] = [{ id: el.id, opacity: el.style.opacity, tf: { x: el.x + m.tx, y: el.y + m.ty, w: el.w, h: el.h, rot: el.rotation + m.rot }, parts }];
   if (el.text && !hideLabel) {
-    items.push({ id: el.id + ':label', opacity: el.style.opacity, tf: { x: el.x + m.text.tx, y: el.y + m.text.ty, w: el.w, h: el.h, rot: el.rotation + m.text.rot }, parts: labelParts(el, g.textBox, true) });
+    items.push({ id: el.id + ':label', opacity: el.style.opacity, tf: { x: el.x + m.text.tx, y: el.y + m.text.ty, w: el.w, h: el.h, rot: el.rotation + m.text.rot }, parts: comp ? comp.text : labelParts(el, g.textBox, true) });
   }
   return items;
 }
@@ -251,8 +302,42 @@ function halo(pts: number[], color: string, sw: number, alpha: number): Part[] {
   ];
 }
 
-function headParts(kind: HeadKind, tip: Point, dir: Point, color: string, sw: number, scale = 1): Part[] {
+/** Crow's-foot ends (ER relationships): which marks, from the line's end inwards. */
+const CROW: Partial<Record<HeadKind, { crow: boolean; bars: number[]; ring?: number }>> = {
+  erOne: { crow: false, bars: [0.55] },
+  erOnlyOne: { crow: false, bars: [0.4, 0.75] },
+  erZeroOne: { crow: false, bars: [0.4], ring: 1.05 },
+  erMany: { crow: true, bars: [] },
+  erOneMany: { crow: true, bars: [1.2] },
+  erZeroMany: { crow: true, bars: [], ring: 1.45 },
+};
+
+function headParts(kind: HeadKind, tip: Point, dir: Point, color: string, sw: number, scale = 1, bg = '#ffffff'): Part[] {
   if (kind === 'none') return [];
+  const crow = CROW[kind];
+  if (crow) {
+    const size = Math.min(34, 9 + sw * 3) * scale * 1.1;
+    const back = { x: -dir.x, y: -dir.y }, n = { x: -dir.y, y: dir.x };
+    const at = (k: number) => ({ x: tip.x + back.x * size * k, y: tip.y + back.y * size * k });
+    const line = (pts: number[]): Part => ({ k: 'line', pts, color, width: sw, alpha: 1, cap: 'round', dash: null });
+    const out: Part[] = [];
+    if (crow.crow) {
+      // three prongs from a point on the line, spreading to the shape
+      const c = at(1), w = size * 0.5;
+      out.push(line([c.x, c.y, tip.x + n.x * w, tip.y + n.y * w]), line([c.x, c.y, tip.x, tip.y]), line([c.x, c.y, tip.x - n.x * w, tip.y - n.y * w]));
+    }
+    for (const k of crow.bars) {
+      const p = at(k), w = size * 0.45;
+      out.push(line([p.x + n.x * w, p.y + n.y * w, p.x - n.x * w, p.y - n.y * w]));
+    }
+    if (crow.ring) {
+      // "zero": a hollow circle, filled with the background so the line doesn't show through it
+      const p = at(crow.ring), r = size * 0.26, pts: number[] = [];
+      for (let i = 0; i < 20; i++) { const a = (i / 20) * Math.PI * 2; pts.push(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r); }
+      out.push({ k: 'line', pts, color, width: Math.max(1, sw * 0.8), alpha: 1, cap: 'round', dash: null, closed: true, fill: bg });
+    }
+    return out;
+  }
   const size = Math.min(34, 9 + sw * 3) * scale; // (scale includes the arrow's own head size)
   const rot = (v: Point, a: number) => ({ x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) });
   const back = { x: -dir.x, y: -dir.y };
@@ -560,13 +645,13 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
       const lead = pointAt(path, leadS);
       const forward = anim.direction === 'reverse' ? { x: -lead.tan.x, y: -lead.tan.y } : lead.tan;
       const head = anim.direction === 'reverse' ? c.startHead : c.endHead;
-      parts.push(...headParts(head, atEnd ? (anim.direction === 'reverse' ? path.pts[0] : path.pts[path.pts.length - 1]) : lead.pt, atEnd ? endTangent(path, anim.direction === 'reverse') : forward, st.stroke, sw, headScale * hs));
+      parts.push(...headParts(head, atEnd ? (anim.direction === 'reverse' ? path.pts[0] : path.pts[path.pts.length - 1]) : lead.pt, atEnd ? endTangent(path, anim.direction === 'reverse') : forward, st.stroke, sw, headScale * hs, background));
       const tailHead = anim.direction === 'reverse' ? c.endHead : c.startHead;
       const tailVisible = anim.direction === 'reverse' ? vb >= len - 0.5 : va <= 0.5;
-      if (tailVisible) parts.push(...headParts(tailHead, anim.direction === 'reverse' ? path.pts[path.pts.length - 1] : path.pts[0], endTangent(path, anim.direction !== 'reverse'), st.stroke, sw, hs));
+      if (tailVisible) parts.push(...headParts(tailHead, anim.direction === 'reverse' ? path.pts[path.pts.length - 1] : path.pts[0], endTangent(path, anim.direction !== 'reverse'), st.stroke, sw, hs, background));
     } else {
-      parts.push(...headParts(c.endHead, path.pts[path.pts.length - 1], endTangent(path, false), st.stroke, sw, headScale * hs));
-      parts.push(...headParts(c.startHead, path.pts[0], endTangent(path, true), st.stroke, sw, headScale * hs));
+      parts.push(...headParts(c.endHead, path.pts[path.pts.length - 1], endTangent(path, false), st.stroke, sw, headScale * hs, background));
+      parts.push(...headParts(c.startHead, path.pts[0], endTangent(path, true), st.stroke, sw, headScale * hs, background));
     }
   }
   const items: Item[] = [{ id: c.id, opacity: st.opacity, tf: null, parts }];

@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Point } from '../model/types';
 import { useDoc, getElement } from '../store/docStore';
 import { useUI } from '../store/uiStore';
-import { geometryFor } from '../engine/shapes';
+import { geometryFor, COMPARTMENTS } from '../engine/shapes';
 import { cssFont } from '../engine/text';
 import { connectorPath, pointAt } from '../engine/connectors';
 import { connectorLabelSize, containerHeader, iconLabelLayout, makeLookup } from '../engine/render';
@@ -14,7 +14,9 @@ export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p:
   const el = getElement(doc, id);
   // started by typing on a selected shape: the typed text replaces the label (as Enter + typing would)
   const seed = useRef(useUI.getState().editSeed);
-  const [text, setText] = useState(seed.current ?? el?.text ?? '');
+  // on a UML class or ER entity, typing replaces just the name (the first line), keeping the compartments below
+  const keepRest = seed.current !== null && el?.type === 'shape' && COMPARTMENTS.has(el.shape) && el.text.includes('\n');
+  const [text, setText] = useState(seed.current === null ? el?.text ?? '' : keepRest ? seed.current + el!.text.slice(el!.text.indexOf('\n')) : seed.current);
   const ref = useRef<HTMLTextAreaElement>(null);
   const done = useRef(false);
   const [lines, setLines] = useState(1);
@@ -23,7 +25,7 @@ export function TextEditor({ id, toScreen, onDone }: { id: string; toScreen: (p:
     const t = ref.current;
     if (!t) return;
     t.focus();
-    if (seed.current !== null) t.setSelectionRange(t.value.length, t.value.length); // keep typing after the first letter
+    if (seed.current !== null) { const at = keepRest ? seed.current.length : t.value.length; t.setSelectionRange(at, at); } // keep typing after the first letter
     else t.select();
   }, []);
   useLayoutEffect(() => { setLines(Math.max(1, text.split('\n').length)); }, [text]);

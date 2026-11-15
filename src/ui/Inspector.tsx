@@ -368,7 +368,9 @@ export function Inspector() {
   );
 }
 
-const HEADS = [{ v: 'none', label: 'None' }, { v: 'arrow', label: 'Arrow' }, { v: 'triangle', label: 'Triangle' }, { v: 'dot', label: 'Dot' }, { v: 'bar', label: 'Bar' }] as { v: ConnectorElement['endHead']; label: string }[];
+const HEADS = [{ v: 'none', label: 'None' }, { v: 'arrow', label: 'Arrow' }, { v: 'triangle', label: 'Triangle' }, { v: 'dot', label: 'Dot' }, { v: 'bar', label: 'Bar' },
+  { v: 'erOne', label: 'ER: one' }, { v: 'erOnlyOne', label: 'ER: one and only one' }, { v: 'erZeroOne', label: 'ER: zero or one' },
+  { v: 'erMany', label: 'ER: many' }, { v: 'erOneMany', label: 'ER: one or many' }, { v: 'erZeroMany', label: 'ER: zero or many' }] as { v: ConnectorElement['endHead']; label: string }[];
 
 function IconBtn({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return <button className="icon-btn sm" title={label} aria-label={label} onClick={onClick}>{children}</button>;

@@ -7,7 +7,7 @@ import { useUI } from '../store/uiStore';
 import { insertImage } from '../store/commands';
 import { ShapeIcon } from './ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
-import { SHAPE_KINDS } from '../model/schema';
+import { BASIC_SHAPES } from '../model/schema';
 
 interface T { id: ToolId; shape?: ShapeKind; icon: ReactNode; label: string; key: string; tip: string }
 
@@ -91,7 +91,7 @@ export function Toolbar() {
         </button>
         {more && (
           <div className="shape-pop" role="menu" onMouseLeave={() => setMore(false)}>
-            {SHAPE_KINDS.map((k) => (
+            {BASIC_SHAPES.map((k) => (
               <button key={k} role="menuitem" className={`shape-cell ${tool === 'shape' && shapeKind === k ? 'on' : ''}`} title={SHAPE_LABELS[k]} aria-label={SHAPE_LABELS[k]} onClick={() => { ui.setTool('shape', k); setMore(false); }}>
                 <ShapeIcon kind={k} size={22} />
               </button>

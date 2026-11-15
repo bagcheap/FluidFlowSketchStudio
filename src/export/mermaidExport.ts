@@ -8,6 +8,7 @@ import type { BoxElement, ConnectorElement, ContainerElement, FlowDocument, Shap
 const WRAP: Partial<Record<ShapeKind, [string, string]>> = {
   rectangle: ['[', ']'], roundRect: ['(', ')'], pill: ['([', '])'], ellipse: ['((', '))'], diamond: ['{', '}'],
   hexagon: ['{{', '}}'], parallelogram: ['[/', '/]'], trapezoid: ['[/', '\\]'], cylinder: ['[(', ')]'],
+  bpmnStart: ['((', '))'], bpmnEnd: ['((', '))'], bpmnIntermediate: ['((', '))'], bpmnGateway: ['{', '}'], bpmnParallel: ['{', '}'],
 };
 
 /** A label as a Mermaid quoted string: quotes as #quot;, line breaks as <br/>, nothing that ends the string. */

@@ -4,6 +4,17 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.43] - 2026-11-15
+
+### Added
+- **UML, ER and BPMN shapes:** the **Shape library** (press **S**, or Insert ▸ Shape library…) now has sections for **UML** (class, actor, package, component, note), **entity-relationship** (entity), and **BPMN** (start, intermediate and end events, exclusive and parallel gateways, data object), next to the basic shapes. Event, gateway, actor and data-object names sit underneath the symbol.
+- **Class and entity boxes with compartments:** a UML class starts as *name / attributes / operations*, an ER entity as *name / columns*. Separate the sections with a line of just `--`: the name is bold and centred, the rest left-aligned under divider lines, and the box grows to fit. Starting to type on a selected class or entity replaces just its name.
+- **Crow's-foot arrowheads** for ER relationships: one, one and only one, zero or one, many, one or many, zero or many (in the Inspector's arrowhead lists).
+- **Network icons** in the Shape library: server, database, router, firewall, load balancer, cloud, internet, network, Wi-Fi, API, desktop, laptop, phone, printer and users.
+
+### Changed
+- Files now use format version 16 (for the new shapes and arrowheads). Older files open as before, but files saved with this version need this version of FlowSketch or later.
+
 ## [0.1.42] - 2026-11-15
 
 ### Added

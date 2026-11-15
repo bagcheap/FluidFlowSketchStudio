@@ -217,7 +217,7 @@ Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excal
 ### 3. Getting work in and out
 
 12. ✅ *Built in 0.1.42.* **Import draw.io and Excalidraw files, and export to Mermaid.** Bring existing diagrams in and animate them (Visio files are much harder and are left out).
-13. **Shape sets for common notations.** UML class, ER (database), BPMN and network diagrams, with shapes that behave correctly (for example class boxes with compartments).
+13. ✅ *Built in 0.1.43.* **Shape sets for common notations.** UML class, ER (database), BPMN and network diagrams, with shapes that behave correctly (for example class boxes with compartments).
 
 ### 4. Bigger bets
 
