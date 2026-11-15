@@ -1596,6 +1596,38 @@ def main():
                 app.js('(v) => window.__flowsketch.setView(v)', v)
         tfind()
 
+        @test('Equal-spacing guides: a shape dragged near an equal gap snaps to it and the gaps are marked')
+        def tspacing():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 42000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            try:
+                for x0 in (5100, 5300, 5500):  # three boxes 100 wide... drawn 100 apart: gaps of 100
+                    app.tool('r'); app.drag((x0, 42100), (x0 + 100, 42160)); app.key('Escape')
+                boxes = [e for e in app.els() if e['type'] == 'shape'][-3:]
+                xs = sorted(round(bx['x']) for bx in boxes)
+                gap = xs[1] - (xs[0] + round(boxes[0]['w']))
+                last = max(boxes, key=lambda e: e['x'])
+                # drag the last one so it sits 5 px further out than the existing gap; it should snap back to equal
+                sx, sy = app.pt(last['x'] + 50, last['y'] + 30)
+                page.mouse.move(sx, sy); page.mouse.down()
+                page.mouse.move(sx + 3, sy, steps=2); page.mouse.move(sx + 5, sy, steps=3); page.wait_for_timeout(80)
+                marks = page.evaluate("() => [...document.querySelectorAll('.stage-overlay text')].map((t) => t.textContent)")
+                page.screenshot(path=f'{OUT}/e2e-spacing.png')
+                page.mouse.up(); page.wait_for_timeout(80)
+                moved = next(e for e in app.els() if e['id'] == last['id'])
+                assert abs(moved['x'] - last['x']) < 0.01, (moved['x'], last['x'])  # snapped back: gaps equal again
+                assert marks.count(str(gap)) >= 2, (marks, gap)
+                # off by more than the tolerance: no snap
+                page.mouse.move(sx, sy); page.mouse.down(); page.mouse.move(sx + 25, sy, steps=5); page.mouse.up(); page.wait_for_timeout(80)
+                moved = next(e for e in app.els() if e['id'] == last['id'])
+                assert abs(moved['x'] - last['x'] - 25) <= 6, (moved['x'], last['x'])  # (it may line up with something else on this busy page)
+            finally:
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+        tspacing()
+
         ctx.close()
 
         @test('7b · Reload app, open saved file: everything preserved')

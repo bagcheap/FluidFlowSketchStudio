@@ -25,6 +25,7 @@ import { liveCameraView } from '../store/commands';
 import { applyStyle, clearAllPlayOrder, playInLabelOrder, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
+import { spacingSnap, type GapMark } from './spacing';
 import { FindBar } from '../ui/FindBar';
 import { findMatches } from '../store/find';
 import { updateMembership, withMembers } from '../store/containers';
@@ -72,6 +73,7 @@ const QC_OFF = 40;
 interface Overlay {
   marquee?: { x: number; y: number; w: number; h: number };
   guides?: { x1: number; y1: number; x2: number; y2: number }[];
+  spacing?: GapMark[]; // equal-spacing guides: gaps that are equal while dragging
   target?: string | null;
   port?: Point | null;
   hover?: string | null; // shape under the pointer (Select tool): shows its quick-connect handles
@@ -731,7 +733,7 @@ export function Canvas() {
         if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
         const snapped = snapMove(it.orig, it.ids, dx, dy);
         dx = snapped.dx; dy = snapped.dy;
-        setOverlay((o) => ({ ...o, guides: snapped.guides }));
+        setOverlay((o) => ({ ...o, guides: snapped.guides, spacing: snapped.spacing }));
         const ids = new Set(it.ids);
         D.live(() => clearBends(mapElements(it.orig, ids, (el) => {
           if (el.type === 'connector') {
@@ -803,7 +805,7 @@ export function Canvas() {
     if (pinch.current) { if (pointers.current.size < 2) pinch.current = null; return; }
     const it = inter.current;
     inter.current = null;
-    setOverlay((o) => ({ ...o, marquee: undefined, guides: undefined, target: null }));
+    setOverlay((o) => ({ ...o, marquee: undefined, guides: undefined, spacing: undefined, target: null }));
     if (!it) return;
     const D = useDoc.getState();
     const u = useUI.getState();
@@ -962,15 +964,16 @@ export function Canvas() {
   function snapMove(orig: FlowDocument, ids: string[], dx: number, dy: number) {
     const u = useUI.getState();
     const guides: Overlay['guides'] = [];
+    const spacing: GapMark[] = [];
     const moving = ids.map((id) => getElement(orig, id)).filter((x): x is BoxElement => !!x && x.type !== 'connector');
-    if (!moving.length) return { dx, dy, guides };
+    if (!moving.length) return { dx, dy, guides, spacing };
     const x0 = Math.min(...moving.map((m) => m.x)) + dx, x1 = Math.max(...moving.map((m) => m.x + m.w)) + dx;
     const y0 = Math.min(...moving.map((m) => m.y)) + dy, y1 = Math.max(...moving.map((m) => m.y + m.h)) + dy;
     if (u.prefs.snapToGrid) {
       const g = orig.canvas.gridSize;
-      return { dx: dx + Math.round(x0 / g) * g - x0, dy: dy + Math.round(y0 / g) * g - y0, guides };
+      return { dx: dx + Math.round(x0 / g) * g - x0, dy: dy + Math.round(y0 / g) * g - y0, guides, spacing };
     }
-    if (!u.prefs.smartGuides) return { dx, dy, guides };
+    if (!u.prefs.smartGuides) return { dx, dy, guides, spacing };
     const tol = 6 / u.view.zoom;
     const others = orig.elements.filter((o): o is BoxElement => o.type !== 'connector' && !ids.includes(o.id) && o.rotation === 0);
     let bx: { d: number; v: number } | null = null, by: { d: number; v: number } | null = null;
@@ -979,9 +982,17 @@ export function Canvas() {
       for (const ox of [o.x, o.x + o.w / 2, o.x + o.w]) for (const m of mx) { const d = ox - m; if (Math.abs(d) < tol && (!bx || Math.abs(d) < Math.abs(bx.d))) bx = { d, v: ox }; }
       for (const oy of [o.y, o.y + o.h / 2, o.y + o.h]) for (const m of my) { const d = oy - m; if (Math.abs(d) < tol && (!by || Math.abs(d) < Math.abs(by.d))) by = { d, v: oy }; }
     }
+    // equal spacing to the neighbours in the same row/column (not containers or pen strokes); the nearer snap wins
+    const peers = others.filter((o) => o.type !== 'container' && o.type !== 'freehand');
+    const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    const sx = spacingSnap(box, peers, true, tol), sy = spacingSnap(box, peers, false, tol);
+    // when both snaps land on the same spot, both are shown
+    if (sx && (!bx || Math.abs(sx.d) <= Math.abs(bx.d) + 0.5)) { spacing.push(...sx.marks); if (bx && Math.abs(sx.d - bx.d) >= 0.5) bx = null; else if (bx) bx = { ...bx, d: sx.d }; if (!bx) dx += sx.d; }
+    if (sy && (!by || Math.abs(sy.d) <= Math.abs(by.d) + 0.5)) { spacing.push(...sy.marks); if (by && Math.abs(sy.d - by.d) >= 0.5) by = null; else if (by) by = { ...by, d: sy.d }; if (!by) dy += sy.d; }
     if (bx) { dx += bx.d; guides.push({ x1: bx.v, y1: Math.min(y0, ...others.map((o) => o.y)) - 20, x2: bx.v, y2: Math.max(y1, ...others.map((o) => o.y + o.h)) + 20 }); }
     if (by) { dy += by.d; guides.push({ x1: Math.min(x0, ...others.map((o) => o.x)) - 20, y1: by.v, x2: Math.max(x1, ...others.map((o) => o.x + o.w)) + 20, y2: by.v }); }
-    return { dx, dy, guides };
+    // the y snap moved the box: the x marks sit in the middle of the rows, which hardly moves, so they're kept as found
+    return { dx, dy, guides, spacing };
   }
 
   function updateCursor(p: Point) {
@@ -1187,6 +1198,17 @@ export function Canvas() {
         );
       }
     }
+    overlay.spacing?.forEach((g, i) => {
+      // a measurement: the gap with a short tick at each end and its size, in pink like the alignment guides
+      const vert = g.x1 === g.x2, t = 5 / z;
+      overlayEls.push(<g key={'sp' + i} stroke="#ec4899" strokeWidth={1.25 / z}>
+        <line x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} />
+        {vert ? <><line x1={g.x1 - t} y1={g.y1} x2={g.x1 + t} y2={g.y1} /><line x1={g.x2 - t} y1={g.y2} x2={g.x2 + t} y2={g.y2} /></>
+          : <><line x1={g.x1} y1={g.y1 - t} x2={g.x1} y2={g.y1 + t} /><line x1={g.x2} y1={g.y2 - t} x2={g.x2} y2={g.y2 + t} /></>}
+        <text x={(g.x1 + g.x2) / 2 + (vert ? 7 / z : 0)} y={(g.y1 + g.y2) / 2 - (vert ? 0 : 7 / z)} fill="#ec4899" stroke="none" fontSize={11 / z}
+          textAnchor={vert ? 'start' : 'middle'} dominantBaseline={vert ? 'middle' : 'auto'} fontFamily="Inter, system-ui, sans-serif">{Math.round(g.gap)}</text>
+      </g>);
+    });
     overlay.guides?.forEach((g, i) => overlayEls.push(<line key={'g' + i} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} stroke="#ec4899" strokeWidth={1 / z} strokeDasharray={`${3 / z} ${3 / z}`} />));
   }
 
