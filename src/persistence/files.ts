@@ -1,7 +1,8 @@
 // Native file I/O: File System Access API when available (save back in place), download fallback.
 // In the desktop app (Tauri) the native macOS dialogs are used instead (see native.ts).
 import type { FlowDocument } from '../model/types';
-import { MAX_FILE_BYTES, parseDocument, serializeDocument, DocumentError, type ParseResult } from '../model/schema';
+import { MAX_FILE_BYTES, serializeDocument, DocumentError, type ParseResult } from '../model/schema';
+import { OPEN_ACCEPT, OPEN_EXTENSIONS, parseAnyDiagram, type SourceFormat } from '../import/formats';
 import { baseName, isDesktopApp, openWithDialog, pickSavePath, saveWithDialog, writeToPath } from './native';
 import { useUI } from '../store/uiStore';
 import { createStore, get, set } from 'idb-keyval';
@@ -138,39 +139,54 @@ export async function saveDocumentFile(doc: FlowDocument, saveAs = false): Promi
   return name;
 }
 
-async function readFile(file: File): Promise<ParseResult & { name: string }> {
+type Opened = ParseResult & { name: string; format: SourceFormat };
+
+async function readFile(file: File): Promise<Opened> {
   if (file.size > MAX_FILE_BYTES) throw new DocumentError('File is too large to open (limit 25 MB).');
   const text = await file.text();
-  return { ...parseDocument(text), name: file.name };
+  return { ...parseAny(text, file.name), name: file.name };
 }
 
-export async function openDocumentFile(): Promise<(ParseResult & { name: string }) | null> {
+/** Any supported format; a conversion error reads as a plain message. */
+function parseAny(text: string, name: string) {
+  try { return parseAnyDiagram(text, name); } catch (e) {
+    if (e instanceof DocumentError) throw e;
+    throw new DocumentError((e as Error)?.message || 'That file could not be read.');
+  }
+}
+
+/**
+ * Where an opened file can be saved back to: only FlowSketch's own files. A draw.io or Excalidraw file opened here is
+ * a converted copy, so Save asks where to save it (as a .flowsketch file) and never overwrites the original.
+ */
+function keepFile(r: Opened, path: string | null, handle: Handle | null) {
+  if (r.format === 'flowsketch') { currentPath = path; currentHandle = handle; fileTitle = r.doc.title; rememberFile(r.doc.id); return; }
+  currentPath = null; currentHandle = null; fileTitle = null; currentDocId = r.doc.id;
+}
+
+export async function openDocumentFile(): Promise<Opened | null> {
   if (isDesktopApp) {
-    const f = await openWithDialog([{ name: 'FlowSketch diagram', extensions: ['flowsketch', 'json'] }]);
+    const f = await openWithDialog([{ name: 'Diagrams (FlowSketch, draw.io, Excalidraw)', extensions: OPEN_EXTENSIONS }]);
     if (!f) return null;
     if (f.text.length > MAX_FILE_BYTES) throw new DocumentError('File is too large to open (limit 25 MB).');
-    const r = { ...parseDocument(f.text), name: f.name };
-    currentPath = f.path;
-    fileTitle = r.doc.title;
-    rememberFile(r.doc.id);
+    const r = { ...parseAny(f.text, f.name), name: f.name };
+    keepFile(r, f.path, null);
     return r;
   }
   if (typeof w.showOpenFilePicker === 'function') {
     try {
       const [h] = await (w.showOpenFilePicker as (o: unknown) => Promise<(Handle & { getFile(): Promise<File> })[]>)({
-        types: [{ description: 'FlowSketch diagram', accept: { 'application/json': ['.flowsketch', '.json'] } }],
+        types: [{ description: 'Diagrams (FlowSketch, draw.io, Excalidraw)', accept: { 'application/json': ['.flowsketch', '.json', '.excalidraw'], 'application/xml': ['.drawio', '.xml'] } }],
       });
       const r = await readFile(await h.getFile());
-      currentHandle = h;
-      fileTitle = r.doc.title;
-      rememberFile(r.doc.id);
+      keepFile(r, null, h);
       return r;
     } catch (e) {
       if ((e as DOMException)?.name === 'AbortError') return null;
       if (e instanceof DocumentError) throw e;
     }
   }
-  const file = await pickFile('.flowsketch,.json,application/json');
+  const file = await pickFile(OPEN_ACCEPT);
   if (!file) return null;
   currentHandle = null; currentPath = null;
   const r = await readFile(file);

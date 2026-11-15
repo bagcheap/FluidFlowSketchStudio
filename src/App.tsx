@@ -162,7 +162,7 @@ export function App() {
       const f = (e as CustomEvent<File>).detail;
       const ok = await cmd.confirmDiscard();
       if (!ok) return;
-      openDroppedFile(f).then((r) => { cmd.loadDocument(r.doc, r.name); if (r.warnings.length) useUI.getState().toast(`Opened with repairs: ${r.warnings[0]}`); })
+      openDroppedFile(f).then((r) => { cmd.loadDocument(r.doc, r.name, r.format !== 'flowsketch'); cmd.openedToast(r); })
         .catch((err) => useUI.getState().toast(err instanceof DocumentError ? err.message : 'Could not open that file.', 'error'));
     };
     window.addEventListener('flowsketch:openfile', onOpen);

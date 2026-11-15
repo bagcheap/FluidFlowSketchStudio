@@ -1658,6 +1658,55 @@ def main():
                 app.js('(v) => window.__flowsketch.setView(v)', v)
         tsizesnap()
 
+        @test('Import: File > Open reads draw.io and Excalidraw files; Export > Mermaid writes this page as Mermaid text')
+        def tformats():
+            import base64, zlib, urllib.parse
+            c5, pg, ap, er = fresh(browser)
+            m = 'Meta' if 'Mac' in pg.evaluate('navigator.platform') else 'Control'
+            page2 = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="d" value="Deep" style="" vertex="1" parent="1"><mxGeometry x="0" y="0" width="100" height="50" as="geometry"/></mxCell></root></mxGraphModel>'
+            z = zlib.compressobj(9, zlib.DEFLATED, -15); comp = z.compress(urllib.parse.quote(page2, safe='').encode()) + z.flush()
+            drawio = ('<mxfile><diagram name="Overview"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>'
+                      '<mxCell id="a" value="Start" style="rounded=1;fillColor=#dae8fc;" vertex="1" parent="1"><mxGeometry x="40" y="60" width="120" height="60" as="geometry"/></mxCell>'
+                      '<mxCell id="b" value="Done" style="ellipse;" vertex="1" parent="1"><mxGeometry x="300" y="60" width="120" height="60" as="geometry"/></mxCell>'
+                      '<mxCell id="e" value="go" style="edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="a" target="b"><mxGeometry relative="1" as="geometry"/></mxCell>'
+                      f'</root></mxGraphModel></diagram><diagram name="Detail">{base64.b64encode(comp).decode()}</diagram></mxfile>')
+            path = f'{OUT}/sample.drawio'
+            open(path, 'w').write(drawio)
+            open_file(pg, m, path); pg.wait_for_timeout(400)
+            d = ap.doc()
+            assert d['title'] == 'sample', d['title']
+            assert [p['name'] for p in d['pages']] == ['Overview', 'Detail'], d['pages']
+            texts = sorted(e['text'] for e in d['elements'] if e['type'] != 'connector')
+            assert texts == ['Done', 'Start'], texts
+            conn = [e for e in d['elements'] if e['type'] == 'connector']
+            assert len(conn) == 1 and conn[0]['text'] == 'go' and conn[0]['start']['elementId'] and conn[0]['end']['elementId']
+            assert pg.get_by_text('Imported', exact=False).count() >= 1  # the toast says it was converted
+            # Mermaid: this page as text
+            pg.get_by_role('menuitem', name='Export').first.click()
+            with pg.expect_download() as dl:
+                pg.get_by_role('menuitem', name='Mermaid flowchart (.mmd)').click()
+            mmd = open(dl.value.path()).read()
+            assert mmd.startswith('flowchart LR') and '"Start"' in mmd and '-->|"go"|' in mmd, mmd
+            # Excalidraw
+            ex = {'type': 'excalidraw', 'version': 2, 'elements': [
+                {'id': 'r', 'type': 'rectangle', 'x': 0, 'y': 0, 'width': 160, 'height': 80, 'strokeColor': '#1971c2', 'backgroundColor': '#a5d8ff', 'fillStyle': 'hachure', 'roughness': 1, 'opacity': 100},
+                {'id': 't', 'type': 'text', 'x': 10, 'y': 20, 'width': 100, 'height': 25, 'text': 'Client', 'fontSize': 20, 'fontFamily': 1, 'containerId': 'r'},
+                {'id': 'o', 'type': 'ellipse', 'x': 300, 'y': 0, 'width': 120, 'height': 80},
+                {'id': 'a', 'type': 'arrow', 'x': 160, 'y': 40, 'points': [[0, 0], [140, 0]], 'startBinding': {'elementId': 'r'}, 'endBinding': {'elementId': 'o'}, 'endArrowhead': 'arrow'}]}
+            path = f'{OUT}/sample.excalidraw'
+            open(path, 'w').write(json.dumps(ex))
+            # the imported diagram isn't saved yet, so Open asks before replacing it
+            pg.mouse.click(700, 600); pg.keyboard.press(f'{m}+o')
+            with pg.expect_file_chooser(timeout=6000) as fc:
+                pg.get_by_test_id('confirm-ok').click()
+            fc.value.set_files(path); pg.wait_for_timeout(400)
+            d = ap.doc()
+            assert d['title'] == 'sample' and any(e['text'] == 'Client' and e['style']['fillStyle'] == 'hachure' for e in d['elements']), d['elements'][:2]
+            assert sum(1 for e in d['elements'] if e['type'] == 'connector' and e['start']['elementId'] and e['end']['elementId']) == 1
+            assert not er, er
+            c5.close()
+        tformats()
+
         ctx.close()
 
         @test('7b · Reload app, open saved file: everything preserved')
