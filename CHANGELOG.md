@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Added
+- **Describe a diagram (AI):** Insert ▸ **Describe a diagram (AI)…** (also in the right-click menu). Describe what you want in your own words, and Claude drafts it as a diagram. You can read or edit the draft, ask for changes ("add a cache between the API and the database"), and insert it, laid out and animated like any diagram from text. Numbered steps in the description play in order. It is opt-in and needs internet and your own Anthropic API key (usage is billed to your Anthropic account). Only what you type in the dialog is sent, and only when you press **Draw it** or **Change draft**. The key stays in this window unless you tick **Remember on this computer**, and **Forget key** removes it. You can choose Opus (best), Sonnet or Haiku (faster, cheaper).
+
 ## [0.1.43] - 2026-11-15
 
 ### Added

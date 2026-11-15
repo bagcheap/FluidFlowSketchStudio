@@ -186,7 +186,7 @@ The 60 FPS target for 100+150 objects is **not demonstrated** here, because no G
 * Responsive layout, with the inspector as a bottom sheet on phones
 
 **Deferred / not yet built:**
-* AI text-to-diagram (Phase 2; the document-edit command layer in `store/commands.ts` is the intended integration point)
+* AI edits to an existing diagram (describing a new diagram is built: Insert ▸ Describe a diagram (AI))
 * Keyframes, easing curves and timeline tracks (the timing model already has per-object delay and phase)
 * Find objects; collaboration and accounts
 * Rotating multi-selections as a unit
@@ -221,7 +221,7 @@ Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excal
 
 ### 4. Bigger bets
 
-14. **AI "describe it and I'll draw it".** Type a description and get a diagram, using Mermaid import as the safe, validated path. Opt-in only, since it needs an API key and internet.
+14. ✅ *Built in 0.1.44.* **AI "describe it and I'll draw it".** Type a description and get a diagram, using Mermaid import as the safe, validated path. Opt-in only, since it needs an API key and internet.
 15. **Data-linked shapes.** Shapes carry properties (owner, status, cost) that drive their look, for example red when "down", for living architecture maps.
 
 ### 5. Later
