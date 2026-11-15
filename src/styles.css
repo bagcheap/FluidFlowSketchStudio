@@ -395,3 +395,7 @@ code { font-size: 12px; }
 .stage .find-bar input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .stage .find-bar .find-count { min-width: 76px; padding: 0 4px; color: var(--fg-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .stage .find-bar .find-indent { width: 26px; flex: none; }
+
+/* Shape library groups */
+.lib-group h3 { margin: 14px 2px 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--fg-2); }
+.lib-group:first-of-type h3 { margin-top: 6px; }

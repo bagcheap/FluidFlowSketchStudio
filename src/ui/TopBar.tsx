@@ -6,7 +6,7 @@ import * as cmd from '../store/commands';
 import { AUTO_LAYOUT_ITEMS, matchSizeItems, MenuBar, type MenuDef, type MenuItem } from './MenuBar';
 import { ALT, MOD, SHIFT } from './shortcuts';
 import { SHAPE_LABELS } from '../engine/shapes';
-import { SHAPE_KINDS } from '../model/schema';
+import { BASIC_SHAPES } from '../model/schema';
 import { exportPng, exportSvg, copyPngToClipboard, exportHtmlPlayer } from '../export/staticExport';
 import { saveCustomTemplate } from '../persistence/storage';
 import { videoSupport } from '../export/video';
@@ -79,7 +79,7 @@ export function TopBar() {
     ] },
     { id: 'insert', label: 'Insert', items: [
       { label: 'Basic shape', sub: (['rectangle', 'roundRect', 'ellipse', 'diamond', 'triangle', 'pill', 'hexagon'] as const).map((k) => ({ label: SHAPE_LABELS[k], run: () => cmd.insertShapeAtCenter(k) })) },
-      { label: 'Flowchart symbol', sub: SHAPE_KINDS.filter((k) => !['rectangle', 'roundRect', 'ellipse', 'triangle', 'star'].includes(k)).map((k) => ({ label: SHAPE_LABELS[k], run: () => cmd.insertShapeAtCenter(k) })) },
+      { label: 'Flowchart symbol', sub: BASIC_SHAPES.filter((k) => !['rectangle', 'roundRect', 'ellipse', 'triangle', 'star'].includes(k)).map((k) => ({ label: SHAPE_LABELS[k], run: () => cmd.insertShapeAtCenter(k) })) },
       { label: 'Shape library…', shortcut: 'S', run: () => ui.openDialog('shapes') },
       { label: 'Arrow / connector', shortcut: 'A', run: () => ui.setTool('arrow') },
       { label: 'Line', shortcut: 'L', run: () => ui.setTool('line') },

@@ -4,7 +4,7 @@ import { SCHEMA_VERSION } from '../model/types';
 import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { useUI } from './uiStore';
-import { cameraView, contentBounds, hasCamera, playSchedule } from '../engine/render';
+import { cameraView, compartmentLayout, contentBounds, hasCamera, playSchedule } from '../engine/render';
 import { toAspect } from '../engine/camera';
 import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
@@ -14,7 +14,7 @@ import { findMatches, replaceAll, replaceOne } from './find';
 import { toMermaid } from '../export/mermaidExport';
 import { cleanNote, DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
-import { geometryFor, SHAPE_LABELS } from '../engine/shapes';
+import { COMPARTMENTS, geometryFor, LABEL_BELOW, SHAPE_LABELS } from '../engine/shapes';
 import { loadIconSet } from '../icons/sets';
 import { fitToContents, isContainer, moveElements, removeContainer, updateMembership, withMembers, wrapInContainer } from './containers';
 import { importFiles, slugName, useLibraries } from '../icons/libraries';
@@ -734,7 +734,16 @@ export function fitShapeToText(e: DiagramElement): DiagramElement {
     const lay = layoutText(e.text || ' ', e.textStyle, null);
     return { ...e, w: Math.max(10, lay.width + e.textStyle.padding * 2 + 4), h: lay.height + e.textStyle.padding * 2 };
   }
-  if (e.type !== 'shape' || !e.text) return e;
+  if (e.type !== 'shape' || !e.text || LABEL_BELOW.has(e.shape)) return e; // a label underneath never makes the shape grow
+  if (COMPARTMENTS.has(e.shape)) {
+    // compartments: wide enough for the longest line, tall enough for every section
+    const pad = e.textStyle.padding;
+    const longest = Math.max(0, ...e.text.split('\n').map((l) => layoutText(l, { ...e.textStyle, bold: true }, null).width));
+    const w = Math.max(e.w, Math.ceil(longest + pad * 2 + 2));
+    const cs = compartmentLayout({ ...e, w, h: 0 });
+    const need = cs.reduce((t, c) => t + c.h, 0);
+    return { ...e, w, x: e.x - (w - e.w) / 2, h: Math.max(e.h, Math.ceil(need)) };
+  }
   let out: ShapeElement = e;
   const pad = e.textStyle.padding;
   // widen first if a single word can't fit (avoid breaking words mid-way)

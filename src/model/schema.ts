@@ -41,7 +41,14 @@ const color = (v: unknown, d: string) => (typeof v === 'string' && COLOR_RE.test
 export const SHAPE_KINDS: readonly ShapeKind[] = [
   'rectangle', 'roundRect', 'ellipse', 'diamond', 'parallelogram', 'hexagon', 'triangle', 'pill', 'cloud',
   'cylinder', 'document', 'speech', 'sticky', 'trapezoid', 'octagon', 'star',
+
+  'umlClass', 'umlActor', 'umlPackage', 'umlComponent', 'note', 'erEntity',
+  'bpmnStart', 'bpmnEnd', 'bpmnIntermediate', 'bpmnGateway', 'bpmnParallel', 'bpmnData',
 ];
+/** The everyday shapes (the toolbar's More shapes, Insert ▸ Flowchart symbol); the rest are notation shapes. */
+export const BASIC_SHAPES: readonly ShapeKind[] = SHAPE_KINDS.slice(0, 16);
+/** Every arrowhead kind (crow's-foot ones for ER relationships since v16). */
+export const HEAD_KINDS = ['none', 'arrow', 'triangle', 'dot', 'bar', 'erOne', 'erOnlyOne', 'erZeroOne', 'erMany', 'erOneMany', 'erZeroMany'] as const;
 
 function style(v: unknown): Style {
   const o = isObj(v) ? v : {};
@@ -194,7 +201,7 @@ function element(v: unknown, warn: (m: string) => void): DiagramElement | null {
       const bends = Array.isArray(v.bends)
         ? v.bends.filter(isObj).slice(0, 50).map((b) => ({ x: num(b.x, 0), y: num(b.y, 0) }))
         : [];
-      const heads = ['none', 'arrow', 'triangle', 'dot', 'bar'] as const;
+      const heads = HEAD_KINDS;
       return {
         ...base, type,
         start: endpoint(v.start), end: endpoint(v.end), bends,
@@ -223,7 +230,7 @@ const DATA_URL_RE = /^data:(image\/(png|jpeg|gif|webp));base64,[A-Za-z0-9+/=]+$/
  */
 export function sanitizeToolStyle(v: unknown, fallback: ToolStyle): ToolStyle {
   if (!isObj(v)) return fallback;
-  const heads = ['none', 'arrow', 'triangle', 'dot', 'bar'] as const;
+  const heads = HEAD_KINDS;
   return {
     style: isObj(v.style) ? style({ ...fallback.style, ...v.style }) : fallback.style,
     textStyle: isObj(v.textStyle) ? textStyle({ ...fallback.textStyle, ...v.textStyle }) : fallback.textStyle,
@@ -398,6 +405,10 @@ export function migrate(raw: Obj): Obj {
   if (version === 14) {
     // v14 -> v15: line jumps (canvas.lineJumps); older files keep their look (off)
     version = 15;
+  }
+  if (version === 15) {
+    // v15 -> v16: UML, ER and BPMN shape kinds and crow's-foot arrowheads; nothing to convert
+    version = 16;
   }
   raw.schemaVersion = version;
   return raw;

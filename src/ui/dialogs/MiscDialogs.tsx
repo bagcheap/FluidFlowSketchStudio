@@ -12,8 +12,11 @@ import { listCustomTemplates, deleteCustomTemplate, listRecents, loadRecent, loa
 import { parseDocument } from '../../model/schema';
 import { renderDocumentAtTime, contentBounds } from '../../engine/render';
 import { frameToSvg } from '../../engine/svgExport';
-import { SHAPE_LABELS } from '../../engine/shapes';
-import { SHAPE_KINDS } from '../../model/schema';
+import { SHAPE_GROUPS, SHAPE_LABELS } from '../../engine/shapes';
+import { IconGlyph, useIconSet } from '../IconsPanel';
+import type { IconSet } from '../../icons/sets';
+import type { ShapeKind } from '../../model/types';
+import { BASIC_SHAPES } from '../../model/schema';
 import { ShapeIcon } from '../ShapeIcon';
 import { uid } from '../../model/defaults';
 import { version } from '../../../package.json';
@@ -266,20 +269,56 @@ export function TemplatesDialog() {
   );
 }
 
+/** Network diagrams: icons from the built-in Tabler set (MIT licence), placed like any icon. */
+const NETWORK_ICONS: [string, string][] = [
+  ['server', 'Server'], ['database', 'Database'], ['router', 'Router'], ['wall', 'Firewall'], ['load-balancer', 'Load balancer'],
+  ['cloud', 'Cloud'], ['world', 'Internet'], ['network', 'Network'], ['wifi', 'Wi-Fi'], ['api', 'API'],
+  ['device-desktop', 'Desktop'], ['device-laptop', 'Laptop'], ['device-mobile', 'Phone'], ['printer', 'Printer'], ['users', 'Users'],
+];
+
+function NetworkCell({ set, name, label }: { set: IconSet | null; name: string; label: string }) {
+  const icon = set?.icon(name);
+  return (
+    <button className="lib-cell" onClick={() => { void cmd.insertIcon('tabler', name); close(); }} title={`Add a ${label.toLowerCase()} icon`}>
+      {icon ? <IconGlyph icon={icon} size={30} /> : <span style={{ width: 30, height: 30 }} />}<span>{label}</span>
+    </button>
+  );
+}
+
 export function ShapesDialog() {
   const [q, setQ] = useState('');
-  const kinds = SHAPE_KINDS.filter((k) => (SHAPE_LABELS[k] + ' ' + k).toLowerCase().includes(q.toLowerCase()));
+  const { set: tabler } = useIconSet('tabler');
+  const match = (text: string) => text.toLowerCase().includes(q.trim().toLowerCase());
+  const pick = (k: ShapeKind) => { useUI.getState().setTool('shape', k); close(); };
+  const groups = [
+    { name: 'Basic shapes', kinds: [...BASIC_SHAPES] },
+    ...SHAPE_GROUPS,
+  ].map((g) => ({ ...g, kinds: g.kinds.filter((k) => match(`${SHAPE_LABELS[k]} ${k} ${g.name}`)) })).filter((g) => g.kinds.length);
+  const network = NETWORK_ICONS.filter(([n, label]) => match(`${label} ${n} network`));
+  const first = groups[0]?.kinds[0];
   return (
     <Modal title="Shape library">
-      <label className="search"><Search size={15} /><input autoFocus placeholder="Search shapes (e.g. database, decision)…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && kinds[0]) { useUI.getState().setTool('shape', kinds[0]); close(); } }} /></label>
-      <div className="lib-grid">
-        {kinds.map((k) => (
-          <button key={k} className="lib-cell" onClick={() => { useUI.getState().setTool('shape', k); close(); }}>
-            <ShapeIcon kind={k} size={34} /><span>{SHAPE_LABELS[k]}</span>
-          </button>
-        ))}
-        {!kinds.length && <p className="note">No shapes match “{q}”.</p>}
-      </div>
+      <label className="search"><Search size={15} /><input autoFocus placeholder="Search shapes (e.g. class, entity, gateway, server)…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && first) pick(first); }} /></label>
+      {groups.map((g) => (
+        <section key={g.name} className="lib-group">
+          <h3>{g.name}</h3>
+          <div className="lib-grid">
+            {g.kinds.map((k) => (
+              <button key={k} className="lib-cell" onClick={() => pick(k)}>
+                <ShapeIcon kind={k} size={34} /><span>{SHAPE_LABELS[k]}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+      {network.length > 0 && (
+        <section className="lib-group">
+          <h3>Network</h3>
+          <div className="lib-grid">{network.map(([n, label]) => <NetworkCell key={n} set={tabler} name={n} label={label} />)}</div>
+        </section>
+      )}
+      {!groups.length && !network.length && <p className="note">No shapes match “{q}”.</p>}
+      <p className="note">UML classes and ER entities: separate the sections with a line of <kbd>--</kbd>. For ER relationships, pick crow's-foot ends in the Inspector's arrowhead lists.</p>
     </Modal>
   );
 }

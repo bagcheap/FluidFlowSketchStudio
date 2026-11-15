@@ -88,6 +88,14 @@ function polygon(b: PathBuilder, pts: [number, number][]) {
 
 const cache = new Map<string, ShapeGeometry>();
 
+/** The label box for shapes whose name sits underneath them (UML actor, BPMN events, gateways, data objects). */
+const BELOW = (w: number, h: number) => ({ x: -Math.max(40, w * 0.75), y: h + 2, w: w + 2 * Math.max(40, w * 0.75), h: 34 });
+/** Shapes whose label sits outside, underneath (text never makes them grow). */
+export const LABEL_BELOW: ReadonlySet<ShapeKind> = new Set(['umlActor', 'bpmnStart', 'bpmnEnd', 'bpmnIntermediate', 'bpmnGateway', 'bpmnParallel', 'bpmnData']);
+/** Shapes whose text is split into compartments by lines of just "--" (name, then attributes, then operations). */
+export const COMPARTMENTS: ReadonlySet<ShapeKind> = new Set(['umlClass', 'erEntity']);
+
+
 export function shapeGeometry(kind: ShapeKind, w: number, h: number, radius: number, flipX = false, flipY = false): ShapeGeometry {
   const key = `${kind}|${w.toFixed(2)}|${h.toFixed(2)}|${radius}|${flipX}|${flipY}`;
   const hit = cache.get(key);
@@ -96,6 +104,7 @@ export function shapeGeometry(kind: ShapeKind, w: number, h: number, radius: num
   const b = new PathBuilder(map);
   const details: string[] = [];
   let tb = { x: 0, y: 0, w, h };
+  let poly: Point[] | undefined; // when the clickable outline isn't the drawn one
   const m = Math.min(w, h);
   switch (kind) {
     case 'rectangle':
@@ -201,6 +210,83 @@ export function shapeGeometry(kind: ShapeKind, w: number, h: number, radius: num
       tb = { x: 0, y: 0, w, h: h - a * 1.5 };
       break;
     }
+    case 'umlClass':
+    case 'erEntity':
+      // compartments (name, attributes, operations) are drawn with the text: see compartmentLayout in render.ts
+      polygon(b, [[0, 0], [w, 0], [w, h], [0, h]]);
+      break;
+    case 'note':
+    case 'bpmnData': {
+      // a page with its top-right corner folded
+      const f = Math.min(m * 0.22, kind === 'note' ? 18 : 14);
+      polygon(b, [[0, 0], [w - f, 0], [w, f], [w, h], [0, h]]);
+      const db = new PathBuilder(map, false);
+      db.moveTo(w - f, 0).lineTo(w - f, f).lineTo(w, f);
+      details.push(db.str());
+      if (kind === 'bpmnData') tb = BELOW(w, h); else tb = { x: 0, y: f * 0.5, w: w - f * 0.3, h: h - f * 0.5 };
+      break;
+    }
+    case 'umlPackage': {
+      // a folder: a tab on the top left
+      const tw = Math.min(w * 0.42, 100), th = Math.min(h * 0.2, 18);
+      polygon(b, [[0, th], [0, 0], [tw, 0], [tw, th], [w, th], [w, h], [0, h]]);
+      const db = new PathBuilder(map, false);
+      db.moveTo(0, th).lineTo(tw, th);
+      details.push(db.str());
+      tb = { x: 0, y: th, w, h: h - th };
+      break;
+    }
+    case 'umlComponent': {
+      polygon(b, [[0, 0], [w, 0], [w, h], [0, h]]);
+      // the component symbol in the top-right corner: a box with two small tabs
+      const s = Math.min(14, m * 0.25), x0 = w - s * 1.6, y0 = s * 0.5;
+      const db = new PathBuilder(map, false);
+      db.moveTo(x0, y0).lineTo(x0 + s, y0).lineTo(x0 + s, y0 + s * 1.3).lineTo(x0, y0 + s * 1.3).close();
+      db.moveTo(x0 - s * 0.3, y0 + s * 0.2).lineTo(x0 + s * 0.3, y0 + s * 0.2).lineTo(x0 + s * 0.3, y0 + s * 0.45).lineTo(x0 - s * 0.3, y0 + s * 0.45).close();
+      db.moveTo(x0 - s * 0.3, y0 + s * 0.8).lineTo(x0 + s * 0.3, y0 + s * 0.8).lineTo(x0 + s * 0.3, y0 + s * 1.05).lineTo(x0 - s * 0.3, y0 + s * 1.05).close();
+      details.push(db.str());
+      tb = { x: 0, y: 0, w: w - s * 1.2, h };
+      break;
+    }
+    case 'umlActor': {
+      // a stick figure: the head is the filled outline; body, arms and legs are details; the name sits below
+      const r = Math.min(w * 0.22, h * 0.13), cx = w / 2, hy = r + 1;
+      b.moveTo(cx + r, hy).arc(cx, hy, r, r, 0, Math.PI * 2).close();
+      const db = new PathBuilder(map, false);
+      db.moveTo(cx, hy + r).lineTo(cx, h * 0.66)
+        .moveTo(w * 0.08, h * 0.38).lineTo(w * 0.92, h * 0.38)
+        .moveTo(cx, h * 0.66).lineTo(w * 0.12, h)
+        .moveTo(cx, h * 0.66).lineTo(w * 0.88, h);
+      details.push(db.str());
+      tb = BELOW(w, h);
+      poly = [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }]; // the whole figure can be clicked and joined
+      break;
+    }
+    case 'bpmnStart':
+    case 'bpmnEnd':
+    case 'bpmnIntermediate': {
+      b.moveTo(w, h / 2).arc(w / 2, h / 2, w / 2, h / 2, 0, Math.PI * 2).close();
+      // end: a thick ring (a second circle just inside); intermediate: a double ring
+      const inset = kind === 'bpmnEnd' ? Math.max(2, m * 0.06) : kind === 'bpmnIntermediate' ? Math.max(3, m * 0.1) : 0;
+      if (inset) {
+        const db = new PathBuilder(map, false);
+        db.moveTo(w - inset, h / 2).arc(w / 2, h / 2, w / 2 - inset, h / 2 - inset, 0, Math.PI * 2).close();
+        details.push(db.str());
+      }
+      tb = BELOW(w, h);
+      break;
+    }
+    case 'bpmnGateway':
+    case 'bpmnParallel': {
+      polygon(b, [[w / 2, 0], [w, h / 2], [w / 2, h], [0, h / 2]]);
+      const s = m * 0.2, cx = w / 2, cy = h / 2;
+      const db = new PathBuilder(map, false);
+      if (kind === 'bpmnGateway') db.moveTo(cx - s, cy - s).lineTo(cx + s, cy + s).moveTo(cx + s, cy - s).lineTo(cx - s, cy + s);
+      else db.moveTo(cx, cy - s * 1.2).lineTo(cx, cy + s * 1.2).moveTo(cx - s * 1.2, cy).lineTo(cx + s * 1.2, cy);
+      details.push(db.str());
+      tb = BELOW(w, h);
+      break;
+    }
     case 'speech': {
       const bh = h * 0.8;
       const r = Math.min(radius || 14, w / 2, bh / 2);
@@ -214,7 +300,7 @@ export function shapeGeometry(kind: ShapeKind, w: number, h: number, radius: num
       break;
     }
   }
-  const g: ShapeGeometry = { d: b.str(), poly: b.poly, details, textBox: tb };
+  const g: ShapeGeometry = { d: b.str(), poly: poly ?? b.poly, details, textBox: tb };
   if (cache.size > 2000) cache.clear();
   cache.set(key, g);
   return g;
@@ -269,4 +355,15 @@ export const SHAPE_LABELS: Record<ShapeKind, string> = {
   parallelogram: 'Parallelogram (I/O)', hexagon: 'Hexagon (preparation)', triangle: 'Triangle', pill: 'Pill (terminator)',
   cloud: 'Cloud', cylinder: 'Cylinder (database)', document: 'Document', speech: 'Speech bubble', sticky: 'Sticky note',
   trapezoid: 'Trapezoid (manual op)', octagon: 'Octagon (stop)', star: 'Star',
+  umlClass: 'UML class', umlActor: 'UML actor', umlPackage: 'UML package', umlComponent: 'UML component', note: 'Note',
+  erEntity: 'ER entity (table)',
+  bpmnStart: 'BPMN start event', bpmnEnd: 'BPMN end event', bpmnIntermediate: 'BPMN intermediate event',
+  bpmnGateway: 'BPMN exclusive gateway', bpmnParallel: 'BPMN parallel gateway', bpmnData: 'BPMN data object',
 };
+
+/** The Shape library's groups. */
+export const SHAPE_GROUPS: { name: string; kinds: ShapeKind[] }[] = [
+  { name: 'UML', kinds: ['umlClass', 'umlActor', 'umlPackage', 'umlComponent', 'note'] },
+  { name: 'Entity-relationship (database)', kinds: ['erEntity', 'diamond'] },
+  { name: 'BPMN (business process)', kinds: ['bpmnStart', 'bpmnIntermediate', 'bpmnEnd', 'roundRect', 'bpmnGateway', 'bpmnParallel', 'bpmnData'] },
+];

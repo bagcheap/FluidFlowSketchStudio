@@ -6,7 +6,11 @@ export type Point = { x: number; y: number };
 export type ShapeKind =
   | 'rectangle' | 'roundRect' | 'ellipse' | 'diamond' | 'parallelogram' | 'hexagon'
   | 'triangle' | 'pill' | 'cloud' | 'cylinder' | 'document' | 'speech' | 'sticky'
-  | 'trapezoid' | 'octagon' | 'star';
+  | 'trapezoid' | 'octagon' | 'star'
+  // notation shapes (schema v16): UML, ER (entity-relationship), BPMN
+  | 'umlClass' | 'umlActor' | 'umlPackage' | 'umlComponent' | 'note'
+  | 'erEntity'
+  | 'bpmnStart' | 'bpmnEnd' | 'bpmnIntermediate' | 'bpmnGateway' | 'bpmnParallel' | 'bpmnData';
 
 export type FillStyle = 'none' | 'solid' | 'hachure' | 'cross-hatch';
 export type StrokeStyle = 'solid' | 'dashed' | 'dotted';
@@ -95,7 +99,9 @@ export interface AnimationSettings {
   connector: ConnectorAnim;
 }
 
-export type HeadKind = 'none' | 'arrow' | 'triangle' | 'dot' | 'bar';
+export type HeadKind = 'none' | 'arrow' | 'triangle' | 'dot' | 'bar'
+  // crow's-foot ends for ER relationships (schema v16)
+  | 'erOne' | 'erOnlyOne' | 'erZeroOne' | 'erMany' | 'erOneMany' | 'erZeroMany';
 export type Routing = 'straight' | 'curved' | 'elbow';
 
 export interface Endpoint {
@@ -214,7 +220,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 15; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth) · v11: arrowhead size (headSize) · v12: step captions and step focus (animation.captions / stepFocus) · v13: camera moves (animation.camera) · v14: page links and hover notes on items (link / note) · v15: line jumps (canvas.lineJumps)
+export const SCHEMA_VERSION = 16; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth) · v11: arrowhead size (headSize) · v12: step captions and step focus (animation.captions / stepFocus) · v13: camera moves (animation.camera) · v14: page links and hover notes on items (link / note) · v15: line jumps (canvas.lineJumps) · v16: UML, ER and BPMN shapes and crow's-foot arrowheads
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).

@@ -103,6 +103,14 @@ export const SHAPE_DEFAULT_SIZE: Partial<Record<ShapeKind, [number, number]>> = 
   star: [120, 120],
   octagon: [120, 120],
   pill: [170, 64],
+  umlClass: [200, 130], erEntity: [200, 120], umlActor: [48, 90], umlPackage: [180, 120], umlComponent: [180, 80], note: [160, 100],
+  bpmnStart: [44, 44], bpmnEnd: [44, 44], bpmnIntermediate: [44, 44], bpmnGateway: [60, 60], bpmnParallel: [60, 60], bpmnData: [44, 56],
+};
+
+/** Starter text for new compartment shapes: sections are separated by a line of "--". */
+export const SHAPE_STARTER_TEXT: Partial<Record<ShapeKind, string>> = {
+  umlClass: 'ClassName\n--\n+ attribute: Type\n--\n+ operation(): Type',
+  erEntity: 'Entity\n--\nPK id\nname',
 };
 
 export function newDocument(title = 'Untitled diagram'): FlowDocument {
@@ -142,6 +150,7 @@ export function baseFields(tool: ToolStyle) {
 export function makeShape(kind: ShapeKind, x: number, y: number, w: number, h: number, tool: ToolStyle): ShapeElement {
   return {
     ...baseFields(tool), type: 'shape', shape: kind, x, y, w, h, flipX: false, flipY: false,
+    text: SHAPE_STARTER_TEXT[kind] ?? '',
     ...(tool.shapeAnim && Object.keys(tool.shapeAnim).length ? { anim: { ...tool.shapeAnim } } : {}),
   };
 }
@@ -240,6 +249,25 @@ export function defaultToolStyle(key: string): ToolStyle {
     s.style = { ...s.style, cornerRadius: 0, fill: '#ffffff' };
   } else if (key === 'shape:cylinder') {
     s.style = { ...s.style, fill: '#d6f5df' };
+  } else if (key === 'shape:umlClass' || key === 'shape:erEntity' || key === 'shape:umlComponent' || key === 'shape:umlPackage') {
+    // technical boxes: square corners, white, tidy text
+    s.style = { ...s.style, cornerRadius: 0, fill: key === 'shape:erEntity' ? '#e7f5ff' : '#ffffff', roughness: 0.7 };
+    s.textStyle = { ...s.textStyle, fontSize: 16, align: key === 'shape:umlPackage' ? 'center' : s.textStyle.align, padding: 8 };
+  } else if (key === 'shape:note' || key === 'shape:bpmnData') {
+    s.style = { ...s.style, fill: '#fff9db', cornerRadius: 0 };
+    s.textStyle = { ...s.textStyle, fontSize: 15 };
+  } else if (key === 'shape:umlActor') {
+    s.style = { ...s.style, fill: '#ffffff' };
+    s.textStyle = { ...s.textStyle, fontSize: 15 };
+  } else if (key === 'shape:bpmnStart' || key === 'shape:bpmnIntermediate') {
+    s.style = { ...s.style, fill: key === 'shape:bpmnStart' ? '#d3f9d8' : '#fff3bf', strokeWidth: 2 };
+    s.textStyle = { ...s.textStyle, fontSize: 14 };
+  } else if (key === 'shape:bpmnEnd') {
+    s.style = { ...s.style, fill: '#ffe3e3', strokeWidth: 3 };
+    s.textStyle = { ...s.textStyle, fontSize: 14 };
+  } else if (key === 'shape:bpmnGateway' || key === 'shape:bpmnParallel') {
+    s.style = { ...s.style, fill: '#fff4c2' };
+    s.textStyle = { ...s.textStyle, fontSize: 14 };
   }
   return s;
 }
