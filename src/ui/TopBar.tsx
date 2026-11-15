@@ -35,7 +35,7 @@ export function TopBar() {
   const menus: MenuDef[] = [
     { id: 'file', label: 'File', items: [
       { label: 'New diagram', shortcut: `${ALT}N`, run: cmd.newDiagram },
-      { label: 'Open…', shortcut: `${MOD}O`, run: () => void cmd.openFile() },
+      { label: 'Open…', shortcut: `${MOD}O`, note: 'also draw.io, Excalidraw', run: () => void cmd.openFile() },
       { label: 'Recent documents…', run: () => ui.openDialog('recent') },
       { label: 'New from template…', run: () => ui.openDialog('templates') },
       { sep: true },
@@ -190,6 +190,8 @@ export function TopBar() {
       { label: 'Quick SVG (current frame)', run: () => void exportSvg({}).catch((e) => ui.toast(String(e.message ?? e), 'error')) },
       { label: 'Copy image to clipboard', run: () => void copyPngToClipboard().then(() => ui.toast('Image copied', 'success')).catch((e) => ui.toast(String(e.message ?? e), 'error')) },
       { label: 'Diagram file (.flowsketch)', run: () => void cmd.save(true) },
+      { label: 'Mermaid flowchart (.mmd)', note: 'this page as text', run: () => void cmd.exportMermaid(false) },
+      { label: 'Copy as Mermaid', run: () => void cmd.exportMermaid(true) },
     ];
   }
 

@@ -8,9 +8,10 @@ import { cameraView, contentBounds, hasCamera, playSchedule } from '../engine/re
 import { toAspect } from '../engine/camera';
 import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
-import { openDocumentFile, pickFile, resetFileHandle, restoreFileFor, saveDocumentFile } from '../persistence/files';
+import { downloadBlob, openDocumentFile, pickFile, resetFileHandle, restoreFileFor, safeFileName, saveDocumentFile } from '../persistence/files';
 import { rememberMermaid } from '../persistence/storage';
 import { findMatches, replaceAll, replaceOne } from './find';
+import { toMermaid } from '../export/mermaidExport';
 import { cleanNote, DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
 import { geometryFor, SHAPE_LABELS } from '../engine/shapes';
@@ -835,9 +836,8 @@ export async function openFile() {
   try {
     const r = await openDocumentFile();
     if (!r) return;
-    loadDocument(r.doc, r.name);
-    if (r.warnings.length) U().toast(`Opened with ${r.warnings.length} repair(s): ${r.warnings[0]}`, 'info');
-    else U().toast(`Opened “${r.doc.title}”`, 'success');
+    loadDocument(r.doc, r.name, r.format !== 'flowsketch');
+    openedToast(r);
   } catch (e) {
     U().toast(e instanceof DocumentError ? e.message : 'Could not open that file.', 'error', { label: 'Try again', run: () => void openFile() });
   }
@@ -1004,4 +1004,29 @@ export function replaceAllMatches() {
   const lockedNote = r.locked ? ` (${r.locked} in locked items left as they were)` : '';
   U().toast(r.count ? `Replaced ${r.count} match${r.count === 1 ? '' : 'es'}${lockedNote}` : `Nothing replaced${lockedNote}`, r.count ? 'success' : 'info');
   U().setFind({ index: -1 });
+}
+
+/** What opening a file says: a converted draw.io / Excalidraw file says so (and that Save makes a .flowsketch copy). */
+export function openedToast(r: { doc: FlowDocument; warnings: string[]; format: string }) {
+  if (r.format !== 'flowsketch') {
+    const n = r.doc.pages.length;
+    U().toast(`Imported “${r.doc.title}” from ${r.format}${n > 1 ? ` (${n} pages)` : ''}. Save keeps it as a FlowSketch file; the original isn't changed.${r.warnings.length ? ` ${r.warnings.length} thing(s) couldn't be brought over, e.g. ${r.warnings[0]}` : ''}`, r.warnings.length ? 'info' : 'success');
+    return;
+  }
+  if (r.warnings.length) U().toast(`Opened with ${r.warnings.length} repair(s): ${r.warnings[0]}`, 'info');
+  else U().toast(`Opened “${r.doc.title}”`, 'success');
+}
+
+// ---- export: Mermaid -------------------------------------------------------------------------------------------
+
+/** Export ▸ Mermaid flowchart: this page as Mermaid text, saved as a .mmd file or copied to the clipboard. */
+export async function exportMermaid(copy: boolean) {
+  const text = toMermaid(D().doc);
+  if (!D().doc.elements.some((e) => e.type === 'shape' || e.type === 'icon' || e.type === 'image')) { U().toast('Nothing on this page to write as a Mermaid flowchart (it needs shapes)', 'error'); return; }
+  if (copy) {
+    try { await navigator.clipboard.writeText(text); U().toast('Copied this page as Mermaid text', 'success'); }
+    catch { U().toast("Couldn't copy to the clipboard here; use Export ▸ Mermaid flowchart (.mmd) instead", 'error'); }
+    return;
+  }
+  downloadBlob(new Blob([text], { type: 'text/plain' }), safeFileName(D().doc.title, 'mmd'));
 }
