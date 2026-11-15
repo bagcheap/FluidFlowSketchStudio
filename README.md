@@ -138,10 +138,16 @@ Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu).
 2. Paste the key into **API key**. Tick **Remember on this computer** if you don't want to paste it again next time. **Forget key** removes it.
 3. Choose a **Model**: Opus (best, the default), Sonnet (faster, cheaper) or Haiku (fastest, cheapest).
 4. Describe the diagram, for example: *"A user signs in through the web app, which checks the auth service, then loads their orders from the API and its database. Number the steps."* Then press **Draw it**. It takes a few seconds to a minute.
-5. A Mermaid draft appears below. You can edit it directly, or type a change ("add a cache between the API and the database") and press **Change draft**.
+5. A Mermaid draft appears below, and your prompt stays in the box. Now you can:
+   * edit the draft directly;
+   * tweak the prompt and press **Draw again** for a fresh draft from just that prompt;
+   * type a change ("add a cache between the API and the database") and press **Change draft**. Claude gets the current draft plus your change.
 6. Press **Insert diagram**. It's laid out and animated like any diagram from text. Numbered steps play in order.
+7. The dialog remembers your last session on this computer. Open it again later and the prompts you used are listed under **Prompts used for this draft**, and the Mermaid that was drawn (with your edits) is still there. **Edit** next to a prompt puts it back in the box to tweak and try again. **Start over** clears it all.
 
 **What is sent, and where:** only the text you type in this dialog (plus the current draft when you ask for a change). It goes straight from your browser or the desktop app to Anthropic's API, and only when you press **Draw it** or **Change draft**. Your diagram file and anything else on the canvas are never sent. Claude's reply is read only as Mermaid text and goes through the same checks as Mermaid you paste yourself. Nothing in it is ever run.
+
+**Where your prompts and drafts are kept:** in local storage on this computer only, until you press **Start over**. They're never sent anywhere except with a request you make.
 
 **Where the key is kept:** without **Remember**, only in memory until you close the window. With it, in this browser's (or the desktop app's) local storage on this computer, as plain text. It is never saved in `.flowsketch` files or exports.
 

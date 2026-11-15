@@ -145,3 +145,31 @@ export function savedModel(): AiModel {
   } catch { return DEFAULT_MODEL; }
 }
 export function storeModel(m: AiModel): void { try { localStorage.setItem(MODEL, m); } catch { /* storage unavailable */ } }
+
+// The last session (prompts sent, the draft as last drawn or edited, and the text in the prompt box), kept in
+// localStorage so reopening the dialog shows them again. Read back type-checked and capped; the draft is untrusted
+// Mermaid text like any other and is only inserted through cmd.importMermaid.
+const SESSION = 'flowsketch:aiSession';
+const MAX_TURNS = 40;
+export interface AiSession { turns: AiTurn[]; draft: string; ask: string }
+const EMPTY: AiSession = { turns: [], draft: '', ask: '' };
+
+export function cleanSession(v: unknown): AiSession {
+  if (!v || typeof v !== 'object') return EMPTY;
+  const o = v as Record<string, unknown>;
+  const str = (x: unknown, max: number) => (typeof x === 'string' ? x.slice(0, max) : '');
+  const turns = (Array.isArray(o.turns) ? o.turns : []).slice(-MAX_TURNS).flatMap((t): AiTurn[] => {
+    if (!t || typeof t !== 'object') return [];
+    const r = (t as Record<string, unknown>).role, text = (t as Record<string, unknown>).text;
+    return (r === 'user' || r === 'assistant') && typeof text === 'string' && text.trim()
+      ? [{ role: r, text: text.slice(0, r === 'user' ? MAX_PROMPT_CHARS : MAX_REPLY_CHARS) }] : [];
+  });
+  while (turns.length && turns[0].role !== 'user') turns.shift(); // a conversation starts with a prompt
+  return { turns, draft: str(o.draft, MAX_REPLY_CHARS), ask: str(o.ask, MAX_PROMPT_CHARS) };
+}
+export function loadSession(): AiSession {
+  try { return cleanSession(JSON.parse(localStorage.getItem(SESSION) ?? 'null')); } catch { return EMPTY; }
+}
+export function saveSession(s: AiSession): void {
+  try { localStorage.setItem(SESSION, JSON.stringify(cleanSession(s))); } catch { /* storage unavailable or full */ }
+}

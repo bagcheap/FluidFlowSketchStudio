@@ -79,3 +79,16 @@ describe('AI describe-a-diagram', () => {
     expect(JSON.parse(String(calls[0].init.body)).fallbacks).toBeUndefined();
   });
 });
+
+describe('AI session kept on this computer', () => {
+  it('saves and restores prompts, draft and the prompt box; stored data is checked', async () => {
+    const { saveSession, loadSession, cleanSession } = await import('../src/ai/describe');
+    saveSession({ turns: [{ role: 'user', text: 'login flow' }, { role: 'assistant', text: 'flowchart LR\nA-->B' }], draft: 'flowchart LR\nA-->B-->C', ask: 'login flow' });
+    expect(loadSession()).toEqual({ turns: [{ role: 'user', text: 'login flow' }, { role: 'assistant', text: 'flowchart LR\nA-->B' }], draft: 'flowchart LR\nA-->B-->C', ask: 'login flow' });
+    // hostile or damaged data
+    expect(cleanSession({ turns: [{ role: 'system', text: 'x' }, { role: 'assistant', text: 'orphan' }, { role: 'user', text: 42 }, { role: 'user', text: 'ok' }], draft: 7, ask: 'a'.repeat(50_000) }))
+      .toEqual({ turns: [{ role: 'user', text: 'ok' }], draft: '', ask: 'a'.repeat(20_000) });
+    localStorage.setItem('flowsketch:aiSession', '{not json');
+    expect(loadSession()).toEqual({ turns: [], draft: '', ask: '' });
+  });
+});
