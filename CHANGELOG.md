@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.43] - 2026-11-15
 
 ### Added
 - **UML, ER and BPMN shapes:** the **Shape library** (press **S**, or Insert ▸ Shape library…) now has sections for **UML** (class, actor, package, component, note), **entity-relationship** (entity), and **BPMN** (start, intermediate and end events, exclusive and parallel gateways, data object), next to the basic shapes. Event, gateway, actor and data-object names sit underneath the symbol.
