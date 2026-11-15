@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.42] - 2026-11-15
 
 ### Added
 - **Open draw.io and Excalidraw files:** **File ▸ Open** (or dropping a file on the window) now also reads **draw.io / diagrams.net** files (`.drawio`, including compressed ones and several pages) and **Excalidraw** files (`.excalidraw`), and turns them into a FlowSketch diagram you can animate. Shapes, text, colours, dashed lines, arrows (with their waypoints, arrowheads and labels), groups, containers (draw.io swimlanes, Excalidraw frames), pen strokes and embedded pictures come over; Excalidraw drawings keep their hand-drawn look. The original file is never changed: Save asks where to keep the FlowSketch copy. Anything that can't be brought over is mentioned in the message after opening.
