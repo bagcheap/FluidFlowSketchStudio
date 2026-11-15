@@ -5,6 +5,8 @@ import { importExcalidraw } from '../src/import/excalidraw';
 import { parseAnyDiagram } from '../src/import/formats';
 import { toMermaid, mermaidLabel } from '../src/export/mermaidExport';
 import { parseMermaid } from '../src/import/mermaid';
+import { importMermaid } from '../src/store/commands';
+import { useDoc } from '../src/store/docStore';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
 import { allPages } from '../src/model/schema';
 import type { ConnectorElement, ContainerElement, DiagramElement, FlowDocument, ShapeElement } from '../src/model/types';
@@ -161,5 +163,50 @@ describe('Mermaid export', () => {
     expect(g.edges.length).toBe(3);
     expect(g.groups.map((x) => x.title)).toEqual(['Front end']);
     expect(mermaidLabel('a\u0007b')).toBe('"a b"');
+  });
+
+  /** What a flowchart means, whatever its node names: nodes by shape and label, links by their ends, label and style, subgraphs by title and members. */
+  function meaning(text: string) {
+    const g = parseMermaid(text);
+    const lab = new Map(g.nodes.map((n) => [n.id, n.label]));
+    return {
+      dir: g.dir,
+      nodes: g.nodes.map((n) => `${n.shape}: ${n.label}`).sort(),
+      edges: g.edges.map((e) => `${lab.get(e.from)} -[${e.label}|${e.stroke}|${e.startHead}>${e.endHead}]-> ${lab.get(e.to)}`).sort(),
+      groups: g.groups.map((x) => `${x.title}: ${x.members.map((m) => lab.get(m) ?? '(group)').sort().join(', ')}`).sort(),
+    };
+  }
+
+  it('Mermaid in, Mermaid out: importing a flowchart and exporting it again gives the same flowchart', () => {
+    const samples = [
+      `flowchart TD
+  A([Start]) --> B{Valid?}
+  B -->|yes| C[(Store)]
+  B -. no .-> D[/Reject/]
+  C ==> E((Done))
+  D --- F{{Note}}
+  A <--> F
+  subgraph Back end
+    C
+    E
+  end`,
+      `graph LR
+  U(["End user"]) -->|"1. Sign in"| P[Portal]
+  P <-->|"2. Ask"| A[Agent]
+  A -.->|"3. Answer, with #quot;quotes#quot;"| P
+  subgraph Cloud ["Cloud services"]
+    A
+    subgraph Data
+      D[(Database)]
+    end
+  end
+  A --> D`,
+    ];
+    for (const src of samples) {
+      useDoc.getState().replace(() => newDocument());
+      importMermaid(src);
+      const back = toMermaid(useDoc.getState().doc);
+      expect(meaning(back), back).toEqual(meaning(src));
+    }
   });
 });

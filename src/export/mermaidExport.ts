@@ -63,7 +63,8 @@ export function toMermaid(doc: FlowDocument): string {
     let a = nodeIds.get(l.start.elementId!)!, b = nodeIds.get(l.end.elementId!)!;
     const startHead = l.startHead !== 'none', endHead = l.endHead !== 'none';
     if (startHead && !endHead) [a, b] = [b, a]; // points backwards: write it the way it points
-    const dashed = l.style.strokeStyle !== 'solid', thick = l.style.strokeWidth >= 4;
+    // thick: as the Mermaid import draws ==> (at least 3 px)
+    const dashed = l.style.strokeStyle !== 'solid', thick = l.style.strokeWidth >= 3;
     const link = startHead && endHead ? (dashed ? '<-.->' : thick ? '<==>' : '<-->')
       : !startHead && !endHead ? (dashed ? '-.-' : thick ? '===' : '---')
       : dashed ? '-.->' : thick ? '==>' : '-->';
