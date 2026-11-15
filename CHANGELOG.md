@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.41] - 2026-11-15
 
 ### Added
 - **Equal-spacing guides:** while you drag a shape, it snaps to spots where its gaps to its neighbours are equal, either halfway between the shapes on either side or repeating a gap that's already there in the same row or column, and pink measurements show the equal gaps and their size. They work alongside the alignment guides (the nearer snap wins) and are switched with them in **View ▸ Alignment guides**.
