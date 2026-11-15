@@ -1628,6 +1628,36 @@ def main():
                 app.js('(v) => window.__flowsketch.setView(v)', v)
         tspacing()
 
+        @test('Same size as a neighbour: drawing a shape a few px off a nearby shape\'s size snaps to it, with size marks')
+        def tsizesnap():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 45000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            try:
+                app.tool('r'); app.drag((5100, 45100), (5240, 45180)); app.key('Escape')  # 140 x 80
+                ref = [e for e in app.els() if e['type'] == 'shape'][-1]
+                rw, rh = round(ref['w']), round(ref['h'])
+                app.tool('r')
+                sx, sy = app.pt(5400, 45100)
+                page.mouse.move(sx, sy); page.mouse.down()
+                page.mouse.move(sx + rw + 3, sy + rh - 4, steps=6); page.wait_for_timeout(60)
+                marks = page.evaluate("() => [...document.querySelectorAll('.stage-overlay text')].map((t) => t.textContent)")
+                page.screenshot(path=f'{OUT}/e2e-sizesnap.png')
+                page.mouse.up(); app.key('Escape')
+                new = [e for e in app.els() if e['type'] == 'shape'][-1]
+                assert abs(new['w'] - ref['w']) < 0.01 and abs(new['h'] - ref['h']) < 0.01, (new['w'], new['h'], ref['w'], ref['h'])
+                assert marks.count(str(rw)) >= 2 and marks.count(str(rh)) >= 2, (marks, rw, rh)
+                # well off: drawn as dragged
+                app.tool('r'); app.drag((5700, 45100), (5700 + rw + 30, 45100 + rh + 25)); app.key('Escape')
+                new = [e for e in app.els() if e['type'] == 'shape'][-1]
+                # (it may match some other shape on this busy page, but not the reference one)
+                assert abs(new['w'] - ref['w']) > 20 and abs(new['h'] - ref['h']) > 15, (new['w'], new['h'])
+            finally:
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+        tsizesnap()
+
         ctx.close()
 
         @test('7b · Reload app, open saved file: everything preserved')

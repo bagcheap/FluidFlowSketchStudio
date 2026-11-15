@@ -25,7 +25,7 @@ import { liveCameraView } from '../store/commands';
 import { applyStyle, clearAllPlayOrder, playInLabelOrder, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
-import { spacingSnap, type GapMark } from './spacing';
+import { placeSizeMarks, sizeSnap, spacingSnap, type GapMark } from './spacing';
 import { FindBar } from '../ui/FindBar';
 import { findMatches } from '../store/find';
 import { updateMembership, withMembers } from '../store/containers';
@@ -602,7 +602,18 @@ export function Canvas() {
         it.moved = true;
         let w = Math.abs(dx), h = Math.abs(dy);
         if (e.shiftKey) { const m = Math.max(w, h); w = m; h = m; }
+        // same size as a neighbour: a width or height close to another shape's snaps to it (not with Shift: square)
+        let marks: GapMark[] | undefined;
+        const created = getElement(D.doc, it.id);
+        if (!e.shiftKey && u.prefs.smartGuides && created && created.type !== 'text' && created.type !== 'freehand') {
+          const s = sizeSnap({ x: dx < 0 ? it.start.x - w : it.start.x, y: dy < 0 ? it.start.y - h : it.start.y, w, h }, sizePeers(D.doc, [it.id]), 6 / u.view.zoom, { w: true, h: true });
+          if (s.w !== undefined) w = s.w;
+          if (s.h !== undefined) h = s.h;
+          marks = s.marks;
+        }
         const x = dx < 0 ? it.start.x - w : it.start.x, y = dy < 0 ? it.start.y - h : it.start.y;
+        if (marks?.length) marks = placeSizeMarks(marks, { x, y, w, h });
+        setOverlay((o) => ({ ...o, spacing: marks?.length ? marks : undefined }));
         D.live((d) => mapElements(d, [it.id], (el) => ({ ...el, x, y, w: Math.max(1, w), h: Math.max(1, h) })));
         return;
       }
@@ -745,7 +756,21 @@ export function Canvas() {
         return;
       }
       case 'resize': {
-        D.live((d) => clearBends(mapElements(d, [it.id], () => resizeBox(it.orig, it.handle, p, e.shiftKey || it.orig.type === 'image' && !e.altKey)), it.reroute));
+        const keep = e.shiftKey || it.orig.type === 'image' && !e.altKey;
+        let res = resizeBox(it.orig, it.handle, p, keep);
+        // same size as a neighbour (unrotated shapes, icons and pictures; not when keeping proportions)
+        let marks: GapMark[] | undefined;
+        if (!keep && u.prefs.smartGuides && it.orig.rotation % 360 === 0 && res.type !== 'text' && res.type !== 'freehand' && res.type !== 'container') {
+          const hd = it.handle;
+          const s = sizeSnap(res, sizePeers(D.doc, [it.id]), 6 / u.view.zoom, { w: hd.includes('w') || hd.includes('e'), h: hd.includes('n') || hd.includes('s') });
+          if (s.w !== undefined || s.h !== undefined) {
+            const w = s.w ?? res.w, hh = s.h ?? res.h;
+            res = { ...res, w, h: hh, x: hd.includes('w') ? res.x + res.w - w : res.x, y: hd.includes('n') ? res.y + res.h - hh : res.y };
+            marks = placeSizeMarks(s.marks, res);
+          }
+        }
+        setOverlay((o) => ({ ...o, spacing: marks }));
+        D.live((d) => clearBends(mapElements(d, [it.id], () => res), it.reroute));
         return;
       }
       case 'resizeMulti': {
@@ -1296,6 +1321,11 @@ export function Canvas() {
       }} />}
     </div>
   );
+}
+
+/** Shapes, icons and pictures whose size a new or resized box can match (unrotated; not containers, text or pen). */
+function sizePeers(doc: FlowDocument, exclude: string[]): BoxElement[] {
+  return doc.elements.filter((o): o is BoxElement => (o.type === 'shape' || o.type === 'icon' || o.type === 'image') && !exclude.includes(o.id) && o.rotation % 360 === 0);
 }
 
 function resizeBox(o: BoxElement, h: Handle, p: Point, keepRatio: boolean): BoxElement {

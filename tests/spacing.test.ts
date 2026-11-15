@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { spacingSnap, type Box } from '../src/editor/spacing';
+import { placeSizeMarks, sizeSnap, spacingSnap, type Box } from '../src/editor/spacing';
 
 const b = (x: number, y: number, w = 100, h = 60): Box => ({ x, y, w, h });
 
@@ -40,5 +40,28 @@ describe('equal-spacing guides', () => {
     const r = spacingSnap(b(448, 0), row, true, 6)!;
     expect(r.d).toBeCloseTo(2);
     expect(r.marks[0].gap).toBe(60);
+  });
+
+  it('same size as a neighbour: a width or height within the tolerance snaps to it, both boxes marked', () => {
+    const others = [b(0, 0, 140, 80), b(600, 0, 200, 50)];
+    const r = sizeSnap(b(300, 300, 137, 84), others, 6, { w: true, h: true });
+    expect(r.w).toBe(140); expect(r.h).toBe(80);
+    expect(r.marks.map((m) => m.gap)).toEqual([140, 140, 80, 80]);
+    expect(r.marks[0]).toMatchObject({ x1: 0, x2: 140 }); // along the top of the neighbour
+    expect(r.marks[2]).toMatchObject({ y1: 0, y2: 80 }); // down the side of the neighbour
+    // after placing the box at its snapped size, its own marks follow it
+    const placed = placeSizeMarks(r.marks, b(300, 300, 140, 80));
+    expect(placed[1]).toMatchObject({ x1: 300, x2: 440 });
+    expect(placed[3]).toMatchObject({ y1: 300, y2: 380 });
+  });
+
+  it('only the sides being changed snap; the closest size wins, then the nearest box; too far: nothing', () => {
+    const others = [b(0, 0, 140, 80), b(1000, 0, 142, 80)];
+    const wOnly = sizeSnap(b(300, 300, 137, 84), others, 6, { w: true, h: false });
+    expect(wOnly.w).toBe(140); expect(wOnly.h).toBeUndefined(); expect(wOnly.marks.length).toBe(2);
+    expect(sizeSnap(b(300, 300, 141, 60), others, 6, { w: true, h: true }).w).toBe(140); // 140 and 142 both 1 away: the nearer box
+    expect(sizeSnap(b(900, 300, 141, 60), others, 6, { w: true, h: true }).w).toBe(142);
+    const none = sizeSnap(b(300, 300, 160, 120), others, 6, { w: true, h: true });
+    expect(none.w).toBeUndefined(); expect(none.h).toBeUndefined(); expect(none.marks).toEqual([]);
   });
 });

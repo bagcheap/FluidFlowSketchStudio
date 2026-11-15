@@ -208,7 +208,7 @@ Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excal
 
 5. ✅ *Built in 0.1.39.* **Line jumps (hop-overs).** Where two arrows cross, one hops over the other, as in Visio and draw.io.
 6. ✅ *Built in 0.1.40.* **Find (and replace).** ⌘F to find text across all pages and jump to it.
-7. ✅ *Built in 0.1.41.* **Equal-spacing guides.** While dragging, show when gaps between shapes are equal (Figma-style), alongside the existing alignment guides.
+7. ✅ *Built in 0.1.41.* **Equal-spacing guides.** While dragging, show when gaps between shapes are equal (Figma-style), alongside the existing alignment guides. Drawing or resizing a shape also snaps to the same width or height as a nearby shape (PowerPoint/Visio style).
 8. **Layers.** Show, hide or lock groups of things, for example an annotations layer switched on for one audience.
 9. **Command palette (⌘K).** Type to run any command, add any shape or icon, or jump to a page.
 10. **Minimap.** A small overview in a corner for finding your way around large diagrams.

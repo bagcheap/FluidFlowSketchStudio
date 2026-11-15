@@ -50,3 +50,54 @@ export function spacingSnap(moving: Box, others: Box[], horizontal: boolean, tol
   const marks = segs.map(([s, e, c]) => (horizontal ? { x1: s, y1: c, x2: e, y2: c, gap: g } : { x1: c, y1: s, x2: c, y2: e, gap: g }));
   return { d: lo - m.lo, marks };
 }
+
+/**
+ * Same size as a neighbour (PowerPoint/Visio style), while drawing or resizing: a width (or height) within `tol` of
+ * another box's snaps to it. Only the sides being changed are snapped (`w` / `h`). Of several matches the closest
+ * size wins, then the nearest box. Marks: the matched size measured along the top (width) or right side (height) of
+ * both boxes.
+ */
+export function sizeSnap(box: Box, others: Box[], tol: number, sides: { w: boolean; h: boolean }): { w?: number; h?: number; marks: GapMark[] } {
+  const marks: GapMark[] = [];
+  const out: { w?: number; h?: number; marks: GapMark[] } = { marks };
+  const dist = (o: Box) => Math.hypot(o.x + o.w / 2 - (box.x + box.w / 2), o.y + o.h / 2 - (box.y + box.h / 2));
+  const best = (get: (o: Box) => number, cur: number) => {
+    let pick: Box | null = null;
+    for (const o of others) {
+      const d = Math.abs(get(o) - cur);
+      if (d >= tol || get(o) < 4) continue;
+      if (!pick || d < Math.abs(get(pick) - cur) - 1e-9 || (Math.abs(d - Math.abs(get(pick) - cur)) < 1e-9 && dist(o) < dist(pick))) pick = o;
+    }
+    return pick;
+  };
+  const off = 12; // the marks sit this far outside each box
+  if (sides.w) {
+    const o = best((b) => b.w, box.w);
+    if (o) {
+      out.w = o.w;
+      marks.push({ x1: o.x, y1: o.y - off, x2: o.x + o.w, y2: o.y - off, gap: o.w });
+      marks.push({ x1: box.x, y1: box.y - off, x2: box.x + o.w, y2: box.y - off, gap: o.w }); // (x as drawn; the caller may move the left side)
+    }
+  }
+  if (sides.h) {
+    const o = best((b) => b.h, box.h);
+    if (o) {
+      out.h = o.h;
+      marks.push({ x1: o.x + o.w + off, y1: o.y, x2: o.x + o.w + off, y2: o.y + o.h, gap: o.h });
+      marks.push({ x1: box.x + box.w + off, y1: box.y, x2: box.x + box.w + off, y2: box.y + o.h, gap: o.h });
+    }
+  }
+  return out;
+}
+
+/** The marks for a box after its size snap moved it: re-measure the box's own marks at its final place. */
+export function placeSizeMarks(marks: GapMark[], box: Box): GapMark[] {
+  const off = 12;
+  // marks come in pairs (neighbour, then this box) for width, then for height
+  return marks.map((m, i) => {
+    if (i % 2 === 0) return m;
+    return m.y1 === m.y2
+      ? { ...m, x1: box.x, x2: box.x + box.w, y1: box.y - off, y2: box.y - off }
+      : { ...m, x1: box.x + box.w + off, x2: box.x + box.w + off, y1: box.y, y2: box.y + box.h };
+  });
+}
