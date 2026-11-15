@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
-import { AUTO_LAYOUT_ITEMS, ItemList, matchSizeItems, type MenuItem } from './MenuBar';
+import { AUTO_LAYOUT_ITEMS, ItemList, matchSizeItems, SELECT_SIMILAR_ITEMS, type MenuItem } from './MenuBar';
 import { ALT, MOD, SHIFT } from './shortcuts';
 
 function selectionItems(): MenuItem[] {
@@ -22,6 +22,7 @@ function selectionItems(): MenuItem[] {
     { label: 'Duplicate', shortcut: `${MOD}D`, run: cmd.duplicateSelection },
     { label: containers.length ? 'Delete (with contents)' : 'Delete', shortcut: 'Del', run: cmd.deleteSelection, disabled: els.every((e) => e.locked) },
     { sep: true },
+    { label: 'Select similar', sub: SELECT_SIMILAR_ITEMS },
     { label: 'Copy style', shortcut: `${MOD}${ALT}C`, run: cmd.copyStyle, disabled: !one },
     { label: 'Paste style', shortcut: `${MOD}${ALT}V`, run: cmd.pasteStyle, disabled: !ui.copiedStyle },
     { label: 'Set as default style', run: cmd.applySelectionStyleToDefaults, disabled: !toolKey, note: toolKey ? `for new ${cmd.toolName(toolKey)} drawings` : undefined },

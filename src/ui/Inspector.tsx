@@ -4,6 +4,7 @@
 import type { ReactNode } from 'react';
 import { AlignCenter, AlignLeft, ArrowRightLeft, AlignRight, ArrowDownToLine, ArrowUpToLine, Bold, ClipboardPaste, Copy, CopyPlus, Italic, Lock, Paintbrush, RotateCcw, Trash2, Unlock, FoldVertical, BringToFront, SendToBack, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal } from 'lucide-react';
 import type { ConnectorAnim, ConnectorElement, ContainerElement, DiagramElement, FillStyle, IconElement, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle } from '../model/types';
+import { kindOf } from '../store/similar';
 import { HIGHLIGHT_COLORS, PALETTE_FILL, PALETTE_STROKE, styleKey } from '../model/defaults';
 import { getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
@@ -103,7 +104,7 @@ export function Inspector() {
   const singleBox = els.length === 1 && first.type !== 'connector' ? first : null;
 
   const heading = onSelection
-    ? els.length === 1 ? `${first.type === 'shape' ? SHAPE_LABELS[first.shape] : first.type === 'connector' ? (first.endHead === 'none' && first.startHead === 'none' ? 'Line' : 'Arrow') : first.type === 'icon' ? `Icon · ${iconTitle(doc.icons[first.iconId]?.name ?? 'missing')}` : first.type === 'container' ? `Container · ${first.text || 'untitled'}` : first.type[0].toUpperCase() + first.type.slice(1)}` : `${els.length} objects`
+    ? els.length === 1 ? `${first.type === 'shape' ? SHAPE_LABELS[first.shape] : first.type === 'connector' ? (first.endHead === 'none' && first.startHead === 'none' ? 'Line' : 'Arrow') : first.type === 'icon' ? `Icon · ${iconTitle(doc.icons[first.iconId]?.name ?? 'missing')}` : first.type === 'container' ? `Container · ${first.text || 'untitled'}` : first.type[0].toUpperCase() + first.type.slice(1)}` : sameKindLabel(els) ?? `${els.length} objects`
     : tool === 'seq' ? `New ${seqKind === 'self' ? 'message to itself' : seqKind} (sequence)`
     : `New ${toolKey!.startsWith('shape:') ? SHAPE_LABELS[toolKey!.slice(6) as ShapeKind].toLowerCase() : toolKey}`;
 
@@ -408,3 +409,12 @@ function CanvasPanel() {
   );
 }
 
+/** "6 × Rectangle" when every selected item is the same kind, else null. */
+function sameKindLabel(els: DiagramElement[]): string | null {
+  const k = kindOf(els[0]);
+  if (!els.every((e) => kindOf(e) === k)) return null;
+  const e = els[0];
+  const name = e.type === 'shape' ? SHAPE_LABELS[e.shape] : e.type === 'connector' ? (k === 'connector:line' ? 'Line' : k === 'connector:arrow' ? 'Arrow' : k === 'connector:bar' ? 'Activation bar' : 'Lifeline')
+    : e.type[0].toUpperCase() + e.type.slice(1);
+  return `${els.length} × ${name}`;
+}

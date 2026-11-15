@@ -3,7 +3,7 @@ import { Download, Moon, Play, Redo2, Sun, Undo2, Monitor } from 'lucide-react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
-import { AUTO_LAYOUT_ITEMS, matchSizeItems, MenuBar, type MenuDef, type MenuItem } from './MenuBar';
+import { AUTO_LAYOUT_ITEMS, matchSizeItems, MenuBar, SELECT_SIMILAR_ITEMS, type MenuDef, type MenuItem } from './MenuBar';
 import { ALT, MOD, SHIFT } from './shortcuts';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { BASIC_SHAPES } from '../model/schema';
@@ -73,6 +73,7 @@ export function TopBar() {
       { label: 'Find and replace…', shortcut: `${ALT}${MOD}F`, run: () => cmd.openFind(true) },
       { sep: true },
       { label: 'Select all', shortcut: `${MOD}A`, run: cmd.selectAll },
+      { label: 'Select similar', sub: SELECT_SIMILAR_ITEMS, disabled: !hasSel },
       { label: 'Deselect', shortcut: 'Esc', run: cmd.deselect, disabled: !hasSel },
       { sep: true },
       { label: 'Preferences…', run: () => ui.openDialog('prefs') },

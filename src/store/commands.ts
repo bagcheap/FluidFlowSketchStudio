@@ -30,6 +30,7 @@ import { autoLayout as layoutDoc } from '../layout/autoLayout';
 import type { LayoutDir } from '../layout/layered';
 import { colorLabel } from '../ui/colorNames';
 import { svgToIcon } from '../icons/svgToIcon';
+import { selectSimilar as similarIds, SIMILAR_LABELS, type SimilarBy } from './similar';
 
 const D = () => useDoc.getState();
 const U = () => useUI.getState();
@@ -98,6 +99,17 @@ export function expandGroups(doc: FlowDocument, ids: string[]): string[] {
     if (g) for (const o of doc.elements) if (o.groupIds.includes(g)) out.add(o.id);
   }
   return [...out];
+}
+
+/** Select similar: add every unlocked item on the page that matches a selected item by `by` to the selection. */
+export function selectSimilar(by: SimilarBy) {
+  const u = U(), sel = u.selection;
+  if (!sel.length) { u.toast('Select an item first'); return; }
+  const ids = similarIds(D().doc.elements, sel, by);
+  u.setTool('select');
+  u.select(ids);
+  const added = ids.length - sel.length;
+  u.toast(added > 0 ? `${SIMILAR_LABELS[by]}: ${ids.length} items selected` : `${SIMILAR_LABELS[by]}: nothing else matches`);
 }
 
 export const selectAll = () => { U().setTool('select'); U().select(D().doc.elements.map((e) => e.id)); };
