@@ -1596,6 +1596,68 @@ def main():
                 app.js('(v) => window.__flowsketch.setView(v)', v)
         tfind()
 
+        @test('Equal-spacing guides: a shape dragged near an equal gap snaps to it and the gaps are marked')
+        def tspacing():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 42000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            try:
+                for x0 in (5100, 5300, 5500):  # three boxes 100 wide... drawn 100 apart: gaps of 100
+                    app.tool('r'); app.drag((x0, 42100), (x0 + 100, 42160)); app.key('Escape')
+                boxes = [e for e in app.els() if e['type'] == 'shape'][-3:]
+                xs = sorted(round(bx['x']) for bx in boxes)
+                gap = xs[1] - (xs[0] + round(boxes[0]['w']))
+                last = max(boxes, key=lambda e: e['x'])
+                # drag the last one so it sits 5 px further out than the existing gap; it should snap back to equal
+                sx, sy = app.pt(last['x'] + 50, last['y'] + 30)
+                page.mouse.move(sx, sy); page.mouse.down()
+                page.mouse.move(sx + 3, sy, steps=2); page.mouse.move(sx + 5, sy, steps=3); page.wait_for_timeout(80)
+                marks = page.evaluate("() => [...document.querySelectorAll('.stage-overlay text')].map((t) => t.textContent)")
+                page.screenshot(path=f'{OUT}/e2e-spacing.png')
+                page.mouse.up(); page.wait_for_timeout(80)
+                moved = next(e for e in app.els() if e['id'] == last['id'])
+                assert abs(moved['x'] - last['x']) < 0.01, (moved['x'], last['x'])  # snapped back: gaps equal again
+                assert marks.count(str(gap)) >= 2, (marks, gap)
+                # off by more than the tolerance: no snap
+                page.mouse.move(sx, sy); page.mouse.down(); page.mouse.move(sx + 25, sy, steps=5); page.mouse.up(); page.wait_for_timeout(80)
+                moved = next(e for e in app.els() if e['id'] == last['id'])
+                assert abs(moved['x'] - last['x'] - 25) <= 6, (moved['x'], last['x'])  # (it may line up with something else on this busy page)
+            finally:
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+        tspacing()
+
+        @test('Same size as a neighbour: drawing a shape a few px off a nearby shape\'s size snaps to it, with size marks')
+        def tsizesnap():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 45000, zoom: 1})')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            try:
+                app.tool('r'); app.drag((5100, 45100), (5240, 45180)); app.key('Escape')  # 140 x 80
+                ref = [e for e in app.els() if e['type'] == 'shape'][-1]
+                rw, rh = round(ref['w']), round(ref['h'])
+                app.tool('r')
+                sx, sy = app.pt(5400, 45100)
+                page.mouse.move(sx, sy); page.mouse.down()
+                page.mouse.move(sx + rw + 3, sy + rh - 4, steps=6); page.wait_for_timeout(60)
+                marks = page.evaluate("() => [...document.querySelectorAll('.stage-overlay text')].map((t) => t.textContent)")
+                page.screenshot(path=f'{OUT}/e2e-sizesnap.png')
+                page.mouse.up(); app.key('Escape')
+                new = [e for e in app.els() if e['type'] == 'shape'][-1]
+                assert abs(new['w'] - ref['w']) < 0.01 and abs(new['h'] - ref['h']) < 0.01, (new['w'], new['h'], ref['w'], ref['h'])
+                assert marks.count(str(rw)) >= 2 and marks.count(str(rh)) >= 2, (marks, rw, rh)
+                # well off: drawn as dragged
+                app.tool('r'); app.drag((5700, 45100), (5700 + rw + 30, 45100 + rh + 25)); app.key('Escape')
+                new = [e for e in app.els() if e['type'] == 'shape'][-1]
+                # (it may match some other shape on this busy page, but not the reference one)
+                assert abs(new['w'] - ref['w']) > 20 and abs(new['h'] - ref['h']) > 15, (new['w'], new['h'])
+            finally:
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+        tsizesnap()
+
         ctx.close()
 
         @test('7b · Reload app, open saved file: everything preserved')

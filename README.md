@@ -195,7 +195,7 @@ The 60 FPS target for 100+150 objects is **not demonstrated** here, because no G
 
 ## Roadmap: ideas for what's next
 
-Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excalidraw and Visio. None are built yet; the order within each group is roughly by value.
+Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excalidraw and Visio. Built ones are marked ✅; the rest are roughly in the order they'll be done.
 
 ### 1. Animated explainers (building on what makes FlowSketch different)
 
@@ -207,23 +207,26 @@ Features worth adding, from comparing FlowSketch with Lucidchart, draw.io, Excal
 ### 2. Everyday editing
 
 5. ✅ *Built in 0.1.39.* **Line jumps (hop-overs).** Where two arrows cross, one hops over the other, as in Visio and draw.io.
-6. **Swimlanes and tables.** Lanes per team or system that shapes snap into (cross-functional flowcharts), and a simple table shape.
-7. ✅ *Built in 0.1.40.* **Find (and replace).** ⌘F to find text across all pages and jump to it.
-8. **Equal-spacing guides.** While dragging, show when gaps between shapes are equal (Figma-style), alongside the existing alignment guides.
-9. **Layers.** Show, hide or lock groups of things, for example an annotations layer switched on for one audience.
-10. **Command palette (⌘K).** Type to run any command, add any shape or icon, or jump to a page.
-11. **Minimap.** A small overview in a corner for finding your way around large diagrams.
-12. **Version snapshots.** Save named versions locally and restore them later, beyond undo.
+6. ✅ *Built in 0.1.40.* **Find (and replace).** ⌘F to find text across all pages and jump to it.
+7. ✅ *Built in 0.1.41.* **Equal-spacing guides.** While dragging, show when gaps between shapes are equal (Figma-style), alongside the existing alignment guides. Drawing or resizing a shape also snaps to the same width or height as a nearby shape (PowerPoint/Visio style).
+8. **Layers.** Show, hide or lock groups of things, for example an annotations layer switched on for one audience.
+9. **Command palette (⌘K).** Type to run any command, add any shape or icon, or jump to a page.
+10. **Minimap.** A small overview in a corner for finding your way around large diagrams.
+11. **Version snapshots.** Save named versions locally and restore them later, beyond undo.
 
 ### 3. Getting work in and out
 
-13. **Import draw.io and Excalidraw files, and export to Mermaid.** Bring existing diagrams in and animate them (Visio files are much harder and are left out).
-14. **Shape sets for common notations.** UML class, ER (database), BPMN and network diagrams, with shapes that behave correctly (for example class boxes with compartments).
+12. **Import draw.io and Excalidraw files, and export to Mermaid.** Bring existing diagrams in and animate them (Visio files are much harder and are left out).
+13. **Shape sets for common notations.** UML class, ER (database), BPMN and network diagrams, with shapes that behave correctly (for example class boxes with compartments).
 
 ### 4. Bigger bets
 
-15. **AI "describe it and I'll draw it".** Type a description and get a diagram, using Mermaid import as the safe, validated path. Opt-in only, since it needs an API key and internet.
-16. **Data-linked shapes.** Shapes carry properties (owner, status, cost) that drive their look, for example red when "down", for living architecture maps.
+14. **AI "describe it and I'll draw it".** Type a description and get a diagram, using Mermaid import as the safe, validated path. Opt-in only, since it needs an API key and internet.
+15. **Data-linked shapes.** Shapes carry properties (owner, status, cost) that drive their look, for example red when "down", for living architecture maps.
+
+### 5. Later
+
+16. **Swimlanes and tables.** Lanes per team or system that shapes snap into (cross-functional flowcharts), and a simple table shape.
 
 ## Known limitations
 
