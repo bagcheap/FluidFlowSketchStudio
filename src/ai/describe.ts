@@ -4,6 +4,7 @@
 // only ever read as Mermaid text and inserted through cmd.importMermaid (parseMermaid / parseSequence + the builders,
 // then the same checks as any other Mermaid input). Nothing in a reply is ever executed or rendered as HTML.
 import type Anthropic from '@anthropic-ai/sdk';
+import { EDIT_SCHEMA, EDIT_SYSTEM_PROMPT } from './edits';
 
 export const AI_MODELS = [
   { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (best)' },
@@ -16,6 +17,8 @@ export const DEFAULT_MODEL: AiModel = 'claude-opus-5-5';
 /** Longest description or change request sent, and longest reply read back. */
 export const MAX_PROMPT_CHARS = 20_000;
 export const MAX_REPLY_CHARS = 100_000;
+/** The largest page description sent for editing. */
+export const MAX_PAGE_CHARS = 200_000;
 
 export const SYSTEM_PROMPT = `You turn a description of a diagram into Mermaid text for FlowSketch, a hand-drawn diagram editor that animates the arrows.
 
@@ -116,6 +119,36 @@ export async function drawWithClaude(turns: AiTurn[], opts: DrawOptions): Promis
     const mermaid = extractMermaid(text);
     if (!mermaid) throw new AiError(msg.stop_reason === 'max_tokens' ? 'The reply was cut off. Try a smaller diagram.' : 'Claude did not reply with a diagram. Try again or describe it differently.');
     return mermaid;
+  } catch (e) {
+    throw new AiError(errorMessage(e, Sdk));
+  }
+}
+
+/**
+ * Ask Claude for changes to the current page: `page` = describePage(doc).json, `request` = what to change. The reply
+ * follows EDIT_SCHEMA (structured outputs) and is still treated as untrusted: it is only parsed as JSON here and
+ * checked operation by operation with parseEdits before anything is shown or applied.
+ */
+export async function editWithClaude(page: string, request: string, opts: DrawOptions): Promise<unknown> {
+  const Sdk = await loadSdk();
+  const apiKey = cleanKey(opts.apiKey);
+  if (!apiKey) throw new AiError('Enter your Anthropic API key first.');
+  if (!request.trim()) throw new AiError('Say what to change first.');
+  if (page.length > MAX_PAGE_CHARS) throw new AiError('This page is too big to send for editing. Try a smaller page.');
+  const client = new Sdk({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 1, timeout: 180_000, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
+  try {
+    const msg = await client.beta.messages.create({
+      model: opts.model,
+      max_tokens: 16000,
+      system: EDIT_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: `Current page:\n${page}\n\nRequest: ${request.trim().slice(0, MAX_PROMPT_CHARS)}` }],
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: EDIT_SCHEMA as unknown as Record<string, unknown> } },
+      ...(opts.model === 'claude-haiku-5-5' ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }),
+    }, { signal: opts.signal });
+    if (msg.stop_reason === 'refusal') throw new AiError('Claude declined that change. Try asking differently.');
+    if (msg.stop_reason === 'max_tokens') throw new AiError('The reply was cut off. Try a smaller change.');
+    const text = msg.content.map((b) => (b.type === 'text' ? b.text : '')).join('').slice(0, MAX_REPLY_CHARS);
+    try { return JSON.parse(text); } catch { throw new AiError('Claude did not reply with changes. Try again.'); }
   } catch (e) {
     throw new AiError(errorMessage(e, Sdk));
   }

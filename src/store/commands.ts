@@ -30,6 +30,7 @@ import { autoLayout as layoutDoc } from '../layout/autoLayout';
 import type { LayoutDir } from '../layout/layered';
 import { colorLabel } from '../ui/colorNames';
 import { svgToIcon } from '../icons/svgToIcon';
+import { applyEdits, type EditOp, type PageView } from '../ai/edits';
 import { selectSimilar as similarIds, SIMILAR_LABELS, type SimilarBy } from './similar';
 
 const D = () => useDoc.getState();
@@ -385,6 +386,25 @@ export function matchSize(mode: MatchSizeMode) {
   const rest = sel.slice(1).filter(canMatchSize);
   if (!ref || !rest.length) { U().toast('Select the shape to match first, then the shapes to resize'); return; }
   D().commit((d) => matchSizes(d, ref.id, rest.map((e) => e.id), mode, U().prefs.matchSizeKeepsProportions));
+}
+
+/**
+ * AI edits: apply checked edit operations (from the Change this page dialog) to the current page as one undo step,
+ * select what was added or changed, and say how it went. Returns how many were applied.
+ */
+export function applyAiEdits(view: PageView, ops: EditOp[]): number {
+  if (!ops.length) return 0;
+  const u = U();
+  const r = applyEdits(D().doc, view, ops, {
+    shape: (k) => u.toolStyle(styleKey('shape', k)), arrow: u.toolStyle('arrow'), container: u.toolStyle('container'), fit: fitShapeToText,
+  });
+  const done = ops.length - r.skipped;
+  if (!done) { u.toast('None of those changes could be made (the items may have changed or be locked)', 'error'); return 0; }
+  D().commit(() => r.doc);
+  u.setTool('select');
+  u.select(r.touched);
+  u.toast(`Made ${done} change${done === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} skipped: items locked or gone)` : ''}`, 'success');
+  return done;
 }
 
 /**
