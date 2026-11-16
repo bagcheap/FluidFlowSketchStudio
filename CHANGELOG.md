@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.45] - 2026-11-16
+
+### Added
+- **Select similar:** right-click an item (or use Edit ▸ Select similar) to select everything on the page like it. **Same kind** picks every shape of that kind (all rectangles, all diamonds), all arrows, or all plain lines. Or match by **Same kind and look**, **Same fill colour**, **Same line colour** or **Same animation**. Then change the colour, arrowheads, animation or any other property in the Inspector once, and every selected item changes together. With several items selected, items like any of them are added. Locked items are left out. The Inspector shows what is selected, for example "6 × Rectangle".
+
 ## [0.1.44] - 2026-11-15
 
 ### Added

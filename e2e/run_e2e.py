@@ -1113,6 +1113,49 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tmatch()
 
+        @test('Select similar: right-click ▸ Select similar ▸ Same kind, then one Inspector change updates them all')
+        def tsimilar():
+            app.key('Escape')
+            v = app.ui()['view']
+            app.js('() => window.__flowsketch.setView({x: 5000, y: 23000, zoom: 1})')  # empty area
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            n0 = len(app.els())
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('flowchart LR\n  A{{One}} --> B{{Two}} --> C{{Three}}\n  C --> D[(Store)]')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            new = app.els()[n0:]
+            hexes = [e for e in new if e['type'] == 'shape' and e['shape'] == 'hexagon']
+            arrows = [e for e in new if e['type'] == 'connector']
+            assert len(hexes) == 3 and len(arrows) == 3
+            def similar(el, choice):
+                app.key('Escape')
+                if el['type'] == 'connector':
+                    p = app.js('(id) => window.__flowsketch.connectorEnds(id)', el['id'])
+                    x, y = app.pt((p['s']['x'] + p['e']['x']) / 2, (p['s']['y'] + p['e']['y']) / 2)
+                else:
+                    x, y = app.pt(el['x'] + el['w'] / 2, el['y'] + el['h'] / 2)
+                page.mouse.click(x, y, button='right'); page.wait_for_selector('.ctx-menu')
+                page.locator('.ctx-menu [role=menuitem]', has_text='Select similar').click()
+                page.locator('.ctx-menu .menu-pop.sub').get_by_role('menuitem', name=choice, exact=True).click(); page.wait_for_timeout(80)
+            similar(hexes[0], 'Same kind')
+            sel = set(app.ui()['selection'])
+            assert {h['id'] for h in hexes} <= sel, sel
+            assert all(e['type'] == 'shape' and e['shape'] == 'hexagon' for e in app.els() if e['id'] in sel)
+            assert page.locator('.inspector').get_by_text(f'{len(sel)} × Hexagon').count() >= 1
+            page.get_by_label('Fill colour #ffe3e3').click()
+            assert all(e['style']['fill'] == '#ffe3e3' for e in app.els() if e['id'] in {h['id'] for h in hexes})
+            # arrows: same kind selects every arrow on the page; one arrowhead change applies to all
+            similar(arrows[0], 'Same kind')
+            sel = set(app.ui()['selection'])
+            assert {a['id'] for a in arrows} <= sel and all(e['type'] == 'connector' for e in app.els() if e['id'] in sel), sel
+            page.get_by_label('End arrowhead').select_option('triangle'); page.wait_for_timeout(60)
+            assert all(e['endHead'] == 'triangle' for e in app.els() if e['id'] in {a['id'] for a in arrows})
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.key('Escape')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tsimilar()
+
         @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
         def tmermaid():
             app.key('Escape')

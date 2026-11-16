@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
 import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
+import { SIMILAR_LABELS, type SimilarBy } from '../store/similar';
 
 export type MenuItem =
   | { sep: true }
@@ -12,6 +13,9 @@ export interface MenuDef { id: string; label: string; items: MenuItem[] }
 
 /** Arrange ▸ Match size and the right-click menu: resize the selection to the first selected shape. */
 /** Arrange ▸ Auto-layout and the right-click menus: arrange shapes in layers along their arrows. */
+/** Edit ▸ Select similar and the right-click menu: grow the selection to items like it. */
+export const SELECT_SIMILAR_ITEMS: MenuItem[] = (['kind', 'look', 'fill', 'stroke', 'anim'] as SimilarBy[]).map((by) => ({ label: SIMILAR_LABELS[by], run: () => cmd.selectSimilar(by) }));
+
 export const AUTO_LAYOUT_ITEMS: MenuItem[] = [
   { label: 'Left to right', run: () => cmd.autoLayout('LR') },
   { label: 'Top to bottom', run: () => cmd.autoLayout('TB') },

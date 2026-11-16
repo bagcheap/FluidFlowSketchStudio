@@ -215,7 +215,7 @@ The 60 FPS target for 100+150 objects is **not demonstrated** here, because no G
 **Implemented:** everything in the acceptance list (§24), including:
 * 16 shapes with a searchable library, text, freehand pen, highlighter, raster images and the eraser
 * Continuous drawing with per-tool remembered styles and an optional shared style; copy/paste style and a format painter
-* Selection: marquee, shift-select, groups, lock, z-order, align/distribute, flip
+* Selection: marquee, shift-select, select similar (same kind, look, fill, line colour or animation; then edit them all at once in the Inspector), groups, lock, z-order, align/distribute, flip
 * Transforms: rotate, numeric geometry, keyboard nudging, alt-drag duplicate
 * Canvas: smart guides, grid snapping, pinch/space/hand/wheel pan-zoom, light/dark themes
 * Undo/redo; real menus
