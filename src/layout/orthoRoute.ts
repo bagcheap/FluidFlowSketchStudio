@@ -6,11 +6,14 @@ import type { Point } from '../model/types';
 
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 /** An end of a route: a point just outside a shape, and the unit axis direction pointing away from that shape. */
-export interface RouteEnd { p: Point; dir: Point }
+export interface RouteEnd { p: Point; dir: Point; stub?: number } // stub: straight run out of the shape before any turn
 
 export const ROUTE_MARGIN = 14; // routes keep this far from shapes
 const BEND = 40; // a turn costs as much as this many px of length
 const SHARE = 0.6; // running along a segment another route already uses costs this much extra per px
+const BORDER = 3; // running along a container's border (where the arrow is hard to see) costs this much extra per px
+const BORDER_NEAR = 8; // "along" = parallel and this close
+const BORDER_CLEAR = 16; // extra grid lines this far either side of each container border give a way round
 
 // directions: 0 right, 1 down, 2 left, 3 up
 const dirIndex = (d: Point) => (Math.abs(d.x) >= Math.abs(d.y) ? (d.x >= 0 ? 0 : 2) : d.y >= 0 ? 1 : 3);
@@ -64,12 +67,13 @@ class Heap {
  * straight into e. Cost = length + BEND per turn + SHARE per px along segments in `used`. Returns the route's points
  * from s.p to e.p (corners only) and its cost, or null when there is no way through.
  */
-export function routeOrtho(s: RouteEnd, e: RouteEnd, obstacles: Rect[], used?: Map<string, number>): { pts: Point[]; cost: number } | null {
-  const M = ROUTE_MARGIN, stub = M + 6;
+export function routeOrtho(s: RouteEnd, e: RouteEnd, obstacles: Rect[], used?: Map<string, number>, borders: Rect[] = []): { pts: Point[]; cost: number } | null {
+  const M = ROUTE_MARGIN, minStub = M + 6;
   const rs = obstacles.map((r) => ({ x0: r.x0 - M, y0: r.y0 - M, x1: r.x1 + M, y1: r.y1 + M }));
   // straight out of each end until clear of every shape's margin (a point on a diamond's slanted side starts well
   // inside its bounding box); give up if something else is in the way
   const clear = (q: RouteEnd): Point | null => {
+    const stub = Math.max(minStub, q.stub ?? 0);
     for (let d = stub; d <= stub + 400; d += 4) {
       const p = { x: q.p.x + q.dir.x * d, y: q.p.y + q.dir.y * d };
       if (!rs.some((r) => strictlyInside(p, r))) return p;
@@ -81,8 +85,21 @@ export function routeOrtho(s: RouteEnd, e: RouteEnd, obstacles: Rect[], used?: M
   const S = S0, E = E0;
   // exact coordinates (rounding would put a kink between nearly lined-up ends and the route)
   const uniq = (v: number[]) => v.slice().sort((a, b) => a - b).filter((x, i, arr) => i === 0 || x - arr[i - 1] > 1e-6);
-  const xs = uniq([S.x, E.x, ...rs.flatMap((r) => [r.x0, r.x1])]);
-  const ys = uniq([S.y, E.y, ...rs.flatMap((r) => [r.y0, r.y1])]);
+  const off = [-BORDER_CLEAR, BORDER_CLEAR];
+  const xs = uniq([S.x, E.x, ...rs.flatMap((r) => [r.x0, r.x1]), ...borders.flatMap((b) => off.flatMap((o) => [b.x0 + o, b.x1 + o]))]);
+  const ys = uniq([S.y, E.y, ...rs.flatMap((r) => [r.y0, r.y1]), ...borders.flatMap((b) => off.flatMap((o) => [b.y0 + o, b.y1 + o]))]);
+  // how much of segment a–b runs along a container border
+  const alongBorder = (a: Point, b: Point) => {
+    let t = 0;
+    const horiz = Math.abs(a.y - b.y) < 0.01, lo = horiz ? Math.min(a.x, b.x) : Math.min(a.y, b.y), hi = horiz ? Math.max(a.x, b.x) : Math.max(a.y, b.y);
+    for (const r of borders) {
+      const lines = horiz ? [r.y0, r.y1] : [r.x0, r.x1];
+      const [s0, s1] = horiz ? [r.x0, r.x1] : [r.y0, r.y1];
+      const c = horiz ? a.y : a.x;
+      if (lines.some((l) => Math.abs(l - c) <= BORDER_NEAR)) t += Math.max(0, Math.min(hi, s1) - Math.max(lo, s0));
+    }
+    return t;
+  };
   const nx = xs.length, ny = ys.length;
   const ix = (x: number) => xs.findIndex((v) => Math.abs(v - x) <= 1e-6), iy = (y: number) => ys.findIndex((v) => Math.abs(v - y) <= 1e-6);
   const si = iy(S.y) * nx + ix(S.x), ei = iy(E.y) * nx + ix(E.x);
@@ -122,7 +139,7 @@ export function routeOrtho(s: RouteEnd, e: RouteEnd, obstacles: Rect[], used?: M
       const m = step(n, d2);
       if (m < 0) continue;
       const a = pt(n), b = pt(m), len = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
-      const g2 = g + len + (d2 === d ? 0 : BEND) + (used?.get(key(a, b)) ?? 0) * SHARE * len;
+      const g2 = g + len + (d2 === d ? 0 : BEND) + (used?.get(key(a, b)) ?? 0) * SHARE * len + (borders.length ? alongBorder(a, b) * BORDER : 0);
       const s2 = m * 4 + d2;
       if (g2 < best[s2] - 1e-9) { best[s2] = g2; from[s2] = st; heap.push(g2 + h(m), s2); }
     }

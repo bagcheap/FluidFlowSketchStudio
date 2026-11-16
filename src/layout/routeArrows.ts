@@ -1,8 +1,9 @@
 // Route arrows around shapes (on request): each chosen arrow gets port anchors on the best pair of sides and bend
 // points along an obstacle-free right-angled route (orthoRoute). Arrows sharing a side of a shape are spread along it.
 // The result is ordinary elbow routing with waypoints: editable with the segment bars, undone by Reset route.
-import type { BoxElement, ConnectorElement, FlowDocument, Point } from '../model/types';
-import { GAP, localOutline, toWorld } from '../engine/connectors';
+import type { BoxElement, ConnectorElement, FlowDocument, HeadKind, Point } from '../model/types';
+import { connectorPath, GAP, LEAD, localOutline, toWorld } from '../engine/connectors';
+import { makeLookup } from '../engine/render';
 import { STILL } from '../engine/animation';
 import { rayPolygon } from '../engine/shapes';
 import { markUsed, routeOrtho, type Rect, type RouteEnd } from './orthoRoute';
@@ -68,6 +69,11 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[], opts: { keep
   const byId = new Map(doc.elements.map((e) => [e.id, e]));
   const boxes = doc.elements.filter(isObstacle);
   const obstacles = boxes.map(bounds);
+  // routes keep off container borders (an arrow along a dashed border is hard to see)
+  const borders = doc.elements.filter((e) => e.type === 'container').map((e) => ({ x0: e.x, y0: e.y, x1: e.x + e.w, y1: e.y + e.h }));
+  // straight room out of each shape before a turn: as the elbow router gives it (more where there is an arrowhead)
+  const stubOf = (c: ConnectorElement, h: HeadKind) => LEAD + (h === 'none' ? 0 : Math.min(34, 9 + 3 * c.style.strokeWidth) * (c.headSize ?? 1));
+  const withStub = (r: RouteEnd, stub: number): RouteEnd => ({ ...r, stub });
   const want = new Set(ids);
   const conns = doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && want.has(e.id) && !e.locked && !e.bar);
   const plans: Plan[] = [];
@@ -80,7 +86,7 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[], opts: { keep
     const ka = kept(c, 'start'), kb = kept(c, 'end');
     const sidesA: Side[] = ka ? [anchorPoint(a, ka).side] : [0, 1, 2, 3], sidesB: Side[] = kb ? [anchorPoint(b, kb).side] : [0, 1, 2, 3];
     for (const sa of sidesA) for (const sb of sidesB) {
-      const r = routeOrtho(ka ? anchorPoint(a, ka).end : sidePoint(a, sa, 0.5).end, kb ? anchorPoint(b, kb).end : sidePoint(b, sb, 0.5).end, obstacles, used);
+      const r = routeOrtho(withStub(ka ? anchorPoint(a, ka).end : sidePoint(a, sa, 0.5).end, stubOf(c, c.startHead)), withStub(kb ? anchorPoint(b, kb).end : sidePoint(b, sb, 0.5).end, stubOf(c, c.endHead)), obstacles, used, borders);
       if (r && r.cost < bestCost) { bestCost = r.cost; best = { c, a, b, sa, sb, pts: r.pts }; }
     }
     if (best) { plans.push(best); markUsed(used, best.pts, obstacles); }
@@ -108,7 +114,7 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[], opts: { keep
     const ka = kept(plan.c, 'start'), kb = kept(plan.c, 'end');
     const A = ka ? anchorPoint(plan.a, ka) : sidePoint(plan.a, plan.sa, tOf.get(`${plan.c.id}:a`) ?? 0.5);
     const B = kb ? anchorPoint(plan.b, kb) : sidePoint(plan.b, plan.sb, tOf.get(`${plan.c.id}:b`) ?? 0.5);
-    const r = routeOrtho(A.end, B.end, obstacles, used2);
+    const r = routeOrtho(withStub(A.end, stubOf(plan.c, plan.c.startHead)), withStub(B.end, stubOf(plan.c, plan.c.endHead)), obstacles, used2, borders);
     if (!r) continue;
     markUsed(used2, r.pts, obstacles);
     done.set(plan.c.id, {
@@ -122,4 +128,71 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[], opts: { keep
     doc: { ...doc, elements: doc.elements.map((e) => (e.type === 'connector' && done.has(e.id) ? { ...e, ...done.get(e.id) } as ConnectorElement : e)) },
     routed: done.size,
   };
+}
+
+/**
+ * Arrows that meet the same side of a shape at the same point (several dropped on its middle) are spread along
+ * that side, in the order of where their other ends are, so they don't bunch up. Only arrow ends attached to the
+ * given shapes are looked at; a side where every arrow already has a point of its own is left alone. Elbow arrows on
+ * a spread side are routed from their new points (around shapes, apart from each other).
+ */
+export function spreadEnds(doc: FlowDocument, shapeIds: (string | null | undefined)[]): FlowDocument {
+  const wanted = new Set(shapeIds.filter(Boolean) as string[]);
+  if (!wanted.size) return doc;
+  const lookup = makeLookup(doc, null);
+  const byId = new Map(doc.elements.map((e) => [e.id, e]));
+  interface EndRef { c: ConnectorElement; end: 'start' | 'end'; t: number; along: number; explicit: boolean }
+  const groups = new Map<string, EndRef[]>();
+  for (const c of doc.elements) {
+    if (c.type !== 'connector' || c.bar || c.locked || (c.start.elementId && c.start.elementId === c.end.elementId)) continue;
+    let path: ReturnType<typeof connectorPath> | null = null;
+    for (const end of ['start', 'end'] as const) {
+      const ep = c[end], el = ep.elementId ? byId.get(ep.elementId) : undefined;
+      if (!el || !wanted.has(el.id) || !isObstacle(el) || el.rotation % 360) continue;
+      const a = ep.anchor;
+      if (a && (a.x < -0.001 || a.x > 1.001 || a.y < -0.001 || a.y > 1.001)) continue; // a lifeline-style point outside the box
+      let local: Point;
+      if (a) local = a;
+      else {
+        path ??= connectorPath(c, lookup);
+        const q = end === 'start' ? path.control[0] : path.control[path.control.length - 1];
+        local = { x: (q.x - el.x) / Math.max(1, el.w), y: (q.y - el.y) / Math.max(1, el.h) };
+      }
+      const side = sideOfAnchor(local);
+      const horizSide = side === 0 || side === 2;
+      const other = c[end === 'start' ? 'end' : 'start'];
+      const oel = other.elementId ? byId.get(other.elementId) : undefined;
+      const op = oel && oel.type !== 'connector' ? { x: oel.x + oel.w / 2, y: oel.y + oel.h / 2 } : { x: other.x, y: other.y };
+      const k = `${el.id}:${side}`;
+      groups.set(k, [...(groups.get(k) ?? []), { c, end, t: horizSide ? local.x : local.y, along: horizSide ? op.x : op.y, explicit: !!a }]);
+    }
+  }
+  const changes = new Map<string, Partial<ConnectorElement>>();
+  const touched = new Set<string>();
+  for (const [k, list] of groups) {
+    if (list.length < 2) continue;
+    const near = (p: number, q: number) => Math.abs(p - q) < 0.08;
+    // nothing to do when every end already has a point of its own
+    if (list.every((r) => r.explicit && !list.some((o) => o !== r && near(o.t, r.t)))) continue;
+    // all of them get evenly spread places, in the order of where their other ends are: the snap points (¼ ½ ¾)
+    // for up to three, so a side the user laid out on snap points keeps them
+    const n = list.length;
+    const slots = n === 2 ? [0.25, 0.75] : n === 3 ? [0.25, 0.5, 0.75] : Array.from({ length: n }, (_, i) => (i + 1) / (n + 1));
+    const movable = [...list].sort((p, q) => p.along - q.along);
+    const pick = slots;
+    const [elId, sideStr] = k.split(':');
+    const el = byId.get(elId) as BoxElement;
+    movable.forEach((r, i) => {
+      const anchor = sidePoint(el, Number(sideStr) as Side, pick[i]).anchor;
+      const ch = changes.get(r.c.id) ?? {};
+      ch[r.end] = { ...r.c[r.end], anchor };
+      changes.set(r.c.id, ch);
+      if (r.c.routing === 'elbow') touched.add(r.c.id);
+    });
+  }
+  if (!changes.size) return doc;
+  let out: FlowDocument = { ...doc, elements: doc.elements.map((e) => (e.type === 'connector' && changes.has(e.id) ? { ...e, ...changes.get(e.id) } as ConnectorElement : e)) };
+  // elbow arrows on a spread side find their way from their new points, keeping apart from each other
+  if (touched.size) out = routeArrowsAround(out, [...touched], { keepAnchors: true }).doc;
+  return out;
 }

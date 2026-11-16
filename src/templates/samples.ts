@@ -1,6 +1,6 @@
 // Built-in sample diagrams / templates. Generated in code so they always match the current schema.
 import type { ConnectorAnim, ConnectorElement, FlowDocument, Routing, ShapeAnim, ShapeElement, ShapeKind } from '../model/types';
-import { DEFAULT_STYLE, DEFAULT_TEXT, defaultToolStyle, makeConnector, makeShape, makeText, newDocument } from '../model/defaults';
+import { DEFAULT_ANIMATION, DEFAULT_STYLE, DEFAULT_TEXT, defaultToolStyle, makeConnector, makeShape, makeText, newDocument } from '../model/defaults';
 import { fitShapeToText } from '../store/commands';
 
 interface BoxOpts { fill?: string; stroke?: string; font?: number; anim?: Partial<ShapeAnim>; bold?: boolean; fillStyle?: ShapeElement['style']['fillStyle']; radius?: number; color?: string; shadow?: boolean; family?: 'hand' | 'sans' }
@@ -9,6 +9,7 @@ interface ArrowOpts { label?: string; anim?: Partial<ConnectorAnim>; color?: str
 function builder(title: string, bg = '#fbfaf7') {
   const doc = newDocument(title);
   doc.canvas.background = bg;
+  doc.animation.shape = { ...DEFAULT_ANIMATION.shape }; // the samples show shapes moving
   let seed = 1000;
   const byId = new Map<string, ShapeElement>();
   const box = (kind: ShapeKind, x: number, y: number, w: number, h: number, text = '', o: BoxOpts = {}) => {

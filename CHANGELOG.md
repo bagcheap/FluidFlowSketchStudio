@@ -4,6 +4,15 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Changed
+- **New diagrams start with still shapes.** Arrows still animate. Pick a shape animation (Inspector, or Animation ▸ All animation settings) to bring shapes to life. Existing diagrams and the sample templates keep their motion.
+- **Moving or resizing a shape keeps where its arrows are attached.** Routed arrows find a fresh way round from the same points, instead of jumping to other sides.
+- **Elbow arrows run straight into their arrowheads.** Every elbow arrow now leaves and enters a shape with a straight stretch (longer where there is an arrowhead) before turning, so corners no longer sit right at a head. Corner rounding never eats into that stretch.
+- **Routed arrows keep off container borders,** where a line along a dashed border was hard to see.
+- **Several arrows into one shape spread out:** when arrows meet the same side of a shape, each gets its own point along that side (the ¼, ½, ¾ snap points for up to three), in the order they come from. Their routes are then laid out so they don't run on top of each other.
+
 ## [0.1.45] - 2026-11-16
 
 ### Added

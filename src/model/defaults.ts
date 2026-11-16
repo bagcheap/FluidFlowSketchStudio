@@ -124,7 +124,9 @@ export function newDocument(title = 'Untitled diagram'): FlowDocument {
     createdAt: now,
     updatedAt: now,
     canvas: { background: '#fbfaf7', grid: 'dots', gridSize: 20, lineJumps: true },
-    animation: structuredClone(DEFAULT_ANIMATION),
+    // new diagrams start with still shapes (arrows still animate); pick a shape animation to bring them to life.
+    // Files are read against DEFAULT_ANIMATION, so existing diagrams keep theirs.
+    animation: { ...structuredClone(DEFAULT_ANIMATION), shape: { ...DEFAULT_ANIMATION.shape, mode: 'off' } },
     elements: [],
     pages: [{ id: page, name: 'Page 1', elements: [] }],
     activePage: page,

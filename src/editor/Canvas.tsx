@@ -12,7 +12,7 @@ import { drawFrame } from '../engine/canvasRenderer';
 import { imageMap, onImageLoaded } from '../engine/images';
 import { connectorPath, isHorizontal, labelPlacement, moveElbowSegment, pointAt, tidyElbow } from '../engine/connectors';
 import { playStepLabels, readPlaySteps } from '../store/sequence';
-import { routeArrowsAround } from '../layout/routeArrows';
+import { routeArrowsAround, spreadEnds } from '../layout/routeArrows';
 import { STILL } from '../engine/animation';
 import { toLocal, toWorld } from '../engine/connectors';
 import { boxAt, connectorLabelBox, hitTest, isLifeline, lifelineAt, nearestPort, portAnchors, portPositions } from './hitTest';
@@ -42,6 +42,11 @@ function attachedElbows(d: FlowDocument, moving: Iterable<string>): string[] {
   const set = new Set(moving);
   return d.elements.filter((c) => c.type === 'connector' && c.routing === 'elbow' && c.bends.length > 0 && !set.has(c.id)
     && ((!!c.start.elementId && set.has(c.start.elementId)) || (!!c.end.elementId && set.has(c.end.elementId)))).map((c) => c.id);
+}
+/** Spread the arrows meeting the shapes at either end of this arrow, so they don't share one point. */
+function spreadAround(d: FlowDocument, connectorId: string): FlowDocument {
+  const c = getElement(d, connectorId);
+  return c?.type === 'connector' ? spreadEnds(d, [c.start.elementId, c.end.elementId]) : d;
 }
 const clearBends = (d: FlowDocument, ids: string[]): FlowDocument =>
   ids.length ? mapElements(d, ids, (c) => ({ ...(c as ConnectorElement), bends: [] })) : d;
@@ -897,6 +902,7 @@ export function Canvas() {
           const r = addConnectedCopy(D.doc, it.src, u.toolStyle('arrow'), { center: toWorldPt(e), connectorId: it.connId });
           if (r) { D.live(() => r.doc); D.end(); u.select([r.id]); return; }
         }
+        if (c) D.live((d) => spreadAround(d, c.id));
         D.end();
         return;
       }
@@ -906,6 +912,7 @@ export function Canvas() {
           const s = c.start;
           D.live((d) => mapElements(d, [it.id], (el) => ({ ...(el as ConnectorElement), end: { x: it.start.x + 140, y: it.start.y, elementId: null, anchor: null }, start: s.elementId ? s : { ...s } })));
         }
+        D.live((d) => spreadAround(d, it.id)); // arrows meeting the same side of a shape don't bunch up
         D.end();
         afterCreate(it.id);
         return;
@@ -926,7 +933,7 @@ export function Canvas() {
         }
         // dropped shapes join the container they land in, or leave the one they were dragged out of
         D.live((d) => updateMembership(d, it.top));
-        if (it.reroute.length) D.live((d) => routeArrowsAround(d, it.reroute).doc); // their arrows find a fresh way round
+        if (it.reroute.length) D.live((d) => routeArrowsAround(d, it.reroute, { keepAnchors: true }).doc); // their arrows find a fresh way round, from where they were attached
         D.end();
         return;
       case 'label':
@@ -938,6 +945,7 @@ export function Canvas() {
           const c = getElement(d, it.id);
           return c?.type === 'connector' && c.routing === 'elbow' && c.start.elementId && c.end.elementId ? routeArrowsAround(d, [c.id], { keepAnchors: true }).doc : d;
         });
+        if (it.moved) D.live((d) => spreadAround(d, it.id));
         D.end();
         return;
       }
@@ -957,7 +965,7 @@ export function Canvas() {
       case 'resize':
       case 'resizeMulti':
         D.live((d) => updateMembership(d, it.k === 'resize' ? [it.id] : it.ids));
-        if (it.reroute.length) D.live((d) => routeArrowsAround(d, it.reroute).doc);
+        if (it.reroute.length) D.live((d) => routeArrowsAround(d, it.reroute, { keepAnchors: true }).doc);
         D.end();
         return;
       default:
