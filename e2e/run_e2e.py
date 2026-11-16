@@ -1405,8 +1405,9 @@ def main():
         def t56():
             c = app.els('connector')[-1]
             app.key('Escape')
-            mid = app.js('(id) => window.__flowsketch.connectorEnds(id)', c['id'])
-            mx, my = (mid['s']['x'] + mid['e']['x']) / 2, (mid['s']['y'] + mid['e']['y']) / 2
+            # a point halfway along the drawn line (an elbow arrow need not pass halfway between its ends)
+            mx, my = app.js('''(id) => { const it = window.__flowsketch.frame(0).items.find((i) => i.id === id);
+              const p = it.parts.find((q) => q.k === 'line').pts; const k = Math.floor(p.length / 4) * 2; return [p[k], p[k + 1]]; }''', c['id'])
             app.click((mx, my))
             assert app.ui()['selection'] == [c['id']], app.ui()['selection']
             # a straight arrow, so the highlight's direction shows as left/right movement (an elbow can be vertical there)
