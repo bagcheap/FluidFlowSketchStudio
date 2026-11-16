@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.46] - 2026-11-16
 
 ### Changed
 - **New diagrams start with still shapes.** Arrows still animate. Pick a shape animation (Inspector, or Animation ▸ All animation settings) to bring shapes to life. Existing diagrams and the sample templates keep their motion.
@@ -12,6 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **Elbow arrows run straight into their arrowheads.** Every elbow arrow now leaves and enters a shape with a straight stretch (longer where there is an arrowhead) before turning, so corners no longer sit right at a head. Corner rounding never eats into that stretch.
 - **Routed arrows keep off container borders,** where a line along a dashed border was hard to see.
 - **Several arrows into one shape spread out:** when arrows meet the same side of a shape, each gets its own point along that side (the ¼, ½, ¾ snap points for up to three), in the order they come from. Their routes are then laid out so they don't run on top of each other.
+- **Arrow Segments now works in play order too:** an arrow that plays as a step (numbered labels, sequence diagrams, Play in order) sends a train of highlights, one after another, during its step. Its step lasts until the last one arrives. Before, Segments was ignored there.
+- **Segments stay separate on short arrows:** with several segments looping, each highlight is kept short enough to leave a gap to the next. Before, long highlights on a short arrow merged into what looked like a single bar.
+- For an arrow in a play order, the Inspector now says that Speed and Delay don't apply in a step.
 
 ## [0.1.45] - 2026-11-16
 

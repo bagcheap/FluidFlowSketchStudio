@@ -281,7 +281,7 @@ export function Inspector() {
               {ca.mode === 'travel' && <>
                 <Slider label="Length" value={ca.highlightLength} min={4} max={300} unit="px" overridden={'highlightLength' in connOv} onReset={() => resetConnAnimKey('highlightLength')} onChange={(v) => setConnAnim({ highlightLength: v })} />
                 {roundTrip && <Slider label="Pause at turn-around" value={Math.round(ca.turnPause * 100)} min={0} max={60} unit="%" onChange={(v) => setConnAnim({ turnPause: v / 100 })} hint="Share of each round trip spent waiting at the far end before coming back" />}
-                <Slider label="Segments" value={ca.segments} min={1} max={8} onChange={(v) => setConnAnim({ segments: v })} hint="Simultaneous moving segments, evenly spaced" />
+                <Slider label="Segments" value={ca.segments} min={1} max={8} onChange={(v) => setConnAnim({ segments: v })} hint={conn?.anim?.window ? "Highlights following each other along the arrow during its step" : "Highlights moving at the same time, evenly spaced"} />
                 <Toggle label="Rounded segment ends" checked={ca.roundCaps} onChange={(v) => setConnAnim({ roundCaps: v })} />
               </>}
               {ca.mode === 'drawOn' && <>
@@ -297,7 +297,7 @@ export function Inspector() {
                   const all = readPlaySteps(useDoc.getState().doc);
                   const step = playStepLabels(all).get(conn.id) ?? '?';
                   return (
-                    <p className="note">Plays as step {step} of {all.length}, one after another. <button className="btn small" onClick={cmd.playArrowsTogether}>Play together</button></p>
+                    <p className="note">Plays as step {step} of {all.length}, one after another. In a step the highlight moves once at the shared play speed, so Speed and Delay don't apply. <button className="btn small" onClick={cmd.playArrowsTogether}>Play together</button></p>
                   );
                 })()}
               </>}
