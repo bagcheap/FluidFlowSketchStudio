@@ -361,6 +361,17 @@ function headParts(kind: HeadKind, tip: Point, dir: Point, color: string, sw: nu
  * return leg. One-way (pause null): always outward. Round trip: out during the first (1 - pause) / 2, waits at
  * the far end for `pause`, then comes back; null while waiting.
  */
+/**
+ * A train of travelling highlights in a play step (Segments > 1): each `hl` long, one highlight-length apart (heads
+ * `gap` apart), so the step's travel is `total` = the whole train crossing the arrow.
+ */
+export function highlightTrain(len: number, highlightLength: number, segments: number): { hl: number; n: number; gap: number; total: number } {
+  const hl = Math.min(highlightLength, len);
+  const n = Math.max(1, Math.min(8, Math.round(segments) || 1));
+  const gap = hl * 2;
+  return { hl, n, gap, total: len + hl + (n - 1) * gap };
+}
+
 export function roundTripLeg(u: number, pause: number | null): { f: number; back: boolean } | null {
   if (pause === null) return { f: u, back: false };
   const legLen = (1 - pause) / 2;
@@ -408,7 +419,7 @@ export function playSchedule(doc: FlowDocument): PlaySchedule {
     if (c.type !== 'connector' || c.bar || !c.anim?.window) continue;
     const a = resolveConnectorAnim(doc.animation, c);
     const len = connectorPath(c, lookup).length;
-    let secs = (len + Math.min(a.highlightLength, len)) / PLAY_SPEED;
+    let secs = highlightTrain(len, a.highlightLength, a.segments).total / PLAY_SPEED; // the whole train crosses
     if (a.direction === 'roundTrip') secs = (2 * secs) / Math.max(0.2, 1 - a.turnPause); // out, wait, back
     const k = Math.round(c.anim.window[0] * 1e4);
     const s = steps.get(k) ?? { ids: [], secs: 0 };
@@ -610,13 +621,24 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
   // with a play window (sequence-diagram steps) the highlight travels once, only during its part of the loop
   const win = anim.window ? playPhase(tt, L ?? settings.duration, playSchedule(doc).win.get(c.id) ?? anim.window) : undefined;
   if (anim.mode === 'travel' && (anim.window ? win !== null : speed > 0 && active)) {
-    const hl = Math.min(anim.highlightLength, len);
-    const n = win !== undefined ? 1 : Math.max(1, anim.segments);
     const roundTrip = anim.direction === 'roundTrip';
+    const train = highlightTrain(len, anim.highlightLength, anim.segments);
+    const n = train.n;
+    // looping: n highlights evenly spaced around the cycle; each is kept short enough to leave a gap to the next,
+    // so they never merge into one bar on a short arrow
+    const hl = win === undefined && n > 1 ? Math.min(train.hl, (0.6 * len) / (n - 0.6)) : train.hl;
     // a round trip is one cycle (out, wait at the far end, back), so each leg moves at the one-way speed
     const u = win ?? fract((tt - anim.delay) * trip(roundTrip ? speed / 2 : speed));
+    // in a play step: one pass, the highlights following each other in a train (the step lasts until the last arrives)
+    const stepLeg = win !== undefined ? roundTripLeg(u, roundTrip ? anim.turnPause : null) : null;
     for (let i = 0; i < n; i++) {
-      const leg = roundTripLeg(fract(u + i / n), roundTrip ? anim.turnPause : null);
+      let leg: { f: number; back: boolean } | null;
+      if (win !== undefined) {
+        if (!stepLeg) continue; // waiting at the far end
+        const f = (stepLeg.f * train.total - i * train.gap) / (len + hl);
+        if (f <= 0 || f >= 1) continue; // not yet set off, or already arrived
+        leg = { f, back: stepLeg.back };
+      } else leg = roundTripLeg(fract(u + i / n), roundTrip ? anim.turnPause : null);
       if (!leg) continue; // waiting at the far end
       const head = leg.f * (len + hl);
       const [a, b] = leg.back ? [len - head, len - head + hl] : range(head - hl, head);

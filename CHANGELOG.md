@@ -4,6 +4,13 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [Unreleased]
+
+### Changed
+- **Arrow Segments now works in play order too:** an arrow that plays as a step (numbered labels, sequence diagrams, Play in order) sends a train of highlights, one after another, during its step. Its step lasts until the last one arrives. Before, Segments was ignored there.
+- **Segments stay separate on short arrows:** with several segments looping, each highlight is kept short enough to leave a gap to the next. Before, long highlights on a short arrow merged into what looked like a single bar.
+- For an arrow in a play order, the Inspector now says that Speed and Delay don't apply in a step.
+
 ## [0.1.45] - 2026-11-16
 
 ### Added
