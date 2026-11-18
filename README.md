@@ -136,7 +136,7 @@ Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu).
 ### 2. Use it in FlowSketch
 
 1. Open Insert ▸ **Describe a diagram (AI)…**.
-2. Paste the key into **API key**. Tick **Remember on this computer** if you don't want to paste it again next time. **Forget key** removes it.
+2. Paste the key into **API key**. To avoid pasting it again next time, tick **Remember in the macOS Keychain** (desktop app) or **Remember in this browser (stored unencrypted)** (browser). **Forget key** removes it.
 3. Choose a **Model**: Opus (best, the default), Sonnet (faster, cheaper) or Haiku (fastest, cheapest).
 4. Describe the diagram, for example: *"A user signs in through the web app, which checks the auth service, then loads their orders from the API and its database. Number the steps."* Then press **Draw it**. It takes a few seconds to a minute.
 5. A Mermaid draft appears below, and your prompt stays in the box. Now you can:
@@ -162,7 +162,13 @@ What it can do: add shapes (next to a shape you name), connect shapes, remove th
 
 **Where your prompts and drafts are kept:** in local storage on this computer only, until you press **Start over**. They're never sent anywhere except with a request you make.
 
-**Where the key is kept:** without **Remember**, only in memory until you close the window. With it, in this browser's (or the desktop app's) local storage on this computer, as plain text. It is never saved in `.flowsketch` files or exports.
+**Where the key is kept:** without **Remember**, only in memory until you close the window. With it:
+- **Desktop app:** in the **macOS Keychain**, encrypted by macOS and tied to your Mac login, under "local.flowsketch.studio". You can see or delete it in the Keychain Access app. A key that an earlier version kept in the app's storage is moved into the Keychain the first time the dialog opens.
+- **Browser:** in this browser's local storage, as **plain text**. Anyone or anything that can read this browser profile (another person on your account, malware, a rogue extension) could read it. Leave Remember off on a shared computer.
+
+Either way it is never saved in `.flowsketch` files, exports, autosave or Recent documents, and it is only ever sent to `api.anthropic.com`. To limit the damage if a key leaks, give FlowSketch its own key in the Claude Console with a low spend limit; you can delete it there at any time.
+
+The desktop app also has a **content security policy**: its window may only load its own files and connect to itself and `api.anthropic.com`, so even injected script couldn't send the key anywhere else.
 
 **Cost:** each request is billed to your Anthropic account at the model's API price. A typical diagram is a few thousand tokens, so usually a few cents or less with Opus and less with Sonnet or Haiku. The Console's **Usage** page shows what you've spent.
 

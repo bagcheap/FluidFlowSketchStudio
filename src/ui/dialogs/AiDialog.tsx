@@ -8,20 +8,48 @@ import { isSequence, parseSequence } from '../../import/mermaidSequence';
 import { Modal } from './Modal';
 import { useDoc } from '../../store/docStore';
 import { describeOps, describePage, parseEdits, type EditOp, type PageView } from '../../ai/edits';
+import { forgetKey, keyPlace, loadKey, saveKey } from '../../ai/keyStore';
 import {
-  AI_MODELS, drawWithClaude, editWithClaude, forgetKey, isKeyRemembered, loadSession, MAX_PROMPT_CHARS, saveSession, savedKey, savedModel, storeKey, storeModel,
+  AI_MODELS, drawWithClaude, editWithClaude, loadSession, MAX_PROMPT_CHARS, saveSession, savedModel, storeModel,
   type AiModel, type AiTurn,
 } from '../../ai/describe';
 
+/** The API key: filled in from where it is remembered (Keychain in the desktop app, else this browser). */
+function useApiKey() {
+  const [key, setKey] = useState('');
+  const [remember, setRemember] = useState(false);
+  const [remembered, setRemembered] = useState(false);
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    let live = true;
+    void loadKey().then((r) => { if (live) { setKey((k) => k || r.key); setRemember(r.remembered); setRemembered(r.remembered); } });
+    return () => { live = false; };
+  }, []);
+  /** Keep the key as asked (before a request). */
+  const keep = async () => {
+    const ok = await saveKey(key, remember);
+    setRemembered(ok && remember && !!key.trim());
+    setNote(ok ? '' : 'Could not use the Keychain, so the key is kept for this window only.');
+  };
+  const forget = async () => { await forgetKey(); setKey(''); setRemember(false); setRemembered(false); };
+  return { key, setKey, remember, setRemember, remembered, note, keep, forget };
+}
+type ApiKey = ReturnType<typeof useApiKey>;
+
 /** The API key and model rows, shared by both AI dialogs. */
-function KeyRows({ k, setK, remember, setRemember, model, setModel }: { k: string; setK: (v: string) => void; remember: boolean; setRemember: (v: boolean) => void; model: AiModel; setModel: (m: AiModel) => void }) {
+function KeyRows({ api, model, setModel }: { api: ApiKey; model: AiModel; setModel: (m: AiModel) => void }) {
+  const inKeychain = keyPlace() === 'keychain';
   return <>
     <div className="ai-row">
       <label className="row-label" htmlFor="ai-key">API key</label>
-      <input id="ai-key" className="ai-key" type="password" autoComplete="off" spellCheck={false} placeholder="sk-ant-…" value={k} onChange={(e) => setK(e.target.value)} />
-      <label className="ai-check"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Remember on this computer</label>
-      {isKeyRemembered() && <button className="btn small" onClick={() => { forgetKey(); setK(''); setRemember(false); }}>Forget key</button>}
+      <input id="ai-key" className="ai-key" type="password" autoComplete="off" spellCheck={false} placeholder="sk-ant-…" value={api.key} onChange={(e) => api.setKey(e.target.value)} />
+      <label className="ai-check" title={inKeychain ? 'Kept encrypted in the macOS Keychain, tied to your Mac login.' : 'Kept in this browser\'s storage as plain text: anyone who can read this browser profile can read it. Without this, the key is forgotten when you close the window.'}>
+        <input type="checkbox" checked={api.remember} onChange={(e) => api.setRemember(e.target.checked)} />
+        {inKeychain ? ' Remember in the macOS Keychain' : ' Remember in this browser (stored unencrypted)'}
+      </label>
+      {api.remembered && <button className="btn small" onClick={() => void api.forget()}>Forget key</button>}
     </div>
+    {api.note && <p className="note ai-error" role="status">{api.note}</p>}
     <div className="ai-row">
       <label className="row-label" htmlFor="ai-model">Model</label>
       <select id="ai-model" value={model} onChange={(e) => setModel(e.target.value as AiModel)}>
@@ -43,8 +71,8 @@ function summary(text: string): { count: number; line: string } {
 }
 
 export function AiDialog() {
-  const [key, setKey] = useState(savedKey);
-  const [remember, setRemember] = useState(isKeyRemembered);
+  const api = useApiKey();
+  const key = api.key;
   const [model, setModel] = useState<AiModel>(savedModel);
   const [saved] = useState(loadSession); // the last session on this computer, shown again
   const [ask, setAsk] = useState(saved.ask);
@@ -62,7 +90,7 @@ export function AiDialog() {
   /** Draw: from the prompt alone (fresh), or as a change to the current draft (refine). */
   const draw = async (refine: boolean) => {
     if (busy || !ask.trim()) return;
-    storeKey(key, remember);
+    await api.keep();
     storeModel(model);
     // refining: the draft as it is now (the user may have edited it), then the change
     const history: AiTurn[] = refine && draft ? [...turns.slice(0, -1), { role: 'assistant', text: draft }] : [];
@@ -90,7 +118,7 @@ export function AiDialog() {
       <button className="btn primary" data-testid="ai-insert" disabled={busy || !info?.count} onClick={insert}>Insert diagram</button>
     </>}>
       <p className="note">Describe the diagram in your own words and Claude drafts it. You can check the draft, ask for changes, then insert it. This needs internet and your own <b>Anthropic API key</b> (create one at platform.claude.com under API keys; usage is billed to your Anthropic account; see the README for step-by-step help). Only what you type here is sent to Anthropic, and only when you press <b>{draft ? 'Draw again' : 'Draw it'}</b> or <b>Change draft</b>. Your prompts and the last draft are kept on this computer, so they are here again next time.</p>
-      <KeyRows k={key} setK={setKey} remember={remember} setRemember={setRemember} model={model} setModel={setModel} />
+      <KeyRows api={api} model={model} setModel={setModel} />
       {prompts.length > 0 && <details className="note ai-prompts" open={prompts.length > 1}>
         <summary>{prompts.length === 1 ? 'Prompt used for this draft' : `Prompts used for this draft (${prompts.length})`}</summary>
         <ol>{prompts.map((p, i) => <li key={i}>
@@ -131,8 +159,8 @@ const lastEditAsk = () => { try { const v = localStorage.getItem(EDIT_ASK); retu
  * (one undo step). Nothing is sent until "Suggest changes" is pressed.
  */
 export function AiEditDialog() {
-  const [key, setKey] = useState(savedKey);
-  const [remember, setRemember] = useState(isKeyRemembered);
+  const api = useApiKey();
+  const key = api.key;
   const [model, setModel] = useState<AiModel>(savedModel);
   const [ask, setAsk] = useState(lastEditAsk);
   useEffect(() => { try { localStorage.setItem(EDIT_ASK, ask); } catch { /* storage unavailable */ } }, [ask]);
@@ -146,7 +174,7 @@ export function AiEditDialog() {
 
   const suggest = async () => {
     if (busy || !ask.trim()) return;
-    storeKey(key, remember);
+    await api.keep();
     storeModel(model);
     const doc = useDoc.getState().doc;
     const view = describePage(doc);
@@ -174,7 +202,7 @@ export function AiEditDialog() {
       </button>
     </>}>
       <p className="note">Say what should change on this page and Claude suggests the edits. You see them first and choose which to apply (one undo step). This needs internet and your own <b>Anthropic API key</b>. When you press <b>Suggest changes</b>, this page's text, shapes, colours, positions and arrows are sent to Anthropic, with your request. Pictures and other pages are not sent.</p>
-      <KeyRows k={key} setK={setKey} remember={remember} setRemember={setRemember} model={model} setModel={setModel} />
+      <KeyRows api={api} model={model} setModel={setModel} />
       <textarea className="mermaid-text ai-ask" aria-label="Change request" data-testid="ai-edit-prompt" maxLength={MAX_PROMPT_CHARS}
         placeholder="e.g. Add a cache between the API and the database, colour all databases green, and number the arrows in the order the request flows."
         value={ask} onChange={(e) => setAsk(e.target.value)}

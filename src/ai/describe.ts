@@ -154,23 +154,10 @@ export async function editWithClaude(page: string, request: string, opts: DrawOp
   }
 }
 
-// The API key and model, remembered on this device only when the user asks (localStorage, read back type-checked).
-// Without "remember", the key lives in memory until the page is closed.
-const KEY = 'flowsketch:anthropicKey';
+// The model choice, remembered on this device (localStorage, read back against AI_MODELS). The API key is kept by
+// keyStore.ts (macOS Keychain in the desktop app).
 const MODEL = 'flowsketch:aiModel';
-let sessionKey = '';
 
-export function savedKey(): string {
-  try { return cleanKey(localStorage.getItem(KEY)) || sessionKey; } catch { return sessionKey; }
-}
-export function isKeyRemembered(): boolean {
-  try { return !!cleanKey(localStorage.getItem(KEY)); } catch { return false; }
-}
-export function storeKey(key: string, remember: boolean): void {
-  sessionKey = cleanKey(key);
-  try { if (remember && sessionKey) localStorage.setItem(KEY, sessionKey); else localStorage.removeItem(KEY); } catch { /* storage unavailable */ }
-}
-export function forgetKey(): void { storeKey('', false); }
 export function savedModel(): AiModel {
   try {
     const m = localStorage.getItem(MODEL);
