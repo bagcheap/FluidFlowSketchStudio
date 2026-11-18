@@ -854,8 +854,30 @@ export async function confirmDiscard(): Promise<boolean> {
   return U().ask('This diagram has changes that are not saved to a file (it is autosaved in this browser and stays in Recent documents). Replace it?', 'Replace');
 }
 
+/**
+ * File ▸ Close: with changes not saved to a file, ask Save / Don't save / Cancel (Save that is cancelled or fails
+ * keeps the diagram open); then start a blank diagram. Returns whether it closed.
+ */
+export async function closeDiagram(): Promise<boolean> {
+  const d = D();
+  const hasContent = pages.allPages(d.doc).some((p) => p.elements.length);
+  if (d.dirty && hasContent) {
+    const title = d.doc.title || 'Untitled diagram';
+    const answer = await U().choose(`Do you want to save the changes to “${title}” before closing it?`, 'Save', "Don't save", 'Close diagram');
+    if (answer === 'cancel') return false;
+    if (answer === 'ok' && !(await save())) return false;
+  }
+  blankDiagram();
+  return true;
+}
+
 export async function newDiagram() {
   if (!(await confirmDiscard())) return;
+  blankDiagram();
+}
+
+/** Replace the diagram with a blank one (no welcome card), forgetting the file it came from. */
+function blankDiagram() {
   resetFileHandle();
   D().load(newDocument());
   useUI.setState({ welcomeDismissed: true }); // the user asked for a blank canvas
@@ -884,11 +906,13 @@ export async function openFile() {
   }
 }
 
-export async function save(saveAs = false) {
+/** Save (or Save as). Returns true when the diagram was written to a file (false if cancelled or it failed). */
+export async function save(saveAs = false): Promise<boolean> {
   try {
     const name = await saveDocumentFile(D().doc, saveAs);
-    if (name) { D().markSaved(name); U().toast(`Saved ${name}`, 'success'); }
+    if (name) { D().markSaved(name); U().toast(`Saved ${name}`, 'success'); return true; }
   } catch (e) { U().toast(`Save failed: ${(e as Error).message}`, 'error'); }
+  return false;
 }
 
 export function renameDocument(title?: string) {

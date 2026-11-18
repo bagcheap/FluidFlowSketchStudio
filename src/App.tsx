@@ -109,9 +109,10 @@ function ConfirmDialog() {
   const req = useUI((s) => s.confirmReq);
   if (!req) return null;
   return (
-    <Modal title="Are you sure?" onClose={() => req.resolve(false)} footer={<>
-      <button className="btn ghost" onClick={() => req.resolve(false)}>Cancel</button>
-      <button className="btn primary" data-testid="confirm-ok" onClick={() => req.resolve(true)}>{req.ok}</button>
+    <Modal title={req.title ?? 'Are you sure?'} onClose={() => req.resolve('cancel')} footer={<>
+      <button className="btn ghost" onClick={() => req.resolve('cancel')}>Cancel</button>
+      {req.alt && <button className="btn" data-testid="confirm-alt" onClick={() => req.resolve('alt')}>{req.alt}</button>}
+      <button className="btn primary" data-testid="confirm-ok" onClick={() => req.resolve('ok')}>{req.ok}</button>
     </>}>
       <p className="note">{req.message}</p>
     </Modal>

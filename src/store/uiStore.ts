@@ -116,7 +116,7 @@ interface UIState {
   hint: string | null;
   menuOpen: string | null;
   reducedMotionOS: boolean;
-  confirmReq: { message: string; ok: string; resolve: (v: boolean) => void } | null;
+  confirmReq: { message: string; ok: string; alt?: string; title?: string; resolve: (v: Choice) => void } | null;
   welcomeDismissed: boolean;
   contextMenu: { x: number; y: number; pageId?: string } | null; // right-click menu position (screen px); pageId: a page tab's menu
   playOrderMode: boolean; // "Set play order": clicking arrows numbers them
@@ -150,7 +150,12 @@ interface UIActions {
   setPlayOrderMode(on: boolean): void;
   /** In-app confirmation (native confirm() is unavailable in sandboxed hosts). */
   ask(message: string, ok?: string): Promise<boolean>;
+  /** In-app question with a third choice (e.g. Save / Don't save / Cancel): resolves 'ok', 'alt' or 'cancel'. */
+  choose(message: string, ok: string, alt: string, title?: string): Promise<Choice>;
 }
+
+/** The answer to an in-app question: the main button, the alternative (if offered), or Cancel. */
+export type Choice = 'ok' | 'alt' | 'cancel';
 
 let toastId = 0;
 
@@ -225,8 +230,12 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   setPlayOrderMode(on) { set({ playOrderMode: on }); },
   setFind(f) { set((s) => ({ find: f === null ? null : { ...(s.find ?? { query: '', replace: '', matchCase: false, allPages: true, showReplace: false, index: -1 }), ...f } })); },
   ask(message, ok = 'Continue') {
-    get().confirmReq?.resolve(false);
-    return new Promise<boolean>((resolve) => set({ confirmReq: { message, ok, resolve: (v) => { set({ confirmReq: null }); resolve(v); } }, menuOpen: null }));
+    get().confirmReq?.resolve('cancel');
+    return new Promise<boolean>((resolve) => set({ confirmReq: { message, ok, resolve: (v) => { set({ confirmReq: null }); resolve(v === 'ok'); } }, menuOpen: null }));
+  },
+  choose(message, ok, alt, title) {
+    get().confirmReq?.resolve('cancel');
+    return new Promise<Choice>((resolve) => set({ confirmReq: { message, ok, alt, title, resolve: (v) => { set({ confirmReq: null }); resolve(v); } }, menuOpen: null }));
   },
 }));
 

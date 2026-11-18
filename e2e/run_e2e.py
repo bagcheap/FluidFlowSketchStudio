@@ -1935,6 +1935,30 @@ def main():
             c5.close()
         tformats()
 
+        @test('File ▸ Close: with unsaved changes asks Save / Don\'t save / Cancel; Cancel keeps it, Don\'t save gives a blank diagram; no changes: closes at once')
+        def tclose():
+            app.key('Escape')
+            app.tool('r'); app.drag((100, 100), (220, 180)); app.key('Escape')  # an unsaved change
+            n = len(app.els())
+            assert n > 0
+            def close():
+                page.get_by_role('menuitem', name='File').click()
+                page.get_by_role('menuitem', name='Close').click(); page.wait_for_timeout(80)
+            close()
+            dlg = page.locator('.modal', has_text='Close diagram')
+            assert dlg.count() == 1 and 'save the changes' in dlg.inner_text(), dlg.all_inner_texts()
+            assert dlg.get_by_role('button', name='Save', exact=True).count() == 1
+            dlg.get_by_role('button', name='Cancel').click(); page.wait_for_timeout(60)
+            assert len(app.els()) == n, 'Cancel must keep the diagram'
+            close()
+            page.get_by_test_id('confirm-alt').click(); page.wait_for_timeout(150)  # Don't save
+            assert app.els() == [], app.els()[:2]
+            assert app.doc()['title'] == 'Untitled diagram'
+            assert page.locator('.modal').count() == 0
+            close()  # nothing changed: closes without asking
+            assert page.locator('.modal', has_text='Close diagram').count() == 0
+        tclose()
+
         ctx.close()
 
         @test('7b · Reload app, open saved file: everything preserved')

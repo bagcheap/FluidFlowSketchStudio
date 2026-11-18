@@ -104,6 +104,7 @@ There are three layers of settings, applied in order:
 
 * **Native format:** `.flowsketch` is versioned JSON (`format`, `schemaVersion`). It contains all geometry, text, z-order, groups, connector relationships, styles, animation settings, seeds, embedded raster images (data URLs) and export preferences, and never any executable content. On import, every value is validated and coerced. Unknown types are skipped, dangling connector references are detached, duplicate IDs are reissued, and SVG or other non-raster image data is refused. Files from a newer schema version produce a clear error, and older versions are migrated (`src/model/schema.ts`).
 * **Save / Save as.** Chromium browsers write back to the same file via the File System Access API. Other browsers fall back to a download.
+* **Close.** File ▸ Close leaves a blank diagram, asking first (Save / Don't save / Cancel) when there are changes not saved to a file.
 * **Autosave & recovery.** IndexedDB, about 0.7 s after each change. The last session is restored on reload. File ▸ Recent documents lists up to 12 documents and can restore the autosave.
 * Templates: File ▸ New from template (7 built-ins). File ▸ Save as custom template stores your own.
 

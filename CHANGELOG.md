@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
+- **File ▸ Close:** closes the diagram and leaves a blank one. If it has changes not saved to a file, it asks first: **Save** (closes once saved; if you cancel the Save dialog it stays open), **Don't save**, or **Cancel**.
 - **Change this page (AI):** Insert ▸ **Change this page (AI)…** (also on the right-click menu) edits the diagram that's already there. Say what should change, for example "add a cache between the API and the database and colour the databases green". Claude suggests the edits, listed in plain words. Untick any you don't want, then **Apply**: one step, undone with one ⌘Z, and what changed is selected. It can add, connect, remove, rename, reshape and recolour shapes, change arrows (style, heads, direction) and group shapes into containers. Everything else stays where it is. Like Describe a diagram, it's opt-in and uses your own Anthropic API key. Pressing **Suggest changes** sends this page's text, shapes, colours, positions and arrows along with your request.
 
 ## [0.1.46] - 2026-11-16

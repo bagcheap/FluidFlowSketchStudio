@@ -43,6 +43,7 @@ export function TopBar() {
       { label: 'Save as…', shortcut: `${MOD}${SHIFT}S`, run: () => void cmd.save(true) },
       { label: 'Rename…', run: () => cmd.renameDocument() },
       { label: 'Duplicate document', run: cmd.duplicateDocument },
+      { label: 'Close', note: 'asks to save changes first', run: () => void cmd.closeDiagram() },
       { label: 'Save as custom template', run: () => saveCustomTemplate(useDoc.getState().doc).then(() => ui.toast('Saved to your templates', 'success')).catch((e) => ui.toast(String(e.message ?? e), 'error')) },
       { sep: true },
       { label: 'Import diagram file…', run: () => void cmd.openFile() },
