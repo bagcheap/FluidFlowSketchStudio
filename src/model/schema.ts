@@ -5,6 +5,9 @@ import type {
 } from './types';
 import { SCHEMA_VERSION } from './types';
 
+/** The pause between play steps when a file doesn't set one (seconds; the same as engine/render.ts STEP_PAUSE). */
+const STEP_PAUSE = 0.35;
+
 /** Arrowhead size limits (a multiple of the usual size). */
 export const HEAD_SIZE_MIN = 0.5, HEAD_SIZE_MAX = 3;
 import { DEFAULT_ANIMATION, DEFAULT_CONNECTOR_ANIM, DEFAULT_SHAPE_ANIM, DEFAULT_STYLE, DEFAULT_TEXT, newDocument, newSeed, uid } from './defaults';
@@ -415,6 +418,11 @@ export function migrate(raw: Obj): Obj {
     // v16 -> v17: highlight thickness (ConnectorAnim.highlightWidth); missing = 1.5, the thickness it always had
     version = 17;
   }
+  if (version === 17) {
+    // v17 -> v18: pause between steps, caption size and position (animation.stepPause / captionSize / captionPosition);
+    // missing = the old fixed 0.35 s, medium, bottom
+    version = 18;
+  }
   raw.schemaVersion = version;
   return raw;
 }
@@ -466,6 +474,9 @@ export function parseDocument(input: string | unknown): ParseResult {
       captions: bool(anim.captions, false),
       stepFocus: bool(anim.stepFocus, false),
       camera: bool(anim.camera, false),
+      ...(anim.stepPause !== undefined ? { stepPause: num(anim.stepPause, STEP_PAUSE, 0, 5) } : {}),
+      ...(anim.captionSize !== undefined ? { captionSize: oneOf(anim.captionSize, ['small', 'medium', 'large'] as const, 'medium') } : {}),
+      ...(anim.captionPosition !== undefined ? { captionPosition: oneOf(anim.captionPosition, ['bottom', 'top'] as const, 'bottom') } : {}),
       shape: sanitizeShapeAnim(anim.shape, false),
       connector: sanitizeConnectorAnim(anim.connector, false),
     },

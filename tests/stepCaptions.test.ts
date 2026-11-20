@@ -36,7 +36,7 @@ describe('step captions and highlighted boxes', () => {
 
   it('captions show the playing step\'s labels, joined when arrows play together', () => {
     const { doc, a3, a4 } = diagram(true, false);
-    expect(renderDocumentAtTime(doc, inStep(doc, 0)).caption).toEqual({ text: '1. ask', alpha: 1 });
+    expect(renderDocumentAtTime(doc, inStep(doc, 0)).caption).toEqual({ text: '1. ask', alpha: 1, size: 'medium', position: 'bottom' });
     expect(renderDocumentAtTime(doc, inStep(doc, 1)).caption?.text).toBe('2. look up');
     expect(stepCaption(doc, [a3.id, a4.id])).toBe('3a. reply · 3b. log');
     expect(renderDocumentAtTime(doc, inStep(doc, 2)).caption?.text).toBe('3a. reply · 3b. log');

@@ -4,6 +4,18 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.50] - 2026-11-20
+
+### Added
+- **Glow and opacity for all arrows:** the Inspector's **Arrow highlight (all arrows)** section (nothing selected) now also has **Opacity** and **Glow**, to make every arrow's highlight subtler or bolder at once.
+- **Playing in order** section in the Inspector (nothing selected), for arrows that play one step at a time:
+  - **Pause between steps** (0–5 s, was always 0.35 s), so viewers have time to read each caption; the loop length follows.
+  - **Caption size** (Small, Medium, Large) and **Caption at** (Bottom or Top), for step captions in the live view, GIF and video exports and the HTML player.
+  - The **Step captions**, **Highlight each step** and **Camera follows steps** switches, all in one place (they are still in the Animation menu too).
+
+### Fixed
+- In the live view, step captions are centred in the visible part of the canvas and kept clear of the toolbar and Inspector.
+
 ## [0.1.49] - 2026-11-20
 
 ### Added

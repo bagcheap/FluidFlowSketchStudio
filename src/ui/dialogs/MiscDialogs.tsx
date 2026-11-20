@@ -69,6 +69,12 @@ export function AnimationDialog() {
           <ColorPicker label="Return colour" value={a.connector.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ returnColor: c })} />
           <Slider label="Segments" value={a.connector.segments} min={1} max={8} onChange={(v) => cmd.setGlobalArrow({ segments: v })} />
           <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} />
+          <Slider label="Opacity" value={Math.round(a.connector.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => cmd.setGlobalArrow({ highlightOpacity: v / 100 })} />
+          <Toggle label="Glow" checked={a.connector.glow} onChange={(v) => cmd.setGlobalArrow({ glow: v })} />
+          <h3>Playing in order</h3>
+          <Slider label="Pause between steps" value={a.stepPause ?? 0.35} min={0} max={5} step={0.05} unit="s" onChange={(v) => cmd.setAnimation({ stepPause: v }, 'step-pause')} />
+          <Row label="Caption size"><Segmented label="Caption size" value={a.captionSize ?? 'medium'} onChange={(v) => cmd.setAnimation({ captionSize: v })} options={[{ v: 'small', label: 'Small' }, { v: 'medium', label: 'Medium' }, { v: 'large', label: 'Large' }]} /></Row>
+          <Row label="Caption at"><Segmented label="Caption position" value={a.captionPosition ?? 'bottom'} onChange={(v) => cmd.setAnimation({ captionPosition: v })} options={[{ v: 'bottom', label: 'Bottom' }, { v: 'top', label: 'Top' }]} /></Row>
         </div>
       </div>
     </Modal>

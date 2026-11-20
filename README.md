@@ -91,7 +91,8 @@ There are three layers of settings, applied in order:
 | Layer | Where | Notes |
 |---|---|---|
 | Document defaults | Animation ▸ Global animation settings | Duration, loop, seamless snapping, global squiggle/speed multipliers, default shape motion and arrow flow, synchronise / randomise phases, reduced-motion mode |
-| All arrows | Inspector with nothing selected ▸ *Arrow highlight (all arrows)* (also in the Animation settings dialog) | Highlight thickness, colour, return colour, segments and length for every arrow on every page at once, plus the overall arrow speed (which also sets how fast arrows playing in order move). Each change replaces that one setting on every arrow (locked ones excepted) and in the arrow tools' remembered style, so new arrows follow too |
+| All arrows | Inspector with nothing selected ▸ *Arrow highlight (all arrows)* (also in the Animation settings dialog) | Highlight thickness, colour, return colour, segments, length, opacity and glow for every arrow on every page at once, plus the overall arrow speed (which also sets how fast arrows playing in order move). Each change replaces that one setting on every arrow (locked ones excepted) and in the arrow tools' remembered style, so new arrows follow too |
+| Playing in order | Inspector with nothing selected ▸ *Playing in order* (also in the Animation settings dialog) | Pause between steps (0–5 s), step captions with their size and position (bottom or top), highlight each step, camera follows steps |
 | Per-object overrides | Inspector ▸ *Shape animation* / *Arrow animation* | Only the values you touch are stored; a blue dot marks an override. ↺ resets a value or a whole section to the document default |
 | Playback preview | Bottom bar | Play/pause, stop, restart, scrub, length, speed, loop, all-motion on/off. Nothing here changes saved geometry |
 

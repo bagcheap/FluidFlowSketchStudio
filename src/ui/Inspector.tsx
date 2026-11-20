@@ -410,6 +410,19 @@ function CanvasPanel() {
           <ColorPicker label="Return colour" value={a.connector.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ returnColor: c })} />
           <Slider label="Segments" value={a.connector.segments} min={1} max={8} onChange={(v) => cmd.setGlobalArrow({ segments: v })} hint="Highlights per arrow: moving together when looping, one after another in a play step" />
           <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} />
+          <Slider label="Opacity" value={Math.round(a.connector.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => cmd.setGlobalArrow({ highlightOpacity: v / 100 })} />
+          <Toggle label="Glow" checked={a.connector.glow} onChange={(v) => cmd.setGlobalArrow({ glow: v })} />
+        </Section>
+        <Section title="Playing in order">
+          <p className="note">For arrows that play one step at a time (numbered labels, sequence diagrams, Animation ▸ Play in order).</p>
+          <Slider label="Pause between steps" value={a.stepPause ?? 0.35} min={0} max={5} step={0.05} unit="s" onChange={(v) => cmd.setAnimation({ stepPause: v }, 'step-pause')} hint="How long each step stays before the next starts (time to read its caption)" />
+          <Toggle label="Step captions" checked={!!a.captions} onChange={(v) => cmd.setAnimation({ captions: v })} />
+          {a.captions && <>
+            <Row label="Caption size"><Segmented label="Caption size" value={a.captionSize ?? 'medium'} onChange={(v) => cmd.setAnimation({ captionSize: v })} options={[{ v: 'small', label: 'Small' }, { v: 'medium', label: 'Medium' }, { v: 'large', label: 'Large' }]} /></Row>
+            <Row label="Caption at"><Segmented label="Caption position" value={a.captionPosition ?? 'bottom'} onChange={(v) => cmd.setAnimation({ captionPosition: v })} options={[{ v: 'bottom', label: 'Bottom' }, { v: 'top', label: 'Top' }]} /></Row>
+          </>}
+          <Toggle label="Highlight each step" checked={!!a.stepFocus} onChange={(v) => cmd.setAnimation({ stepFocus: v })} />
+          <Toggle label="Camera follows steps" checked={!!a.camera} onChange={(v) => cmd.setAnimation({ camera: v })} />
         </Section>
         <div className="insp-empty">
           <p><b>Quick start:</b> press <kbd>U</kbd> for a rounded rectangle, drag to draw (the tool stays active), <kbd>A</kbd> to connect shapes, double-click a shape to type, then <kbd>K</kbd> to play.</p>
