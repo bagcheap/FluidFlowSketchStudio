@@ -1028,6 +1028,44 @@ def main():
                 app.js('(v) => window.__flowsketch.setView(v)', v)
         taiedit()
 
+        @test('AI key in the browser: remembered only encrypted with a passphrase; after a reload it unlocks with it')
+        def tkeyenc():
+            c7, p7, a7, e7 = fresh(browser)
+            try:
+                def api(route):
+                    if route.request.method == 'OPTIONS':
+                        return route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'})
+                    route.fulfill(status=200, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
+                        'id': 'm', 'type': 'message', 'role': 'assistant', 'model': 'claude-opus-5-5', 'stop_reason': 'end_turn', 'stop_sequence': None,
+                        'content': [{'type': 'text', 'text': '```mermaid\nflowchart LR\nA-->B\n```'}], 'usage': {'input_tokens': 1, 'output_tokens': 1}}))
+                p7.route('https://api.anthropic.com/**', api)
+                def open_dialog():
+                    p7.get_by_role('menuitem', name='Insert').click()
+                    p7.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                open_dialog()
+                p7.get_by_label('API key').fill('sk-ant-e2e-0123456789')
+                p7.get_by_label('Remember in this browser (encrypted with a passphrase)').check()
+                p7.locator('#ai-pass').fill('correct horse')
+                p7.get_by_test_id('ai-prompt').fill('two boxes')
+                p7.get_by_test_id('ai-draw').click()
+                p7.get_by_test_id('ai-draft').wait_for(timeout=8000)
+                stored = a7.js("() => Object.keys(localStorage).filter(k => k.startsWith('flowsketch:anthropicKey')).map(k => [k, localStorage.getItem(k)])")
+                assert [k for k, _ in stored] == ['flowsketch:anthropicKeyEnc'], stored
+                assert 'sk-ant-e2e' not in stored[0][1]
+                p7.reload(); p7.wait_for_timeout(800)
+                open_dialog()
+                p7.get_by_test_id('ai-unlock').wait_for(timeout=3000)
+                assert p7.get_by_label('API key').input_value() == ''
+                p7.locator('#ai-unlock').fill('wrong passphrase'); p7.get_by_test_id('ai-unlock').click()
+                p7.get_by_text('That passphrase did not open the saved key').wait_for(timeout=10000)
+                p7.locator('#ai-unlock').fill('correct horse'); p7.get_by_test_id('ai-unlock').click()
+                p7.wait_for_function("() => document.querySelector('#ai-key')?.value === 'sk-ant-e2e-0123456789'", timeout=10000)
+                assert p7.locator('#ai-pass').count() == 0  # the same key, already stored: no new passphrase asked
+                assert not e7, e7
+            finally:
+                c7.close()
+        tkeyenc()
+
 
         @test('Moving an arrow end drops its old waypoints; an elbow arrow then routes round shapes from where it was dropped')
         def tendmove():

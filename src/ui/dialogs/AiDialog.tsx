@@ -8,7 +8,7 @@ import { isSequence, parseSequence } from '../../import/mermaidSequence';
 import { Modal } from './Modal';
 import { useDoc } from '../../store/docStore';
 import { describeOps, describePage, parseEdits, type EditOp, type PageView } from '../../ai/edits';
-import { forgetKey, keyPlace, loadKey, saveKey } from '../../ai/keyStore';
+import { forgetKey, keyPlace, loadKey, MIN_PASSPHRASE, saveKey, unlockKey } from '../../ai/keyStore';
 import {
   AI_MODELS, drawWithClaude, editWithClaude, loadSession, MAX_PROMPT_CHARS, saveSession, savedModel, storeModel,
   type AiModel, type AiTurn,
@@ -19,20 +19,39 @@ function useApiKey() {
   const [key, setKey] = useState('');
   const [remember, setRemember] = useState(false);
   const [remembered, setRemembered] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [unlocked, setUnlocked] = useState(''); // the key as unlocked/loaded, so an unchanged key needs no new passphrase
+  const [pass, setPass] = useState('');
   const [note, setNote] = useState('');
   useEffect(() => {
     let live = true;
-    void loadKey().then((r) => { if (live) { setKey((k) => k || r.key); setRemember(r.remembered); setRemembered(r.remembered); } });
+    void loadKey().then((r) => {
+      if (!live) return;
+      setKey((k) => k || r.key); setUnlocked(r.key); setRemember(r.remembered); setRemembered(r.remembered); setLocked(r.locked);
+      if (r.note) setNote(r.note);
+    });
     return () => { live = false; };
   }, []);
+  /** Browser: open the encrypted copy with the passphrase typed. */
+  const unlock = async () => {
+    const k = await unlockKey(pass);
+    if (!k) { setNote('That passphrase did not open the saved key. Try again, or paste the key and choose a new passphrase.'); return; }
+    setKey(k); setUnlocked(k); setLocked(false); setPass(''); setNote('');
+  };
+  /** Does ticking Remember need a passphrase now (browser, a key not already stored)? */
+  const needsPass = keyPlace() === 'browser' && remember && !!key.trim() && !(remembered && !locked && key === unlocked);
   /** Keep the key as asked (before a request). */
   const keep = async () => {
-    const ok = await saveKey(key, remember);
-    setRemembered(ok && remember && !!key.trim());
-    setNote(ok ? '' : 'Could not use the Keychain, so the key is kept for this window only.');
+    const r = await saveKey(key, remember, needsPass ? pass : '');
+    const kept = r === 'ok' && remember && !!key.trim();
+    setRemembered(kept);
+    if (kept) { setLocked(false); setUnlocked(key); setPass(''); }
+    setNote(r === 'keychain-failed' ? 'Could not use the Keychain, so the key is kept for this window only.'
+      : r === 'need-passphrase' ? `Not remembered: choose a passphrase of at least ${MIN_PASSPHRASE} characters to keep the key encrypted (it is kept for this tab meanwhile).`
+      : r === 'failed' ? 'Could not save the key in this browser; it is kept for this tab only.' : '');
   };
-  const forget = async () => { await forgetKey(); setKey(''); setRemember(false); setRemembered(false); };
-  return { key, setKey, remember, setRemember, remembered, note, keep, forget };
+  const forget = async () => { await forgetKey(); setKey(''); setUnlocked(''); setRemember(false); setRemembered(false); setLocked(false); setPass(''); setNote(''); };
+  return { key, setKey, remember, setRemember, remembered, locked, pass, setPass, needsPass, note, unlock, keep, forget };
 }
 type ApiKey = ReturnType<typeof useApiKey>;
 
@@ -40,15 +59,26 @@ type ApiKey = ReturnType<typeof useApiKey>;
 function KeyRows({ api, model, setModel }: { api: ApiKey; model: AiModel; setModel: (m: AiModel) => void }) {
   const inKeychain = keyPlace() === 'keychain';
   return <>
+    {api.locked && !api.key && <div className="ai-row">
+      <label className="row-label" htmlFor="ai-unlock">Passphrase</label>
+      <input id="ai-unlock" className="ai-key" type="password" autoComplete="current-password" placeholder="Unlock your saved key" value={api.pass}
+        onChange={(e) => api.setPass(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void api.unlock(); } }} />
+      <button className="btn small" data-testid="ai-unlock" disabled={!api.pass} onClick={() => void api.unlock()}>Unlock</button>
+      <button className="btn small" onClick={() => void api.forget()}>Forget key</button>
+    </div>}
     <div className="ai-row">
       <label className="row-label" htmlFor="ai-key">API key</label>
-      <input id="ai-key" className="ai-key" type="password" autoComplete="off" spellCheck={false} placeholder="sk-ant-…" value={api.key} onChange={(e) => api.setKey(e.target.value)} />
-      <label className="ai-check" title={inKeychain ? 'Kept encrypted in the macOS Keychain, tied to your Mac login.' : 'Kept in this browser\'s storage as plain text: anyone who can read this browser profile can read it. Without this, the key is forgotten when you close the window.'}>
+      <input id="ai-key" className="ai-key" type="password" autoComplete="off" spellCheck={false} placeholder={api.locked && !api.key ? 'Saved and locked: unlock above, or paste a key' : 'sk-ant-…'} value={api.key} onChange={(e) => api.setKey(e.target.value)} />
+      <label className="ai-check" title={inKeychain ? 'Kept encrypted in the macOS Keychain, tied to your Mac login.' : 'Kept in this browser encrypted with a passphrase you choose (the passphrase is never stored). You unlock it once per tab. Without this, the key is forgotten when you close the tab.'}>
         <input type="checkbox" checked={api.remember} onChange={(e) => api.setRemember(e.target.checked)} />
-        {inKeychain ? ' Remember in the macOS Keychain' : ' Remember in this browser (stored unencrypted)'}
+        {inKeychain ? ' Remember in the macOS Keychain' : ' Remember in this browser (encrypted with a passphrase)'}
       </label>
-      {api.remembered && <button className="btn small" onClick={() => void api.forget()}>Forget key</button>}
+      {api.remembered && !api.locked && <button className="btn small" onClick={() => void api.forget()}>Forget key</button>}
     </div>
+    {api.needsPass && <div className="ai-row">
+      <label className="row-label" htmlFor="ai-pass">Passphrase</label>
+      <input id="ai-pass" className="ai-key" type="password" autoComplete="new-password" placeholder={`At least ${MIN_PASSPHRASE} characters; needed to unlock the key next time`} value={api.pass} onChange={(e) => api.setPass(e.target.value)} />
+    </div>}
     {api.note && <p className="note ai-error" role="status">{api.note}</p>}
     <div className="ai-row">
       <label className="row-label" htmlFor="ai-model">Model</label>

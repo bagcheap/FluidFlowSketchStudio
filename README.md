@@ -136,7 +136,7 @@ Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu).
 ### 2. Use it in FlowSketch
 
 1. Open Insert ▸ **Describe a diagram (AI)…**.
-2. Paste the key into **API key**. To avoid pasting it again next time, tick **Remember in the macOS Keychain** (desktop app) or **Remember in this browser (stored unencrypted)** (browser). **Forget key** removes it.
+2. Paste the key into **API key**. To avoid pasting it again next time, tick **Remember in the macOS Keychain** (desktop app) or **Remember in this browser (encrypted with a passphrase)** (browser; choose a passphrase of at least 8 characters, and type it once per tab to unlock the key). **Forget key** removes it.
 3. Choose a **Model**: Opus (best, the default), Sonnet (faster, cheaper) or Haiku (fastest, cheapest).
 4. Describe the diagram, for example: *"A user signs in through the web app, which checks the auth service, then loads their orders from the API and its database. Number the steps."* Then press **Draw it**. It takes a few seconds to a minute.
 5. A Mermaid draft appears below, and your prompt stays in the box. Now you can:
@@ -164,11 +164,11 @@ What it can do: add shapes (next to a shape you name), connect shapes, remove th
 
 **Where the key is kept:** without **Remember**, only in memory until you close the window. With it:
 - **Desktop app:** in the **macOS Keychain**, encrypted by macOS and tied to your Mac login, under "local.flowsketch.studio". You can see or delete it in the Keychain Access app. A key that an earlier version kept in the app's storage is moved into the Keychain the first time the dialog opens.
-- **Browser:** in this browser's local storage, as **plain text**. Anyone or anything that can read this browser profile (another person on your account, malware, a rogue extension) could read it. Leave Remember off on a shared computer.
+- **Browser:** **encrypted with a passphrase** you choose (PBKDF2 with 600,000 rounds, then AES-GCM, using the browser's own Web Crypto). Only the encrypted key is stored, never the passphrase. Next time, the dialog asks for the passphrase once per tab to unlock the key. Someone who copies your browser profile or a backup gets only the encrypted copy. While the key is unlocked, it is in the page's memory: a malicious extension running in the page could still read it. A key an earlier version stored unencrypted is removed from storage the first time the dialog opens; tick Remember and choose a passphrase to keep it.
 
 Either way it is never saved in `.flowsketch` files, exports, autosave or Recent documents, and it is only ever sent to `api.anthropic.com`. To limit the damage if a key leaks, give FlowSketch its own key in the Claude Console with a low spend limit; you can delete it there at any time.
 
-The desktop app also has a **content security policy**: its window may only load its own files and connect to itself and `api.anthropic.com`, so even injected script couldn't send the key anywhere else.
+The desktop app and the built web app (`npm run build`) have a **content security policy**: the page may only load its own files and connect to itself and `api.anthropic.com`, so even injected script couldn't send the key anywhere else. (`npm run dev` has none, for live reloading.)
 
 **Cost:** each request is billed to your Anthropic account at the model's API price. A typical diagram is a few thousand tokens, so usually a few cents or less with Opus and less with Sonnet or Haiku. The Console's **Usage** page shows what you've spent.
 
