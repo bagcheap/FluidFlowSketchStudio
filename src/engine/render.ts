@@ -295,10 +295,11 @@ function wiggled(p: ConnectorPath, s0: number, s1: number, rough: number, seed: 
 }
 
 /** Soft glow drawn as wide translucent strokes (cheap everywhere, identical in canvas and SVG). */
-function halo(pts: number[], color: string, sw: number, alpha: number): Part[] {
+function halo(pts: number[], color: string, hw: number, alpha: number): Part[] {
+  // hw = the highlight's own width; the glow reaches the same distance beyond it whatever its thickness
   return [
-    { k: 'line', pts, color, width: sw + 9, alpha: alpha * 0.12, cap: 'round', dash: null },
-    { k: 'line', pts, color, width: sw + 5, alpha: alpha * 0.2, cap: 'round', dash: null },
+    { k: 'line', pts, color, width: hw + 7.5, alpha: alpha * 0.12, cap: 'round', dash: null },
+    { k: 'line', pts, color, width: hw + 3.5, alpha: alpha * 0.2, cap: 'round', dash: null },
   ];
 }
 
@@ -419,7 +420,8 @@ export function playSchedule(doc: FlowDocument): PlaySchedule {
     if (c.type !== 'connector' || c.bar || !c.anim?.window) continue;
     const a = resolveConnectorAnim(doc.animation, c);
     const len = connectorPath(c, lookup).length;
-    let secs = highlightTrain(len, a.highlightLength, a.segments).total / PLAY_SPEED; // the whole train crosses
+    // the whole train crosses, at the play speed scaled by the global arrow speed
+    let secs = highlightTrain(len, a.highlightLength, a.segments).total / (PLAY_SPEED * Math.max(0.05, doc.animation.arrowSpeedScale || 1));
     if (a.direction === 'roundTrip') secs = (2 * secs) / Math.max(0.2, 1 - a.turnPause); // out, wait, back
     const k = Math.round(c.anim.window[0] * 1e4);
     const s = steps.get(k) ?? { ids: [], secs: 0 };
@@ -645,8 +647,8 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
       const pts = wiggled(path, Math.max(shorten(c.startHead) * 0.6, a), Math.min(len - shorten(c.endHead) * 0.6, b), st.roughness, c.seed);
       const color = leg.back ? anim.returnColor : anim.highlightColor;
       if (pts.length >= 4) {
-        if (anim.glow) parts.push(...halo(pts, color, sw, anim.highlightOpacity));
-        parts.push({ k: 'line', pts, color, width: sw + 1.5, alpha: anim.highlightOpacity, cap: anim.roundCaps ? 'round' : 'butt', dash: null });
+        if (anim.glow) parts.push(...halo(pts, color, sw + anim.highlightWidth, anim.highlightOpacity));
+        parts.push({ k: 'line', pts, color, width: sw + anim.highlightWidth, alpha: anim.highlightOpacity, cap: anim.roundCaps ? 'round' : 'butt', dash: null });
       }
     }
   }
@@ -654,8 +656,8 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
     const k = trip(speed);
     pulse = 0.5 + 0.5 * Math.sin(2 * Math.PI * k * tt);
     if (base.length) {
-      if (anim.glow) parts.push(...halo(base, anim.highlightColor, sw, anim.highlightOpacity * pulse));
-      parts.push({ k: 'line', pts: base, color: anim.highlightColor, width: sw + 1.5, alpha: anim.highlightOpacity * pulse, cap: 'round', dash: null });
+      if (anim.glow) parts.push(...halo(base, anim.highlightColor, sw + anim.highlightWidth, anim.highlightOpacity * pulse));
+      parts.push({ k: 'line', pts: base, color: anim.highlightColor, width: sw + anim.highlightWidth, alpha: anim.highlightOpacity * pulse, cap: 'round', dash: null });
     }
   }
   const headScale = anim.arrowPulse && anim.mode !== 'none' ? 1 + 0.18 * Math.sin(2 * Math.PI * trip(speed || 0.5) * tt) : 1;

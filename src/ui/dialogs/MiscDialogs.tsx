@@ -5,7 +5,7 @@ import { useDoc } from '../../store/docStore';
 import { useUI } from '../../store/uiStore';
 import * as cmd from '../../store/commands';
 import { Modal } from './Modal';
-import { Row, Segmented, Select, Slider, Toggle } from '../controls';
+import { ColorPicker, Row, Segmented, Select, Slider, Toggle } from '../controls';
 import { SHORTCUTS } from '../shortcuts';
 import { SAMPLES } from '../../templates/samples';
 import { listCustomTemplates, deleteCustomTemplate, listRecents, loadRecent, loadAutosave, removeRecent, type CustomTemplate, type RecentEntry } from '../../persistence/storage';
@@ -18,7 +18,7 @@ import type { IconSet } from '../../icons/sets';
 import type { ShapeKind } from '../../model/types';
 import { BASIC_SHAPES } from '../../model/schema';
 import { ShapeIcon } from '../ShapeIcon';
-import { uid } from '../../model/defaults';
+import { HIGHLIGHT_COLORS, uid } from '../../model/defaults';
 import { version } from '../../../package.json';
 import { boldRuns, RELEASES } from '../changelog';
 
@@ -62,7 +62,13 @@ export function AnimationDialog() {
           <h3>Default arrow flow</h3>
           <Select label="Arrow style" value={a.connector.mode} onChange={(v) => setConn({ mode: v })} options={[{ v: 'travel', label: 'Travelling highlight' }, { v: 'drawOn', label: 'Draw on' }, { v: 'dash', label: 'Marching dashes' }, { v: 'pulse', label: 'Pulse' }, { v: 'none', label: 'Static' }]} />
           <Slider label="Speed" value={a.connector.speed} min={0.05} max={3} step={0.05} unit="/s" onChange={(v) => setConn({ speed: v })} />
-          <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => setConn({ highlightLength: v })} />
+          <h3>Arrow highlight (all arrows)</h3>
+          <p className="note">These set every arrow at once (replacing an arrow's own value for that setting), and new arrows too.</p>
+          <Slider label="Thickness" value={a.connector.highlightWidth} min={0} max={12} step={0.5} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightWidth: v })} />
+          <ColorPicker label="Highlight colour" value={a.connector.highlightColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ highlightColor: c })} />
+          <ColorPicker label="Return colour" value={a.connector.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ returnColor: c })} />
+          <Slider label="Segments" value={a.connector.segments} min={1} max={8} onChange={(v) => cmd.setGlobalArrow({ segments: v })} />
+          <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} />
         </div>
       </div>
     </Modal>

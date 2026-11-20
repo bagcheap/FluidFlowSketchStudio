@@ -280,6 +280,7 @@ export function Inspector() {
               </>}
               {ca.mode === 'travel' && <>
                 <Slider label="Length" value={ca.highlightLength} min={4} max={300} unit="px" overridden={'highlightLength' in connOv} onReset={() => resetConnAnimKey('highlightLength')} onChange={(v) => setConnAnim({ highlightLength: v })} />
+                <Slider label="Thickness" value={ca.highlightWidth} min={0} max={12} step={0.5} unit="px" overridden={'highlightWidth' in connOv} onReset={() => resetConnAnimKey('highlightWidth')} onChange={(v) => setConnAnim({ highlightWidth: v })} hint="How much thicker the highlight is than the line" />
                 {roundTrip && <Slider label="Pause at turn-around" value={Math.round(ca.turnPause * 100)} min={0} max={60} unit="%" onChange={(v) => setConnAnim({ turnPause: v / 100 })} hint="Share of each round trip spent waiting at the far end before coming back" />}
                 <Slider label="Segments" value={ca.segments} min={1} max={8} onChange={(v) => setConnAnim({ segments: v })} hint={conn?.anim?.window ? "Highlights following each other along the arrow during its step" : "Highlights moving at the same time, evenly spaced"} />
                 <Toggle label="Rounded segment ends" checked={ca.roundCaps} onChange={(v) => setConnAnim({ roundCaps: v })} />
@@ -400,6 +401,15 @@ function CanvasPanel() {
           <Select label="Default shape motion" value={a.shape.mode} onChange={(v) => cmd.setAnimation({ shape: { ...a.shape, mode: v } })} options={[{ v: 'combined', label: 'Combined organic motion' }, { v: 'float', label: 'Gentle float' }, { v: 'wobble', label: 'Organic wobble' }, { v: 'boil', label: 'Sketch boil' }, { v: 'sway', label: 'Soft sway' }, { v: 'off', label: 'Off' }]} />
           <Select label="Default arrow flow" value={a.connector.mode} onChange={(v) => cmd.setAnimation({ connector: { ...a.connector, mode: v } })} options={[{ v: 'travel', label: 'Travelling highlight' }, { v: 'drawOn', label: 'Draw on' }, { v: 'dash', label: 'Marching dashes' }, { v: 'pulse', label: 'Pulse' }, { v: 'none', label: 'Static' }]} />
           <button className="btn small" onClick={() => useUI.getState().openDialog('animation')}>All animation settings…</button>
+        </Section>
+        <Section title="Arrow highlight (all arrows)">
+          <p className="note">These set every arrow on every page at once (an arrow's own value for that setting is replaced), and new arrows too. Fine-tune one arrow afterwards by selecting it.</p>
+          <Slider label="Thickness" value={a.connector.highlightWidth} min={0} max={12} step={0.5} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightWidth: v })} hint="How much thicker the moving highlight is than the arrow's line" />
+          <Slider label="Arrow speed" value={a.arrowSpeedScale} min={0.1} max={4} step={0.05} unit="×" onChange={(v) => cmd.setAnimation({ arrowSpeedScale: v }, 'arrow-speed')} hint="Speeds up or slows down every arrow, including arrows playing in order" />
+          <ColorPicker label="Highlight colour" value={a.connector.highlightColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ highlightColor: c })} />
+          <ColorPicker label="Return colour" value={a.connector.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ returnColor: c })} />
+          <Slider label="Segments" value={a.connector.segments} min={1} max={8} onChange={(v) => cmd.setGlobalArrow({ segments: v })} hint="Highlights per arrow: moving together when looping, one after another in a play step" />
+          <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} />
         </Section>
         <div className="insp-empty">
           <p><b>Quick start:</b> press <kbd>U</kbd> for a rounded rectangle, drag to draw (the tool stays active), <kbd>A</kbd> to connect shapes, double-click a shape to type, then <kbd>K</kbd> to play.</p>
