@@ -104,6 +104,7 @@ There are three layers of settings, applied in order:
 
 * **Native format:** `.flowsketch` is versioned JSON (`format`, `schemaVersion`). It contains all geometry, text, z-order, groups, connector relationships, styles, animation settings, seeds, embedded raster images (data URLs) and export preferences, and never any executable content. On import, every value is validated and coerced. Unknown types are skipped, dangling connector references are detached, duplicate IDs are reissued, and SVG or other non-raster image data is refused. Files from a newer schema version produce a clear error, and older versions are migrated (`src/model/schema.ts`).
 * **Save / Save as.** Chromium browsers write back to the same file via the File System Access API. Other browsers fall back to a download.
+* **Close.** File ▸ Close leaves a blank diagram, asking first (Save / Don't save / Cancel) when there are changes not saved to a file.
 * **Autosave & recovery.** IndexedDB, about 0.7 s after each change. The last session is restored on reload. File ▸ Recent documents lists up to 12 documents and can restore the autosave.
 * Templates: File ▸ New from template (7 built-ins). File ▸ Save as custom template stores your own.
 
@@ -135,7 +136,7 @@ Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu).
 ### 2. Use it in FlowSketch
 
 1. Open Insert ▸ **Describe a diagram (AI)…**.
-2. Paste the key into **API key**. Tick **Remember on this computer** if you don't want to paste it again next time. **Forget key** removes it.
+2. Paste the key into **API key**. To avoid pasting it again next time, tick **Remember in the macOS Keychain** (desktop app) or **Remember in this browser (encrypted with a passphrase)** (browser; choose a passphrase of at least 8 characters, and type it once per tab to unlock the key). **Forget key** removes it.
 3. Choose a **Model**: Opus (best, the default), Sonnet (faster, cheaper) or Haiku (fastest, cheapest).
 4. Describe the diagram, for example: *"A user signs in through the web app, which checks the auth service, then loads their orders from the API and its database. Number the steps."* Then press **Draw it**. It takes a few seconds to a minute.
 5. A Mermaid draft appears below, and your prompt stays in the box. Now you can:
@@ -145,11 +146,29 @@ Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu).
 6. Press **Insert diagram**. It's laid out and animated like any diagram from text. Numbered steps play in order.
 7. The dialog remembers your last session on this computer. Open it again later and the prompts you used are listed under **Prompts used for this draft**, and the Mermaid that was drawn (with your edits) is still there. **Edit** next to a prompt puts it back in the box to tweak and try again. **Start over** clears it all.
 
-**What is sent, and where:** only the text you type in this dialog (plus the current draft when you ask for a change). It goes straight from your browser or the desktop app to Anthropic's API, and only when you press **Draw it** or **Change draft**. Your diagram file and anything else on the canvas are never sent. Claude's reply is read only as Mermaid text and goes through the same checks as Mermaid you paste yourself. Nothing in it is ever run.
+**What is sent, and where:** only the text you type in this dialog (plus the current draft when you ask for a change). It goes straight from your browser or the desktop app to Anthropic's API, and only when you press **Draw it** or **Change draft**. With Describe a diagram, your diagram file and anything else on the canvas are never sent (Change this page, below, does send the page). Claude's reply is read only as Mermaid text and goes through the same checks as Mermaid you paste yourself. Nothing in it is ever run.
+
+### 3. Change a diagram that's already on the page
+
+Insert ▸ **Change this page (AI)…** (also on the canvas right-click menu) works on what you've already drawn.
+
+1. Type what should change, for example: *"Add a cache between the API and the database, colour all databases green, and number the arrows in the order a request flows."* Then press **Suggest changes**.
+2. Claude's suggestions are listed in plain words, for example "Add cylinder “Cache” below “API”" and "Connect “API” → “Cache”". Untick any you don't want.
+3. Press **Apply**. The changes are made as one step, so one ⌘Z undoes them all, and what was added or changed is selected.
+
+What it can do: add shapes (next to a shape you name), connect shapes, remove things, rename, change a shape's kind, recolour, change an arrow's style, heads or direction, put shapes in a container, or move them in or out of one. Everything else on the page stays as it is, including positions, styles and animation.
+
+**What is sent for a change:** this page's text, the kinds of shapes, their colours and positions, the arrows between them and the containers, with your request. Pictures, other pages and anything else in the file are not sent. Claude's reply is a list of changes in a fixed format. Each one is checked (it must name something that's on the page, a known shape kind, a real colour) before it's shown to you, and nothing in it is ever run.
 
 **Where your prompts and drafts are kept:** in local storage on this computer only, until you press **Start over**. They're never sent anywhere except with a request you make.
 
-**Where the key is kept:** without **Remember**, only in memory until you close the window. With it, in this browser's (or the desktop app's) local storage on this computer, as plain text. It is never saved in `.flowsketch` files or exports.
+**Where the key is kept:** without **Remember**, only in memory until you close the window. With it:
+- **Desktop app:** in the **macOS Keychain**, encrypted by macOS and tied to your Mac login, under "local.flowsketch.studio". You can see or delete it in the Keychain Access app. A key that an earlier version kept in the app's storage is moved into the Keychain the first time the dialog opens.
+- **Browser:** **encrypted with a passphrase** you choose (PBKDF2 with 600,000 rounds, then AES-GCM, using the browser's own Web Crypto). Only the encrypted key is stored, never the passphrase. Next time, the dialog asks for the passphrase once per tab to unlock the key. Someone who copies your browser profile or a backup gets only the encrypted copy. While the key is unlocked, it is in the page's memory: a malicious extension running in the page could still read it. A key an earlier version stored unencrypted is removed from storage the first time the dialog opens; tick Remember and choose a passphrase to keep it.
+
+Either way it is never saved in `.flowsketch` files, exports, autosave or Recent documents, and it is only ever sent to `api.anthropic.com`. To limit the damage if a key leaks, give FlowSketch its own key in the Claude Console with a low spend limit; you can delete it there at any time.
+
+The desktop app and the built web app (`npm run build`) have a **content security policy**: the page may only load its own files and connect to itself and `api.anthropic.com`, so even injected script couldn't send the key anywhere else. (`npm run dev` has none, for live reloading.)
 
 **Cost:** each request is billed to your Anthropic account at the model's API price. A typical diagram is a few thousand tokens, so usually a few cents or less with Opus and less with Sonnet or Haiku. The Console's **Usage** page shows what you've spent.
 
@@ -224,7 +243,6 @@ The 60 FPS target for 100+150 objects is **not demonstrated** here, because no G
 * Responsive layout, with the inspector as a bottom sheet on phones
 
 **Deferred / not yet built:**
-* AI edits to an existing diagram (describing a new diagram is built: Insert ▸ Describe a diagram (AI))
 * Keyframes, easing curves and timeline tracks (the timing model already has per-object delay and phase)
 * Find objects; collaboration and accounts
 * Rotating multi-selections as a unit

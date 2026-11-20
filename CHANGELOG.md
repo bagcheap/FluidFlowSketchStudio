@@ -4,6 +4,18 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.47] - 2026-11-20
+
+### Added
+- **File ▸ Close:** closes the diagram and leaves a blank one. If it has changes not saved to a file, it asks first: **Save** (closes once saved; if you cancel the Save dialog it stays open), **Don't save**, or **Cancel**.
+- **Change this page (AI):** Insert ▸ **Change this page (AI)…** (also on the right-click menu) edits the diagram that's already there. Say what should change, for example "add a cache between the API and the database and colour the databases green". Claude suggests the edits, listed in plain words. Untick any you don't want, then **Apply**: one step, undone with one ⌘Z, and what changed is selected. It can add, connect, remove, rename, reshape and recolour shapes, change arrows (style, heads, direction) and group shapes into containers. Everything else stays where it is. Like Describe a diagram, it's opt-in and uses your own Anthropic API key. Pressing **Suggest changes** sends this page's text, shapes, colours, positions and arrows along with your request.
+
+### Changed
+- **The API key is kept more safely in the desktop app:** with **Remember**, it now goes in the **macOS Keychain** (encrypted, tied to your Mac login) instead of the app's storage. A key remembered before is moved into the Keychain the first time you open an AI dialog.
+- **The desktop app's window has a content security policy:** it may only load its own files and connect to itself and the Anthropic API.
+- **In the browser, a remembered API key is now encrypted:** tick **Remember in this browser**, choose a passphrase, and only the encrypted key is stored. Next time, unlock it with the passphrase once per tab. A key remembered before without encryption is removed from storage the first time you open an AI dialog (it stays for that tab).
+- **The web app's built version has the same content security policy** as the desktop app.
+
 ## [0.1.46] - 2026-11-16
 
 ### Changed

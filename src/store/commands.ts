@@ -30,6 +30,7 @@ import { autoLayout as layoutDoc } from '../layout/autoLayout';
 import type { LayoutDir } from '../layout/layered';
 import { colorLabel } from '../ui/colorNames';
 import { svgToIcon } from '../icons/svgToIcon';
+import { applyEdits, type EditOp, type PageView } from '../ai/edits';
 import { selectSimilar as similarIds, SIMILAR_LABELS, type SimilarBy } from './similar';
 
 const D = () => useDoc.getState();
@@ -385,6 +386,25 @@ export function matchSize(mode: MatchSizeMode) {
   const rest = sel.slice(1).filter(canMatchSize);
   if (!ref || !rest.length) { U().toast('Select the shape to match first, then the shapes to resize'); return; }
   D().commit((d) => matchSizes(d, ref.id, rest.map((e) => e.id), mode, U().prefs.matchSizeKeepsProportions));
+}
+
+/**
+ * AI edits: apply checked edit operations (from the Change this page dialog) to the current page as one undo step,
+ * select what was added or changed, and say how it went. Returns how many were applied.
+ */
+export function applyAiEdits(view: PageView, ops: EditOp[]): number {
+  if (!ops.length) return 0;
+  const u = U();
+  const r = applyEdits(D().doc, view, ops, {
+    shape: (k) => u.toolStyle(styleKey('shape', k)), arrow: u.toolStyle('arrow'), container: u.toolStyle('container'), fit: fitShapeToText,
+  });
+  const done = ops.length - r.skipped;
+  if (!done) { u.toast('None of those changes could be made (the items may have changed or be locked)', 'error'); return 0; }
+  D().commit(() => r.doc);
+  u.setTool('select');
+  u.select(r.touched);
+  u.toast(`Made ${done} change${done === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} skipped: items locked or gone)` : ''}`, 'success');
+  return done;
 }
 
 /**
@@ -834,8 +854,30 @@ export async function confirmDiscard(): Promise<boolean> {
   return U().ask('This diagram has changes that are not saved to a file (it is autosaved in this browser and stays in Recent documents). Replace it?', 'Replace');
 }
 
+/**
+ * File ▸ Close: with changes not saved to a file, ask Save / Don't save / Cancel (Save that is cancelled or fails
+ * keeps the diagram open); then start a blank diagram. Returns whether it closed.
+ */
+export async function closeDiagram(): Promise<boolean> {
+  const d = D();
+  const hasContent = pages.allPages(d.doc).some((p) => p.elements.length);
+  if (d.dirty && hasContent) {
+    const title = d.doc.title || 'Untitled diagram';
+    const answer = await U().choose(`Do you want to save the changes to “${title}” before closing it?`, 'Save', "Don't save", 'Close diagram');
+    if (answer === 'cancel') return false;
+    if (answer === 'ok' && !(await save())) return false;
+  }
+  blankDiagram();
+  return true;
+}
+
 export async function newDiagram() {
   if (!(await confirmDiscard())) return;
+  blankDiagram();
+}
+
+/** Replace the diagram with a blank one (no welcome card), forgetting the file it came from. */
+function blankDiagram() {
   resetFileHandle();
   D().load(newDocument());
   useUI.setState({ welcomeDismissed: true }); // the user asked for a blank canvas
@@ -864,11 +906,13 @@ export async function openFile() {
   }
 }
 
-export async function save(saveAs = false) {
+/** Save (or Save as). Returns true when the diagram was written to a file (false if cancelled or it failed). */
+export async function save(saveAs = false): Promise<boolean> {
   try {
     const name = await saveDocumentFile(D().doc, saveAs);
-    if (name) { D().markSaved(name); U().toast(`Saved ${name}`, 'success'); }
+    if (name) { D().markSaved(name); U().toast(`Saved ${name}`, 'success'); return true; }
   } catch (e) { U().toast(`Save failed: ${(e as Error).message}`, 'error'); }
+  return false;
 }
 
 export function renameDocument(title?: string) {

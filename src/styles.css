@@ -373,6 +373,9 @@ code { font-size: 12px; }
 .ai-ask { min-height: 110px; font-family: inherit; font-size: 13px; }
 .ai-prompts ol { margin: 6px 0 0; padding-left: 20px; }
 .ai-prompts li { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; }
+.ai-plan { margin-top: 8px; }
+.ai-ops { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow: auto; }
+.ai-ops .ai-check { align-items: flex-start; }
 .ai-prompt-text { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fg); }
 .ai-error { color: var(--danger); font-size: 12.5px; }
 .note code { font-size: 11.5px; background: var(--panel-2); padding: 0 3px; border-radius: 3px; }

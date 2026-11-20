@@ -968,6 +968,104 @@ def main():
 
         tai()
 
+        @test('Change this page (AI): the page goes with the request; suggested changes are listed, one unticked, the rest applied in one undo step')
+        def taiedit():
+            app.key('Escape')
+            v = app.ui()['view']
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.js('() => window.__flowsketch.setView({x: 9000, y: 27000, zoom: 1})')  # empty area
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('flowchart LR\n  W[Web] --> A[API] --> D[(DB)]')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            sent = []
+            def handle(route):
+                req = route.request
+                if req.method == 'OPTIONS':
+                    return route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'})
+                body = json.loads(req.post_data or '{}'); sent.append(body)
+                content = body['messages'][0]['content']
+                items = json.loads(content.split('Current page:\n', 1)[1].split('\n\nRequest:', 1)[0])
+                ids = {i.get('label'): i['id'] for i in items if 'label' in i and i.get('label') in ('Web', 'API', 'DB')}
+                reply = {'summary': 'Adds a cache under the API and colours the database green.', 'ops': [
+                    {'op': 'add_shape', 'ref': 'n1', 'label': 'Cache', 'shape': 'cylinder', 'near': ids['API'], 'place': 'below', 'container': None},
+                    {'op': 'connect', 'from': ids['API'], 'to': 'n1', 'label': 'get', 'style': 'dashed', 'heads': 'end'},
+                    {'op': 'set_color', 'ids': [ids['DB']], 'fill': '#d3f9d8', 'line': None},
+                ]}
+                route.fulfill(status=200, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
+                    'id': 'msg_e2e', 'type': 'message', 'role': 'assistant', 'model': 'claude-opus-5-5', 'stop_reason': 'end_turn', 'stop_sequence': None,
+                    'content': [{'type': 'text', 'text': json.dumps(reply)}], 'usage': {'input_tokens': 1, 'output_tokens': 1}}))
+            page.route('https://api.anthropic.com/**', handle)
+            try:
+                page.get_by_role('menuitem', name='Insert').click()
+                page.get_by_role('menuitem', name='Change this page (AI)…').click()
+                page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
+                page.get_by_test_id('ai-edit-prompt').fill('Add a cache below the API and make the database green')
+                page.get_by_test_id('ai-suggest').click()
+                page.get_by_test_id('ai-plan').wait_for(timeout=8000)
+                assert len(sent) == 1 and sent[0]['output_config']['format']['type'] == 'json_schema'
+                assert 'Request: Add a cache below the API' in sent[0]['messages'][0]['content']
+                lines = page.locator('.ai-ops li').all_inner_texts()
+                assert lines == ['Add cylinder (database) “Cache” below “API”', 'Connect “API” → “Cache” (“get”), dashed', 'Colour “DB”: fill #d3f9d8'], lines
+                page.locator('.ai-ops li').nth(2).get_by_role('checkbox').uncheck()  # keep the database's colour
+                h1 = app.js('() => window.__flowsketch.history()')['past']
+                page.get_by_test_id('ai-apply').click(); page.wait_for_timeout(150)
+                assert app.js('() => window.__flowsketch.history()')['past'] == h1 + 1  # one undo step
+                els = app.els()
+                cache = [e for e in els if e['type'] == 'shape' and e['text'] == 'Cache'][-1]
+                api = [e for e in els if e['type'] == 'shape' and e['text'] == 'API'][-1]
+                db = [e for e in els if e['type'] == 'shape' and e['text'] == 'DB'][-1]
+                assert cache['shape'] == 'cylinder' and cache['y'] > api['y'] + api['h'], (cache, api)
+                arrow = [e for e in els if e['type'] == 'connector' and e['text'] == 'get'][0]
+                assert arrow['start']['elementId'] == api['id'] and arrow['end']['elementId'] == cache['id'] and arrow['style']['strokeStyle'] == 'dashed'
+                assert db['style']['fill'] != '#d3f9d8', 'unticked change was applied'
+                assert cache['id'] in app.ui()['selection']
+            finally:
+                page.unroute('https://api.anthropic.com/**')
+                app.js("() => localStorage.removeItem('flowsketch:aiEditAsk')")
+                app.key('Escape')
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+        taiedit()
+
+        @test('AI key in the browser: remembered only encrypted with a passphrase; after a reload it unlocks with it')
+        def tkeyenc():
+            c7, p7, a7, e7 = fresh(browser)
+            try:
+                def api(route):
+                    if route.request.method == 'OPTIONS':
+                        return route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'})
+                    route.fulfill(status=200, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
+                        'id': 'm', 'type': 'message', 'role': 'assistant', 'model': 'claude-opus-5-5', 'stop_reason': 'end_turn', 'stop_sequence': None,
+                        'content': [{'type': 'text', 'text': '```mermaid\nflowchart LR\nA-->B\n```'}], 'usage': {'input_tokens': 1, 'output_tokens': 1}}))
+                p7.route('https://api.anthropic.com/**', api)
+                def open_dialog():
+                    p7.get_by_role('menuitem', name='Insert').click()
+                    p7.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                open_dialog()
+                p7.get_by_label('API key').fill('sk-ant-e2e-0123456789')
+                p7.get_by_label('Remember in this browser (encrypted with a passphrase)').check()
+                p7.locator('#ai-pass').fill('correct horse')
+                p7.get_by_test_id('ai-prompt').fill('two boxes')
+                p7.get_by_test_id('ai-draw').click()
+                p7.get_by_test_id('ai-draft').wait_for(timeout=8000)
+                stored = a7.js("() => Object.keys(localStorage).filter(k => k.startsWith('flowsketch:anthropicKey')).map(k => [k, localStorage.getItem(k)])")
+                assert [k for k, _ in stored] == ['flowsketch:anthropicKeyEnc'], stored
+                assert 'sk-ant-e2e' not in stored[0][1]
+                p7.reload(); p7.wait_for_timeout(800)
+                open_dialog()
+                p7.get_by_test_id('ai-unlock').wait_for(timeout=3000)
+                assert p7.get_by_label('API key').input_value() == ''
+                p7.locator('#ai-unlock').fill('wrong passphrase'); p7.get_by_test_id('ai-unlock').click()
+                p7.get_by_text('That passphrase did not open the saved key').wait_for(timeout=10000)
+                p7.locator('#ai-unlock').fill('correct horse'); p7.get_by_test_id('ai-unlock').click()
+                p7.wait_for_function("() => document.querySelector('#ai-key')?.value === 'sk-ant-e2e-0123456789'", timeout=10000)
+                assert p7.locator('#ai-pass').count() == 0  # the same key, already stored: no new passphrase asked
+                assert not e7, e7
+            finally:
+                c7.close()
+        tkeyenc()
+
 
         @test('Moving an arrow end drops its old waypoints; an elbow arrow then routes round shapes from where it was dropped')
         def tendmove():
@@ -1874,6 +1972,30 @@ def main():
             assert not er, er
             c5.close()
         tformats()
+
+        @test('File ▸ Close: with unsaved changes asks Save / Don\'t save / Cancel; Cancel keeps it, Don\'t save gives a blank diagram; no changes: closes at once')
+        def tclose():
+            app.key('Escape')
+            app.tool('r'); app.drag((100, 100), (220, 180)); app.key('Escape')  # an unsaved change
+            n = len(app.els())
+            assert n > 0
+            def close():
+                page.get_by_role('menuitem', name='File').click()
+                page.get_by_role('menuitem', name='Close').click(); page.wait_for_timeout(80)
+            close()
+            dlg = page.locator('.modal', has_text='Close diagram')
+            assert dlg.count() == 1 and 'save the changes' in dlg.inner_text(), dlg.all_inner_texts()
+            assert dlg.get_by_role('button', name='Save', exact=True).count() == 1
+            dlg.get_by_role('button', name='Cancel').click(); page.wait_for_timeout(60)
+            assert len(app.els()) == n, 'Cancel must keep the diagram'
+            close()
+            page.get_by_test_id('confirm-alt').click(); page.wait_for_timeout(150)  # Don't save
+            assert app.els() == [], app.els()[:2]
+            assert app.doc()['title'] == 'Untitled diagram'
+            assert page.locator('.modal').count() == 0
+            close()  # nothing changed: closes without asking
+            assert page.locator('.modal', has_text='Close diagram').count() == 0
+        tclose()
 
         ctx.close()
 
