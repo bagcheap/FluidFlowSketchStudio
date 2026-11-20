@@ -21,7 +21,7 @@ import { activeLevel, addBar, addFrameBehind, addParticipant, addSelfMessage, as
 import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { Copy } from 'lucide-react';
-import { liveCameraView } from '../store/commands';
+import { liveCameraView, visibleArea } from '../store/commands';
 import { applyStyle, clearAllPlayOrder, playInLabelOrder, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
@@ -169,7 +169,9 @@ export function Canvas() {
         hide: u.editingId ? new Set([u.editingId]) : undefined,
         cull: { x: view.x, y: view.y, w: stage.w / view.zoom, h: stage.h / view.zoom },
       });
-      drawFrame(ctx, frame, { images: imageMap(d.doc.assets), originX: view.x, originY: view.y, scale: view.zoom * dpr });
+      // a step caption stays in the part of the canvas not under the toolbar and Inspector
+      const va = visibleArea();
+      drawFrame(ctx, frame, { images: imageMap(d.doc.assets), originX: view.x, originY: view.y, scale: view.zoom * dpr, captionArea: { x: 0, y: va.top * dpr, w: va.w * dpr, h: va.h * dpr } });
     };
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); off(); };

@@ -1286,6 +1286,38 @@ def main():
             assert app.doc()['animation']['connector']['highlightColor'] == '#3b82f6'
         tglobalarrow()
 
+        @test('Playing in order: pause between steps, caption size and position, glow for all arrows (Inspector, nothing selected)')
+        def tplaysettings():
+            app.key('Escape')
+            v = app.ui()['view']
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.js('() => window.__flowsketch.setView({x: 9000, y: 31000, zoom: 1})')
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('flowchart LR\n  A[Client] -->|1. ask| B[Server] -->|2. look up| C[(Store)]')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            app.key('Escape'); app.key('Escape')
+            secs0 = app.doc()['animation']['duration']
+            page.get_by_label('Pause between steps value').fill('1.5'); page.keyboard.press('Enter'); page.wait_for_timeout(80)
+            a = app.doc()['animation']
+            assert a['stepPause'] == 1.5 and a['duration'] > secs0 + 2, (a.get('stepPause'), secs0, a['duration'])
+            page.get_by_label('Step captions').check(); page.wait_for_timeout(60)
+            page.get_by_label('Caption size').get_by_role('radio', name='Large').click()
+            page.get_by_label('Caption position').get_by_role('radio', name='Top').click(); page.wait_for_timeout(60)
+            a = app.doc()['animation']
+            assert a['captions'] and a['captionSize'] == 'large' and a['captionPosition'] == 'top', a
+            f = app.js('(t) => window.__flowsketch.frame(t)', 0.3)
+            assert f.get('caption') and f['caption']['position'] == 'top' and f['caption']['size'] == 'large', f.get('caption')
+            page.get_by_label('Glow').first.uncheck(); page.wait_for_timeout(60)
+            assert app.doc()['animation']['connector']['glow'] is False
+            # the caption is drawn at the top of the live view
+            app.js('() => window.__flowsketch.pause && window.__flowsketch.pause(0.3)')
+            page.wait_for_timeout(200)
+            page.locator('[data-testid=stage]').screenshot(path=f'{OUT}/e2e-caption-top.png')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tplaysettings()
+
         @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
         def tmermaid():
             app.key('Escape')
@@ -1539,6 +1571,8 @@ def main():
             for frac in (0.5, 0.35, 0.65, 0.2, 0.8):
                 mx, my = app.js('''([id, f]) => { const it = window.__flowsketch.frame(0).items.find((i) => i.id === id);
                   const p = it.parts.find((q) => q.k === 'line').pts; const k = Math.floor(p.length / 2 * f) * 2; return [p[k], p[k + 1]]; }''', [c['id'], frac])
+                app.js('([x, y]) => window.__flowsketch.setView({x: x - 450, y: y - 380, zoom: 1})', [mx, my])  # the point in clear view
+                page.wait_for_timeout(50)
                 app.click((mx, my))
                 if app.ui()['selection'] == [c['id']]: break
                 app.key('Escape')
@@ -1593,7 +1627,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 17
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 18
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()

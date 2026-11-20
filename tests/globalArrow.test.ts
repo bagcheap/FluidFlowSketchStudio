@@ -77,7 +77,37 @@ describe('Arrow highlight (all arrows)', () => {
     const old = JSON.parse(serializeDocument(newDocument()));
     old.schemaVersion = 16; delete old.animation.connector.highlightWidth;
     const r = parseDocument(JSON.stringify(old)).doc;
-    expect(r.schemaVersion).toBe(17);
+    expect(r.schemaVersion).toBe(18);
     expect(r.animation.connector.highlightWidth).toBe(1.5);
+  });
+});
+
+describe('Glow, opacity, pause between steps, caption style', () => {
+  beforeEach(() => { D().load(newDocument()); useUI.setState((s) => ({ prefs: { ...s.prefs, toolStyles: {} } })); });
+
+  it('glow and opacity are all-arrows settings too', () => {
+    const own = arrow(0, { glow: true, highlightOpacity: 0.4 });
+    D().commit((d) => ({ ...d, elements: [own] }));
+    setGlobalArrow({ glow: false });
+    setGlobalArrow({ highlightOpacity: 0.6 });
+    expect(conn(own.id).anim).toBeUndefined();
+    const parts = renderDocumentAtTime(D().doc, 0.3).items[0].parts.filter((p) => p.k === 'line' && p.color === D().doc.animation.connector.highlightColor);
+    expect(parts.length).toBe(1); // no glow strokes, just the highlight
+    expect((parts[0] as { alpha: number }).alpha).toBeCloseTo(0.6);
+  });
+
+  it('pause between steps: longer steps, loop refitted; caption size and position reach the frame', () => {
+    const a = arrow(0, { window: [0, 0.4] }), b = arrow(0, { window: [0.4, 0.85] });
+    a.text = '1. ask'; b.text = '2. answer';
+    D().commit((d) => ({ ...d, elements: [a, b], animation: { ...d.animation, captions: true } }));
+    const short = playSchedule(D().doc).seconds;
+    setAnimation({ stepPause: 2 });
+    expect(playSchedule(D().doc).seconds).toBeCloseTo(short + 2 * (2 - 0.35), 5);
+    expect(D().doc.animation.duration).toBeCloseTo(Math.ceil(playSchedule(D().doc).seconds * 10) / 10, 5);
+    setAnimation({ captionSize: 'large', captionPosition: 'top' });
+    const f = renderDocumentAtTime(D().doc, 0.2);
+    expect(f.caption).toMatchObject({ text: '1. ask', size: 'large', position: 'top' });
+    const saved = parseDocument(serializeDocument(D().doc)).doc.animation;
+    expect(saved).toMatchObject({ stepPause: 2, captionSize: 'large', captionPosition: 'top' });
   });
 });

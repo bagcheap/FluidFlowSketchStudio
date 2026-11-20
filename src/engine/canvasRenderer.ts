@@ -11,6 +11,8 @@ export interface DrawOptions {
   originX: number;
   originY: number;
   scale: number;
+  /** Where a step caption may go, in device px (the live view keeps it clear of the toolbar and Inspector); default: the whole canvas. */
+  captionArea?: { x: number; y: number; w: number; h: number };
 }
 
 function tracePath(ctx: Ctx, ops: Op[]) {
@@ -159,16 +161,20 @@ export function drawFrame(ctx: Ctx, frame: Frame, o: DrawOptions) {
   ctx.setTransform(o.scale, 0, 0, o.scale, -o.originX * o.scale, -o.originY * o.scale);
   for (const it of frame.items) drawItem(ctx, it, o.images);
   ctx.restore();
-  if (frame.caption && frame.caption.alpha > 0.01) drawCaption(ctx, frame.caption.text, frame.caption.alpha);
+  if (frame.caption && frame.caption.alpha > 0.01) drawCaption(ctx, frame.caption.text, frame.caption.alpha, frame.caption.size, frame.caption.position, o.captionArea);
 }
 
 /**
  * A step caption: a dark, rounded subtitle bar near the bottom of whatever is being drawn (the live view, an export
  * frame or the HTML player), sized to the output, at most two lines.
  */
-function drawCaption(ctx: Ctx, text: string, alpha: number) {
-  const W = ctx.canvas.width, H = ctx.canvas.height;
-  const fs = Math.round(Math.min(40, Math.max(12, Math.min(W, H) * 0.032)));
+const CAPTION_SCALE = { small: 0.75, medium: 1, large: 1.4 } as const;
+
+function drawCaption(ctx: Ctx, text: string, alpha: number, size: keyof typeof CAPTION_SCALE = 'medium', position: 'bottom' | 'top' = 'bottom', area?: { x: number; y: number; w: number; h: number }) {
+  const ax = area?.x ?? 0, ay = area?.y ?? 0;
+  const W = area?.w ?? ctx.canvas.width, H = area?.h ?? ctx.canvas.height;
+  const k = CAPTION_SCALE[size] ?? 1;
+  const fs = Math.round(Math.min(40 * k, Math.max(10, Math.min(W, H) * 0.032 * k)));
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`;
@@ -190,7 +196,8 @@ function drawCaption(ctx: Ctx, text: string, alpha: number) {
   }
   const textW = Math.max(...lines.map((l) => ctx.measureText(l).width));
   const boxW = Math.min(maxW, textW + padX * 2), boxH = lines.length * lh + padY * 2;
-  const x = (W - boxW) / 2, y = H - boxH - Math.max(fs, H * 0.04);
+  const margin = Math.max(fs, H * 0.04);
+  const x = ax + (W - boxW) / 2, y = ay + (position === 'top' ? margin : H - boxH - margin);
   ctx.globalAlpha = alpha;
   ctx.fillStyle = 'rgba(17, 24, 39, 0.82)';
   const r = Math.min(fs * 0.6, boxH / 2);
@@ -201,6 +208,6 @@ function drawCaption(ctx: Ctx, text: string, alpha: number) {
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, y + padY + lh * (i + 0.5)));
+  lines.forEach((l, i) => ctx.fillText(l, ax + W / 2, y + padY + lh * (i + 0.5)));
   ctx.restore();
 }

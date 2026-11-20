@@ -79,6 +79,8 @@ export interface ConnectorAnim {
   window?: [number, number]; // travelling highlight plays once, only in this part of the loop (fractions 0..1): sequence-diagram steps
 }
 
+export type CaptionSize = 'small' | 'medium' | 'large';
+
 export interface AnimationSettings {
   enabled: boolean;
   animateShapes: boolean;
@@ -96,6 +98,9 @@ export interface AnimationSettings {
   captions?: boolean; // arrows playing in order: the playing step's arrow labels as a subtitle (schema v12)
   stepFocus?: boolean; // arrows playing in order: the playing step's shapes glow, the rest dims (schema v12)
   camera?: boolean; // arrows playing in order: the view zooms to each step (or group of nearby steps), then back to the whole picture (schema v13)
+  stepPause?: number; // arrows playing in order: seconds between one step and the next (schema v18; unset = 0.35)
+  captionSize?: CaptionSize; // step captions: text size (schema v18; unset = medium)
+  captionPosition?: 'bottom' | 'top'; // step captions: where the subtitle bar sits (schema v18; unset = bottom)
   shape: ShapeAnim; // document defaults
   connector: ConnectorAnim;
 }
@@ -221,7 +226,7 @@ export interface ExportPrefs {
   padding: number;
 }
 
-export const SCHEMA_VERSION = 17; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth) · v11: arrowhead size (headSize) · v12: step captions and step focus (animation.captions / stepFocus) · v13: camera moves (animation.camera) · v14: page links and hover notes on items (link / note) · v15: line jumps (canvas.lineJumps) · v16: UML, ER and BPMN shapes and crow's-foot arrowheads · v17: highlight thickness (ConnectorAnim.highlightWidth)
+export const SCHEMA_VERSION = 18; // v2: icons (IconElement + FlowDocument.icons) · v3: gradient paints and bbox in icon parts · v4: containers · v5: round-trip arrow highlights · v6: rounded elbows (elbowRadius); curved arrows with no curve became straight · v7: pages (tabs) and sequence-diagram anchors beyond the box · v8: activation bars (ConnectorElement.bar) · v9: arrow play windows (message-by-message playback) · v10: arrow label width (labelWidth) · v11: arrowhead size (headSize) · v12: step captions and step focus (animation.captions / stepFocus) · v13: camera moves (animation.camera) · v14: page links and hover notes on items (link / note) · v15: line jumps (canvas.lineJumps) · v16: UML, ER and BPMN shapes and crow's-foot arrowheads · v17: highlight thickness (ConnectorAnim.highlightWidth) · v18: pause between steps and caption size/position (animation.stepPause / captionSize / captionPosition)
 
 /**
  * One drawable piece of an icon: plain path data plus paint, in the icon's own units (w × h).

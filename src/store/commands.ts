@@ -835,13 +835,13 @@ export function setAnimation(patch: Partial<FlowDocument['animation']>, key = 'a
     const next = { ...d, animation: { ...d.animation, ...patch } };
     // camera moves add time to the play order (moving in, between shots and back out), and the arrow speed sets
     // how long each step takes: fit the loop to it
-    const retime = ('camera' in patch && patch.camera !== d.animation.camera) || ('arrowSpeedScale' in patch && patch.arrowSpeedScale !== d.animation.arrowSpeedScale);
+    const retime = (['camera', 'arrowSpeedScale', 'stepPause'] as const).some((k) => k in patch && patch[k] !== d.animation[k]);
     return retime && playSchedule(next).steps.length ? fitLoopToPlay(next) : next;
   }, key);
 }
 
 /** Arrow-highlight settings that "all arrows" controls set for every arrow at once. */
-export const GLOBAL_ARROW_KEYS = ['highlightWidth', 'highlightColor', 'returnColor', 'segments', 'highlightLength'] as const;
+export const GLOBAL_ARROW_KEYS = ['highlightWidth', 'highlightColor', 'returnColor', 'segments', 'highlightLength', 'highlightOpacity', 'glow'] as const;
 export type GlobalArrowKey = (typeof GLOBAL_ARROW_KEYS)[number];
 
 /**

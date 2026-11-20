@@ -2,7 +2,7 @@
 // The single source of truth for what a diagram looks like at time t. Pure with respect to the
 // document: it never mutates it. The live canvas, PNG/GIF/video export and SVG export all consume
 // the returned Frame, so preview and exports match exactly.
-import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, IconElement, IconGradient, IconPaint, Style, Point, ShapeElement, TextElement, TextStyle } from '../model/types';
+import type { BoxElement, CaptionSize, ConnectorElement, ContainerElement, DiagramElement, FlowDocument, FreehandElement, HeadKind, IconElement, IconGradient, IconPaint, Style, Point, ShapeElement, TextElement, TextStyle } from '../model/types';
 import type { Motion, PreviewFlags } from './animation';
 import { STILL, resolveConnectorAnim, shapeMotion } from './animation';
 import { connectorPath, endTangent, pointAt, slice, type ConnectorPath, type Lookup } from './connectors';
@@ -28,7 +28,7 @@ export type Part =
 
 export interface Transform { x: number; y: number; w: number; h: number; rot: number }
 export interface Item { id: string; opacity: number; tf: Transform | null; parts: Part[] }
-export interface Frame { items: Item[]; time: number; background: string; caption?: { text: string; alpha: number } }
+export interface Frame { items: Item[]; time: number; background: string; caption?: { text: string; alpha: number; size?: CaptionSize; position?: 'bottom' | 'top' } }
 
 export interface RenderOptions {
   flags?: PreviewFlags;
@@ -401,6 +401,8 @@ function barParts(path: ConnectorPath, st: ConnectorElement['style']): Part[] {
 export const PLAY_SPEED = 250;
 /** …with this pause (seconds) after each step. */
 export const STEP_PAUSE = 0.35;
+/** The pause between play steps for this document (seconds). */
+export const stepPause = (doc: FlowDocument) => Math.max(0, Math.min(5, doc.animation.stepPause ?? STEP_PAUSE));
 
 interface PlaySchedule { win: Map<string, [number, number]>; seconds: number; steps: { ids: string[]; start: number }[]; camera: CamKey[] }
 const schedules = new WeakMap<FlowDocument, PlaySchedule>();
@@ -442,7 +444,7 @@ export function playSchedule(doc: FlowDocument): PlaySchedule {
     }
     for (const id of s.ids) win.set(id, [at, at + s.secs]);
     stepList.push({ ids: s.ids, start: at });
-    at += s.secs + STEP_PAUSE;
+    at += s.secs + stepPause(doc);
     if (cam && (k === ordered.length - 1 || cam.of[k + 1] !== cam.of[k])) keys.push({ at, shot: cam.shots[cam.of[k]] }); // hold until it moves on
   });
   if (cam) { at += CAM_MOVE; keys.push({ at, shot: null }); at += CAM_CLOSE; keys.push({ at, shot: null }); }
@@ -759,7 +761,7 @@ export function renderDocumentAtTime(doc: FlowDocument, t: number, opts: RenderO
     if (step) {
       if (anim.stepFocus) applyStepFocus(doc, items, step.ids, step.fade);
       const text = anim.captions ? stepCaption(doc, step.ids) : '';
-      if (text) caption = { text, alpha: step.fade };
+      if (text) caption = { text, alpha: step.fade, size: anim.captionSize ?? 'medium', position: anim.captionPosition ?? 'bottom' };
     }
   }
   return { items, time: t, background: doc.canvas.background, ...(caption ? { caption } : {}) };
