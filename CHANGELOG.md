@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.50] - 2026-11-20
 
 ### Added
 - **Glow and opacity for all arrows:** the Inspector's **Arrow highlight (all arrows)** section (nothing selected) now also has **Opacity** and **Glow**, to make every arrow's highlight subtler or bolder at once.
