@@ -833,10 +833,47 @@ export function resetDocAnimation() {
 export function setAnimation(patch: Partial<FlowDocument['animation']>, key = 'anim-settings') {
   D().commit((d) => {
     const next = { ...d, animation: { ...d.animation, ...patch } };
-    // camera moves add time to the play order (moving in, between shots and back out): fit the loop to it
-    return 'camera' in patch && patch.camera !== d.animation.camera && playSchedule(next).steps.length ? fitLoopToPlay(next) : next;
+    // camera moves add time to the play order (moving in, between shots and back out), and the arrow speed sets
+    // how long each step takes: fit the loop to it
+    const retime = ('camera' in patch && patch.camera !== d.animation.camera) || ('arrowSpeedScale' in patch && patch.arrowSpeedScale !== d.animation.arrowSpeedScale);
+    return retime && playSchedule(next).steps.length ? fitLoopToPlay(next) : next;
   }, key);
 }
+
+/** Arrow-highlight settings that "all arrows" controls set for every arrow at once. */
+export const GLOBAL_ARROW_KEYS = ['highlightWidth', 'highlightColor', 'returnColor', 'segments', 'highlightLength'] as const;
+export type GlobalArrowKey = (typeof GLOBAL_ARROW_KEYS)[number];
+
+/**
+ * Set an arrow-highlight setting for every arrow: the document default changes, and that setting is removed from
+ * every (unlocked) arrow on every page that had its own value, so all of them follow it; the arrow tools' remembered
+ * styles forget it too, so new arrows follow it. Other per-arrow settings (and lifelines' "no animation") stay.
+ * One undo step (rapid slider changes coalesce); the play-order loop is refitted when timing changes.
+ */
+export function setGlobalArrow(patch: Partial<Pick<ConnectorAnim, GlobalArrowKey>>) {
+  const keys = Object.keys(patch) as GlobalArrowKey[];
+  if (!keys.length) return;
+  const strip = (els: DiagramElement[]) => els.map((e) => {
+    if (e.type !== 'connector' || e.locked || !e.anim || !keys.some((k) => k in e.anim!)) return e;
+    const anim = { ...e.anim };
+    for (const k of keys) delete anim[k];
+    const { anim: _old, ...rest } = e;
+    return (Object.keys(anim).length ? { ...rest, anim } : rest) as ConnectorElement;
+  });
+  D().commit((d) => {
+    const next = { ...d, animation: { ...d.animation, connector: { ...d.animation.connector, ...patch } }, elements: strip(d.elements), pages: d.pages.map((p) => ({ ...p, elements: strip(p.elements) })) };
+    return (patch.segments !== undefined || patch.highlightLength !== undefined) && playSchedule(next).steps.length ? fitLoopToPlay(next) : next;
+  }, `global-arrow:${keys.join()}`);
+  // new arrows follow too: tool styles stop remembering these settings
+  const u = U();
+  for (const [key, ts] of Object.entries(u.prefs.toolStyles)) {
+    if (!ts.connectorAnim || !keys.some((k) => k in ts.connectorAnim!)) continue;
+    const ca = { ...ts.connectorAnim };
+    for (const k of keys) delete ca[k];
+    u.setToolStyle(key, { ...ts, connectorAnim: ca });
+  }
+}
+
 
 // ---- playback --------------------------------------------------------------------
 export function togglePlay() {

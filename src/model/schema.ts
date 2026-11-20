@@ -126,6 +126,7 @@ export function sanitizeConnectorAnim(v: unknown, partial: boolean): Partial<Con
     turnPause: num(o.turnPause, d.turnPause, 0, 0.6),
     highlightLength: num(o.highlightLength, d.highlightLength, 2, 2000),
     highlightOpacity: num(o.highlightOpacity, d.highlightOpacity, 0, 1),
+    highlightWidth: num(o.highlightWidth, d.highlightWidth, 0, 20),
     segments: Math.round(num(o.segments, d.segments, 1, 12)),
     roundCaps: bool(o.roundCaps, d.roundCaps),
     glow: bool(o.glow, d.glow),
@@ -409,6 +410,10 @@ export function migrate(raw: Obj): Obj {
   if (version === 15) {
     // v15 -> v16: UML, ER and BPMN shape kinds and crow's-foot arrowheads; nothing to convert
     version = 16;
+  }
+  if (version === 16) {
+    // v16 -> v17: highlight thickness (ConnectorAnim.highlightWidth); missing = 1.5, the thickness it always had
+    version = 17;
   }
   raw.schemaVersion = version;
   return raw;

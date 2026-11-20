@@ -91,12 +91,13 @@ There are three layers of settings, applied in order:
 | Layer | Where | Notes |
 |---|---|---|
 | Document defaults | Animation ▸ Global animation settings | Duration, loop, seamless snapping, global squiggle/speed multipliers, default shape motion and arrow flow, synchronise / randomise phases, reduced-motion mode |
+| All arrows | Inspector with nothing selected ▸ *Arrow highlight (all arrows)* (also in the Animation settings dialog) | Highlight thickness, colour, return colour, segments and length for every arrow on every page at once, plus the overall arrow speed (which also sets how fast arrows playing in order move). Each change replaces that one setting on every arrow (locked ones excepted) and in the arrow tools' remembered style, so new arrows follow too |
 | Per-object overrides | Inspector ▸ *Shape animation* / *Arrow animation* | Only the values you touch are stored; a blue dot marks an override. ↺ resets a value or a whole section to the document default |
 | Playback preview | Bottom bar | Play/pause, stop, restart, scrub, length, speed, loop, all-motion on/off. Nothing here changes saved geometry |
 
 **Shape motion modes:** Gentle float · Organic wobble (smooth outline deformation) · Sketch boil (cycles between three stable hand-drawn variants) · Soft sway (tiny rotation) · Combined (default) · Off. The per-object parameters are squiggle intensity, speed, movement amplitude, rotation, deform, smoothness, phase, delay, and text behaviour (moves with shape / stays stable / drifts on its own). Text glyphs are never deformed.
 
-**Arrow modes:** Travelling highlight (colour, length, opacity, segment count, round/square ends, glow) · Draw on (drawing share, pause, optional erase-from-tail; the arrowhead rides the leading tip) · Marching dashes · Pulse · Static. Every mode also has speed, direction, delay and an optional arrowhead pulse. All of them follow the true connector geometry, including curves and elbows.
+**Arrow modes:** Travelling highlight (colour, length, thickness, opacity, segment count, round/square ends, glow) · Draw on (drawing share, pause, optional erase-from-tail; the arrowhead rides the leading tip) · Marching dashes · Pulse · Static. Every mode also has speed, direction, delay and an optional arrowhead pulse. All of them follow the true connector geometry, including curves and elbows.
 
 **Seamless loops.** With *Seamless* on (the default), every frequency is snapped to a whole number of cycles per loop, so position and velocity match at t = 0 and t = L. Per-object *delays* ease in and therefore break seamlessness; the GIF dialog warns when this applies.
 

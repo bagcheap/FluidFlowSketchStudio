@@ -1254,6 +1254,38 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tsimilar()
 
+        @test('Arrow highlight (all arrows): a global colour and thickness reach every arrow, replacing an arrow\'s own colour; undo restores it')
+        def tglobalarrow():
+            app.key('Escape')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            c = app.els('connector')[-1]
+            # give this arrow its own highlight colour in its Inspector
+            mx, my = app.js('''(id) => { const it = window.__flowsketch.frame(0).items.find((i) => i.id === id);
+              const p = it.parts.find((q) => q.k === 'line').pts; const k = Math.floor(p.length / 4) * 2; return [p[k], p[k + 1]]; }''', c['id'])
+            app.click((mx, my))
+            assert app.ui()['selection'] == [c['id']], app.ui()['selection']
+            page.get_by_label('Arrow animation', exact=True).select_option('travel')
+            page.get_by_label('Highlight colour #ec4899').click(); page.wait_for_timeout(60)
+            mine = [e for e in app.els() if e['id'] == c['id']][0]
+            assert mine['anim'].get('highlightColor') == '#ec4899', mine['anim']
+            # nothing selected: the canvas Inspector's all-arrows section
+            app.key('Escape'); app.key('Escape')  # Select tool, nothing selected
+            page.get_by_label('Highlight colour #22c55e').click(); page.wait_for_timeout(60)
+            d = app.doc()
+            assert d['animation']['connector']['highlightColor'] == '#22c55e'
+            mine = [e for e in app.els() if e['id'] == c['id']][0]
+            assert 'highlightColor' not in (mine.get('anim') or {}), mine.get('anim')
+            page.get_by_label('Thickness value').fill('5'); page.keyboard.press('Enter'); page.wait_for_timeout(60)
+            assert app.doc()['animation']['connector']['highlightWidth'] == 5
+            f = app.js('(id) => window.__flowsketch.frame(0.4).items.find((i) => i.id === id)', c['id'])
+            widths = [p['width'] for p in f['parts'] if p['k'] == 'line' and p['color'] == '#22c55e']
+            assert widths and abs(max(widths) - (mine['style']['strokeWidth'] + 5 + 7.5)) < 0.01, widths
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            back = [e for e in app.els() if e['id'] == c['id']][0]
+            assert (back.get('anim') or {}).get('highlightColor') != '#ec4899'
+            assert app.doc()['animation']['connector']['highlightColor'] == '#3b82f6'
+        tglobalarrow()
+
         @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
         def tmermaid():
             app.key('Escape')
@@ -1503,10 +1535,13 @@ def main():
         def t56():
             c = app.els('connector')[-1]
             app.key('Escape')
-            # a point halfway along the drawn line (an elbow arrow need not pass halfway between its ends)
-            mx, my = app.js('''(id) => { const it = window.__flowsketch.frame(0).items.find((i) => i.id === id);
-              const p = it.parts.find((q) => q.k === 'line').pts; const k = Math.floor(p.length / 4) * 2; return [p[k], p[k + 1]]; }''', c['id'])
-            app.click((mx, my))
+            # points along the drawn line (an elbow arrow need not pass halfway between its ends); the first that selects it
+            for frac in (0.5, 0.35, 0.65, 0.2, 0.8):
+                mx, my = app.js('''([id, f]) => { const it = window.__flowsketch.frame(0).items.find((i) => i.id === id);
+                  const p = it.parts.find((q) => q.k === 'line').pts; const k = Math.floor(p.length / 2 * f) * 2; return [p[k], p[k + 1]]; }''', [c['id'], frac])
+                app.click((mx, my))
+                if app.ui()['selection'] == [c['id']]: break
+                app.key('Escape')
             assert app.ui()['selection'] == [c['id']], app.ui()['selection']
             # a straight arrow, so the highlight's direction shows as left/right movement (an elbow can be vertical there)
             page.get_by_role('radiogroup', name='Routing').get_by_role('radio', name='Straight').click(); page.wait_for_timeout(60)
@@ -1558,7 +1593,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 16
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 17
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()

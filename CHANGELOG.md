@@ -4,6 +4,13 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.49] - 2026-11-20
+
+### Added
+- **Arrow highlight settings for all arrows at once:** with nothing selected, the Inspector has a new **Arrow highlight (all arrows)** section (also in Animation ▸ All animation settings). **Thickness**, **Highlight colour**, **Return colour**, **Segments** and **Highlight length** change every arrow on every page in one go, replacing any arrow's own value for that setting, and new arrows follow them too. Locked arrows are left alone. You can still fine-tune one arrow afterwards.
+- **Highlight thickness:** how much thicker the moving highlight is than the arrow's line, for all arrows or for one arrow in its Inspector. It used to be fixed.
+- **Arrow speed** in the same section speeds up or slows down every arrow, now including arrows that play one step at a time (the loop length adjusts to match).
+
 ## [0.1.48] - 2026-11-20
 
 ### Fixed

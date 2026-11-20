@@ -61,6 +61,7 @@ export const DEFAULT_CONNECTOR_ANIM: ConnectorAnim = {
   turnPause: 0.1,
   highlightLength: 36,
   highlightOpacity: 1,
+  highlightWidth: 1.5,
   segments: 1,
   roundCaps: true,
   glow: true,
