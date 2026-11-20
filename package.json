@@ -1,6 +1,6 @@
 {
   "name": "flowsketch-studio",
-  "version": "0.1.47",
+  "version": "0.1.48",
   "private": true,
   "type": "module",
   "description": "FlowSketch Studio — animated hand-drawn flow diagram editor",
@@ -30,7 +30,7 @@
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-fs": "^2.7.1",
-    "fflate": "^0.8.2",
+    "fflate": "^0.8.3",
     "gifenc": "^1.0.3",
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.55.0",

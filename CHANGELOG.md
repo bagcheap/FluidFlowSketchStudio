@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.48] - 2026-11-20
+
+### Fixed
+- **Security updates:** a damaged or deliberately malformed ZIP file could freeze the app while importing icons (fixed in the fflate library, now at 0.8.3). The test tools' web library (undici) is also updated; it isn't part of the app.
+
 ## [0.1.47] - 2026-11-20
 
 ### Added
