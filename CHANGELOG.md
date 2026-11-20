@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.47] - 2026-11-20
 
 ### Added
 - **File ▸ Close:** closes the diagram and leaves a blank one. If it has changes not saved to a file, it asks first: **Save** (closes once saved; if you cancel the Save dialog it stays open), **Don't save**, or **Cancel**.
