@@ -27,6 +27,7 @@ import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
 import { placeSizeMarks, sizeSnap, spacingSnap, type GapMark } from './spacing';
 import { FindBar } from '../ui/FindBar';
+import { ReviewPanel } from '../ui/ReviewPanel';
 import { findMatches } from '../store/find';
 import { updateMembership, withMembers } from '../store/containers';
 
@@ -1279,6 +1280,7 @@ export function Canvas() {
         <g transform={`scale(${z}) translate(${-view.x} ${-view.y})`}>{overlayEls}</g>
       </svg>
       {!presentation && <FindBar />}
+      {!presentation && <ReviewPanel />}
       {playOrderMode && !presentation && (
         <div className="order-bar no-canvas" role="toolbar" aria-label="Set play order">
           <span><b>Play order:</b> click arrows in turn · Shift: same step · again: remove</span>

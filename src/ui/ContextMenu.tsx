@@ -89,6 +89,7 @@ function canvasItems(): MenuItem[] {
     { sep: true },
     { label: 'Grid', sub: (['dots', 'lines', 'none'] as const).map((g) => ({ label: g === 'none' ? 'Plain' : g === 'dots' ? 'Dot grid' : 'Line grid', checked: doc.canvas.grid === g, run: () => setGrid(g) })) },
     { label: 'Line jumps', checked: !!doc.canvas.lineJumps, run: cmd.toggleLineJumps },
+    { label: 'Review diagram', checked: useUI.getState().review, run: () => cmd.toggleReview() },
     { label: 'Snap to grid', checked: ui.prefs.snapToGrid, run: () => ui.updatePrefs({ snapToGrid: !ui.prefs.snapToGrid }) },
     { label: 'Alignment guides', checked: ui.prefs.smartGuides, run: () => ui.updatePrefs({ smartGuides: !ui.prefs.smartGuides }) },
     { sep: true },

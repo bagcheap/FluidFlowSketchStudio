@@ -1410,6 +1410,41 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         trenumber()
 
+        @test('Review panel: lists likely mistakes as you edit; click selects; Renumber fixes a gap; hide; page snapshot for the AI tools')
+        def treview():
+            app.key('Escape')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            page.get_by_role('button', name='Add page').click(); page.wait_for_timeout(100)
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('flowchart LR\n  A[Client] -->|1. ask| B[API]\n  B -->|3. query| C[(Database)]\n  D[Alone]')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            app.key('Escape'); app.key('Escape')
+            page.get_by_role('menuitem', name='View').click()
+            page.get_by_role('menuitemcheckbox', name='Review diagram').click(); page.wait_for_timeout(400)
+            panel = page.get_by_role('region', name='Review')
+            assert panel.is_visible()
+            text = panel.inner_text()
+            assert 'There is no step 2' in text and '“Alone” isn’t connected to anything' in text, text
+            panel.screenshot(path=f'{OUT}/e2e-review.png')
+            alone = [e for e in app.els() if e['type'] == 'shape' and e['text'] == 'Alone'][0]
+            panel.get_by_role('button', name='Note “Alone” isn’t connected to anything', exact=True).click(); page.wait_for_timeout(80)
+            assert app.ui()['selection'] == [alone['id']], app.ui()['selection']
+            panel.get_by_role('button', name='Renumber steps').click(); page.wait_for_timeout(400)
+            labels = sorted(e['text'] for e in app.els('connector'))
+            assert labels == ['1. ask', '2. query'], labels
+            assert 'There is no step 2' not in panel.inner_text()
+            panel.get_by_role('button', name='Hide: “Alone” isn’t connected to anything').click(); page.wait_for_timeout(100)
+            assert 'Nothing to fix on this page' in panel.inner_text() and 'Show 1 hidden' in panel.inner_text(), panel.inner_text()
+            panel.get_by_role('button', name='Show 1 hidden').click(); page.wait_for_timeout(60)
+            assert 'Alone' in panel.inner_text()
+            snap = app.js('() => window.__flowsketch.snapshot()')
+            assert snap and snap['png'] and 100 < snap['width'] <= 1568 and 50 < snap['height'] <= 1568, snap
+            panel.get_by_role('button', name='Close review').click(); page.wait_for_timeout(60)
+            assert not page.get_by_role('region', name='Review').is_visible()
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+        treview()
+
         @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
         def tmermaid():
             app.key('Escape')

@@ -11,6 +11,7 @@ import { App } from './App';
 import { useDoc } from './store/docStore';
 import { useUI } from './store/uiStore';
 import { makeLookup, playSchedule, renderDocumentAtTime } from './engine/render';
+import { pageSnapshot } from './export/staticExport';
 import { connectorPath } from './engine/connectors';
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
@@ -24,6 +25,8 @@ Object.assign(window, {
     setView: (v: { x: number; y: number; zoom: number }) => useUI.getState().setView(v),
     pause: (t?: number) => { useUI.getState().setPlaying(false); if (t !== undefined) useUI.getState().setTime(t); },
     frame: (t: number) => JSON.parse(JSON.stringify(renderDocumentAtTime(useDoc.getState().doc, t))),
+    /** A snapshot of the current page as the AI tools would send it: size and whether it is a PNG (not the picture itself). */
+    snapshot: async () => { const img = await pageSnapshot(useDoc.getState().doc); if (!img) return null; const b = atob(img.data); return { png: b.slice(1, 4) === 'PNG', bytes: b.length, width: (b.charCodeAt(16) << 24) | (b.charCodeAt(17) << 16) | (b.charCodeAt(18) << 8) | b.charCodeAt(19), height: (b.charCodeAt(20) << 24) | (b.charCodeAt(21) << 16) | (b.charCodeAt(22) << 8) | b.charCodeAt(23) }; },
     /** When an arrow plays in the order, as [start, end] fractions of the loop (null if it doesn't). */
     playWindow: (id: string) => playSchedule(useDoc.getState().doc).win.get(id) ?? null,
     connectorEnds: (id: string) => {

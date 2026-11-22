@@ -22,6 +22,7 @@ export function TopBar() {
   const autosavedAt = useDoc((s) => s.autosavedAt);
   const sel = useUI((s) => s.selection);
   const prefs = useUI((s) => s.prefs);
+  const review = useUI((s) => s.review);
   const ui = useUI.getState();
   const [title, setTitle] = useState(doc.title);
   // follow the document's title (undo, opening a file) but never overwrite the field while it is being typed in
@@ -169,6 +170,7 @@ export function TopBar() {
       { label: 'Grid', sub: (['dots', 'lines', 'none'] as const).map((g) => ({ label: g === 'none' ? 'Plain' : g === 'dots' ? 'Dot grid' : 'Line grid', checked: doc.canvas.grid === g, run: () => useDoc.getState().commit((d) => ({ ...d, canvas: { ...d.canvas, grid: g } })) })) },
       { label: 'Diagram theme', sub: THEMES.map((t) => ({ label: t.name, run: () => cmd.applyTheme(t.id) })) },
       { label: 'Line jumps', note: 'arrows hop where they cross', checked: !!doc.canvas.lineJumps, run: cmd.toggleLineJumps },
+      { label: 'Review diagram', note: 'likely mistakes', checked: review, run: () => cmd.toggleReview() },
       { label: 'Alignment guides', checked: prefs.smartGuides, run: toggle('smartGuides') },
       { label: 'Show inspector', checked: prefs.showInspector, run: toggle('showInspector') },
       { label: 'Show timeline', checked: prefs.showTimeline, run: toggle('showTimeline') },
