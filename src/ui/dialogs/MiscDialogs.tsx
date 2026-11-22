@@ -173,6 +173,7 @@ export function PrefsDialog() {
       <Toggle label="Continuous drawing (tool stays active after drawing)" checked={p.continuousDrawing} onChange={(v) => up({ continuousDrawing: v })} />
       <Toggle label="Colours I set on selected objects also become that tool’s default" checked={p.selectionUpdatesDefaults} onChange={(v) => up({ selectionUpdatesDefaults: v })} />
       <Toggle label="Match size ▸ Width / Height keeps each shape’s proportions" checked={p.matchSizeKeepsProportions} onChange={(v) => up({ matchSizeKeepsProportions: v })} />
+      <Toggle label="Typing a step number that’s taken moves later steps up" checked={p.autoRenumberSteps} onChange={(v) => up({ autoRenumberSteps: v })} hint="Change an arrow label from “7b” to “8” and the arrows numbered 8, 9… become 9, 10…" />
       <Toggle label="Use shared style defaults for all shape tools" checked={p.sharedStyles} onChange={(v) => up({ sharedStyles: v, sharedStyle: v ? useUI.getState().toolStyle('shape:roundRect') : null })} />
       <Toggle label="Pause an object’s motion while dragging/resizing it" checked={p.suspendWhileDragging} onChange={(v) => up({ suspendWhileDragging: v })} />
       <Toggle label="Autoplay animation on open (ignored if your system asks for reduced motion)" checked={p.autoplay} onChange={(v) => up({ autoplay: v })} />

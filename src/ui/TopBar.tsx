@@ -139,6 +139,8 @@ export function TopBar() {
       { label: 'Arrow flow type → selection', disabled: !hasSel, sub: Object.entries(cmd.ARROW_PRESETS).map(([k, v]) => ({ label: k, run: () => cmd.applyAnimToSelection(undefined, v) })) },
       { label: 'Set play order…', note: 'click arrows in turn', run: cmd.startPlayOrder },
       { label: 'Play in label order', note: '1, 2, 4a+4b…', run: cmd.playInLabelOrder },
+      { label: 'Play in label order on every page', run: cmd.playInLabelOrderAllPages },
+      { label: 'Renumber step labels', note: 'to match play order', run: cmd.renumberStepLabels },
       { label: 'Play messages in order', note: 'one after another', run: cmd.playMessagesInOrder },
       { label: 'Play arrows together', run: cmd.playArrowsTogether },
       { label: 'Step captions', note: 'labels as subtitles', checked: !!a.captions, run: anim({ captions: !a.captions }) },

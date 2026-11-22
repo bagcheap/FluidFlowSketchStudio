@@ -1350,6 +1350,36 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tthemes()
 
+        @test('Step numbers: typing a taken number moves later steps up and the label-made play order follows; Renumber step labels')
+        def trenumber():
+            app.key('Escape')
+            v = app.ui()['view']
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            app.js('() => window.__flowsketch.setView({x: 15000, y: 40000, zoom: 1})')
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('flowchart LR\n  A -->|1. ask| B -->|2a. look up| C\n  B -->|2b. fetch| D\n  D -->|3. reply| E')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            app.key('Escape'); app.key('Escape')
+            arrows = lambda: {e['text']: e for e in app.els() if e['type'] == 'connector' and e.get('text')}
+            fetch_id = arrows()['2b. fetch']['id']
+            app.key('Control+f'); page.keyboard.type('2b. fetch'); page.keyboard.press('Enter'); page.wait_for_timeout(80)
+            app.key('Escape')
+            assert app.ui()['selection'] == [fetch_id], app.ui()['selection']
+            app.key('Enter'); page.wait_for_selector('.text-editor')
+            page.keyboard.press('Control+a'); page.keyboard.type('3. fetch'); page.keyboard.press('Escape'); page.wait_for_timeout(100)
+            a = arrows()
+            assert set(a) >= {'1. ask', '2a. look up', '3. fetch', '4. reply'}, list(a)
+            steps = sorted((e['anim']['window'][0], e['text']) for e in a.values() if (e.get('anim') or {}).get('window'))
+            assert [t for _, t in steps] == ['1. ask', '2a. look up', '3. fetch', '4. reply'], steps
+            # Renumber step labels tidies "2a" (now alone in its step) to "2"
+            page.get_by_role('menuitem', name='Animation').click()
+            page.get_by_role('menuitem', name='Renumber step labels').click(); page.wait_for_timeout(80)
+            assert '2. look up' in arrows(), list(arrows())
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        trenumber()
+
         @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
         def tmermaid():
             app.key('Escape')

@@ -527,6 +527,54 @@ export function playInLabelOrder() {
   U().toast(`${n} numbered arrow${n === 1 ? '' : 's'}${f ? ` (+${f} following)` : ''} now play in label order (${steps.length} step${steps.length === 1 ? '' : 's'}, loop ${D().doc.animation.duration} s)`);
 }
 
+/**
+ * After an arrow's label was edited (`before` → `after`): if its new plain step number is taken, later steps move up
+ * (pref `autoRenumberSteps`); and if the page's play order came from the labels, it is worked out again so it still
+ * does. Used inside the edit's own commit, so it is one undo step.
+ */
+export function afterLabelEdit(before: FlowDocument, after: FlowDocument, id: string, oldText: string, newText: string): { doc: FlowDocument; shifted: number } {
+  let d = after, shifted = 0;
+  if (U().prefs.autoRenumberSteps) ({ doc: d, shifted } = seq.makeRoomForStep(d, id, oldText, newText));
+  return { doc: keepLabelOrder(before, d), shifted };
+}
+
+/** A play order that came from the labels is worked out again after labels change (current page). */
+function keepLabelOrder(before: FlowDocument, after: FlowDocument): FlowDocument {
+  return seq.orderFollowsLabels(before) ? fitLoopToPlay(seq.applyPlaySteps(after, seq.labelSteps(after))) : after;
+}
+
+/**
+ * Animation ▸ Renumber steps: the arrows' leading step numbers are rewritten to match the play order (1, 2, 3…, letters
+ * for arrows sharing a step), closing gaps; with no order set, the label order is tidied and then played. One undo step.
+ */
+export function renumberStepLabels() {
+  const doc = D().doc;
+  const hadOrder = seq.readPlaySteps(doc).length > 0;
+  const r = seq.renumberSteps(doc);
+  if (!seq.numberedSteps(doc).length) { U().toast('No arrow labels start with a step number, like "1.", "2." or "4a."', 'error'); return; }
+  D().commit(() => (hadOrder ? r.doc : fitLoopToPlay(seq.applyPlaySteps(r.doc, seq.labelSteps(r.doc)))));
+  U().toast(r.changed ? `Renumbered ${r.changed} arrow label${r.changed === 1 ? '' : 's'} to match the play order` : 'Step numbers already match the play order', 'success');
+}
+
+/**
+ * Animation ▸ Play in label order on every page: each page whose arrows have step numbers gets its play order from
+ * them again. The loop length is fitted to the current page. One undo step.
+ */
+export function playInLabelOrderAllPages() {
+  const doc = D().doc;
+  let pages = 0;
+  const redo = (els: FlowDocument['elements']): FlowDocument['elements'] => {
+    const pd = { ...doc, elements: els };
+    if (!seq.numberedSteps(pd).length) return els;
+    pages++;
+    return seq.applyPlaySteps(pd, seq.labelSteps(pd)).elements;
+  };
+  const next: FlowDocument = { ...doc, elements: redo(doc.elements), pages: doc.pages.map((pg) => (pg.id === doc.activePage ? pg : { ...pg, elements: redo(pg.elements) })) };
+  if (!pages) { U().toast('No arrow labels on any page start with a step number, like "1.", "2." or "4a."', 'error'); return; }
+  D().commit(() => (seq.readPlaySteps(next).length ? fitLoopToPlay(next) : next));
+  U().toast(`Play order updated from labels on ${pages} page${pages === 1 ? '' : 's'}`, 'success');
+}
+
 /** In "Set play order": start again, with every arrow animating all the time. */
 export function clearAllPlayOrder() {
   D().commit((d) => seq.applyPlaySteps(d, []));
@@ -1138,7 +1186,8 @@ export function replaceCurrent() {
   const m = ms[Math.min(Math.max(0, f.index), ms.length - 1)];
   const next = replaceOne(D().doc, m, f.query, f.replace, f.matchCase);
   if (!next) { U().toast('That item is locked, so its text was not changed.', 'info'); findNext(1); return; }
-  D().commit(() => next);
+  const before = D().doc;
+  D().commit(() => keepLabelOrder(before, next));
   if (currentMatches().length) goToMatch(Math.max(0, f.index)); // the next match now has this index
 }
 
@@ -1147,7 +1196,7 @@ export function replaceAllMatches() {
   const f = U().find;
   if (!f || !f.query) return;
   const r = replaceAll(D().doc, f.query, f.replace, f);
-  if (r.count) D().commit(() => r.doc);
+  if (r.count) { const before = D().doc; D().commit(() => keepLabelOrder(before, r.doc)); }
   const lockedNote = r.locked ? ` (${r.locked} in locked items left as they were)` : '';
   U().toast(r.count ? `Replaced ${r.count} match${r.count === 1 ? '' : 'es'}${lockedNote}` : `Nothing replaced${lockedNote}`, r.count ? 'success' : 'info');
   U().setFind({ index: -1 });
