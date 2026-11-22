@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { AlignCenter, AlignLeft, ArrowRightLeft, AlignRight, ArrowDownToLine, ArrowUpToLine, Bold, ClipboardPaste, Copy, CopyPlus, Italic, Lock, Paintbrush, RotateCcw, Trash2, Unlock, FoldVertical, BringToFront, SendToBack, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal } from 'lucide-react';
 import type { ConnectorAnim, ConnectorElement, ContainerElement, DiagramElement, FillStyle, IconElement, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle } from '../model/types';
 import { kindOf } from '../store/similar';
+import { THEMES } from '../store/themes';
 import { HIGHLIGHT_COLORS, PALETTE_FILL, PALETTE_STROKE, styleKey } from '../model/defaults';
 import { getElement, mapElements, useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
@@ -275,11 +276,11 @@ export function Inspector() {
               {(ca.mode === 'travel' || ca.mode === 'pulse') && <>
                 <ColorPicker label={roundTrip ? 'Outgoing colour' : 'Highlight colour'} value={ca.highlightColor} palette={HIGHLIGHT_COLORS} onChange={(c) => setConnAnim({ highlightColor: c })} />
                 {roundTrip && <ColorPicker label="Return colour" value={ca.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => setConnAnim({ returnColor: c })} />}
-                <Slider label="Opacity" value={Math.round(ca.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => setConnAnim({ highlightOpacity: v / 100 })} />
-                <Toggle label="Glow" checked={ca.glow} onChange={(v) => setConnAnim({ glow: v })} />
+                <Slider label="Opacity" value={Math.round(ca.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => setConnAnim({ highlightOpacity: v / 100 })} hint="How strongly the highlight shows over the line (its glow follows)" />
+                <Toggle label="Glow" checked={ca.glow} onChange={(v) => setConnAnim({ glow: v })} hint="A soft halo in the highlight colour around the moving highlight (travelling highlight and pulse)" />
               </>}
               {ca.mode === 'travel' && <>
-                <Slider label="Length" value={ca.highlightLength} min={4} max={300} unit="px" overridden={'highlightLength' in connOv} onReset={() => resetConnAnimKey('highlightLength')} onChange={(v) => setConnAnim({ highlightLength: v })} />
+                <Slider label="Length" value={ca.highlightLength} min={4} max={300} unit="px" overridden={'highlightLength' in connOv} onReset={() => resetConnAnimKey('highlightLength')} onChange={(v) => setConnAnim({ highlightLength: v })} hint="How long each moving highlight is" />
                 <Slider label="Thickness" value={ca.highlightWidth} min={0} max={12} step={0.5} unit="px" overridden={'highlightWidth' in connOv} onReset={() => resetConnAnimKey('highlightWidth')} onChange={(v) => setConnAnim({ highlightWidth: v })} hint="How much thicker the highlight is than the line" />
                 {roundTrip && <Slider label="Pause at turn-around" value={Math.round(ca.turnPause * 100)} min={0} max={60} unit="%" onChange={(v) => setConnAnim({ turnPause: v / 100 })} hint="Share of each round trip spent waiting at the far end before coming back" />}
                 <Slider label="Segments" value={ca.segments} min={1} max={8} onChange={(v) => setConnAnim({ segments: v })} hint={conn?.anim?.window ? "Highlights following each other along the arrow during its step" : "Highlights moving at the same time, evenly spaced"} />
@@ -386,6 +387,20 @@ function CanvasPanel() {
     <aside className="inspector no-canvas" aria-label="Canvas properties">
       <div className="insp-head"><div><div className="insp-title">Canvas</div><div className="insp-sub">Pick a tool to set its defaults, or select objects to edit them</div></div></div>
       <div className="insp-scroll">
+        <Section title="Theme">
+          <div className="theme-grid" role="group" aria-label="Diagram theme">
+            {THEMES.map((t) => (
+              <button key={t.id} className="theme-btn" data-theme-id={t.id} title={`Apply the ${t.name} look to the whole diagram (Undo to go back)`} onClick={() => cmd.applyTheme(t.id)}>
+                <span className="theme-swatch" style={{ background: t.background }} aria-hidden>
+                  {t.fills.slice(0, 3).map((f, i) => <i key={i} style={{ background: f, borderColor: t.stroke }} />)}
+                  <b style={{ background: t.highlight }} />
+                </span>
+                <span className="theme-name">{t.name}</span>
+              </button>
+            ))}
+          </div>
+          <p className="note">Recolours every page at once (background, shapes, text, arrows and highlights); new shapes and arrows match. Fills keep their variety. Locked items and pictures stay as they are.</p>
+        </Section>
         <Section title="Background">
           <ColorPicker label="Canvas background" value={doc.canvas.background} palette={['#ffffff', '#fbfaf7', '#f6f7fb', '#fffbea', '#f3faf5', '#1e1e24']} onChange={(c) => setCanvas({ background: c })} />
           <Row label="Grid">
@@ -396,7 +411,8 @@ function CanvasPanel() {
         </Section>
         <Section title="Animation (document)">
           <Toggle label="Animation enabled" checked={a.enabled} onChange={(v) => cmd.setAnimation({ enabled: v })} />
-          <Slider label="Global squiggle" value={a.intensityScale} min={0} max={3} step={0.05} unit="×" onChange={(v) => cmd.setAnimation({ intensityScale: v })} />
+          <Row label="Shape motion"><Segmented label="Shape motion" value={cmd.motionLevelOf(a) ?? undefined} onChange={(v) => cmd.setMotionLevel(v)} options={[{ v: 'still', label: 'Still', title: 'No shape motion' }, { v: 'calm', label: 'Calm', title: 'Gentle, slow motion' }, { v: 'natural', label: 'Natural', title: 'The usual motion' }, { v: 'lively', label: 'Lively', title: 'Stronger, quicker motion' }]} /></Row>
+          <Slider label="Global squiggle" value={a.intensityScale} min={0} max={3} step={0.05} unit="×" onChange={(v) => cmd.setAnimation({ intensityScale: v })} hint="How strongly every shape moves (all of its motion)" />
           <Slider label="Default squiggle" value={a.shape.intensity} min={0} max={10} step={0.5} onChange={(v) => cmd.setAnimation({ shape: { ...a.shape, intensity: v } })} />
           <Select label="Default shape motion" value={a.shape.mode} onChange={(v) => cmd.setAnimation({ shape: { ...a.shape, mode: v } })} options={[{ v: 'combined', label: 'Combined organic motion' }, { v: 'float', label: 'Gentle float' }, { v: 'wobble', label: 'Organic wobble' }, { v: 'boil', label: 'Sketch boil' }, { v: 'sway', label: 'Soft sway' }, { v: 'off', label: 'Off' }]} />
           <Select label="Default arrow flow" value={a.connector.mode} onChange={(v) => cmd.setAnimation({ connector: { ...a.connector, mode: v } })} options={[{ v: 'travel', label: 'Travelling highlight' }, { v: 'drawOn', label: 'Draw on' }, { v: 'dash', label: 'Marching dashes' }, { v: 'pulse', label: 'Pulse' }, { v: 'none', label: 'Static' }]} />
@@ -409,9 +425,10 @@ function CanvasPanel() {
           <ColorPicker label="Highlight colour" value={a.connector.highlightColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ highlightColor: c })} />
           <ColorPicker label="Return colour" value={a.connector.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ returnColor: c })} />
           <Slider label="Segments" value={a.connector.segments} min={1} max={8} onChange={(v) => cmd.setGlobalArrow({ segments: v })} hint="Highlights per arrow: moving together when looping, one after another in a play step" />
-          <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} />
-          <Slider label="Opacity" value={Math.round(a.connector.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => cmd.setGlobalArrow({ highlightOpacity: v / 100 })} />
-          <Toggle label="Glow" checked={a.connector.glow} onChange={(v) => cmd.setGlobalArrow({ glow: v })} />
+          <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} hint="How long each moving highlight is" />
+          <Slider label="Opacity" value={Math.round(a.connector.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => cmd.setGlobalArrow({ highlightOpacity: v / 100 })} hint="How strongly the highlight shows over the line (its glow follows)" />
+          <Slider label="Round-trip pause" value={Math.round(a.connector.turnPause * 100)} min={0} max={60} unit="%" onChange={(v) => cmd.setGlobalArrow({ turnPause: v / 100 })} hint="For two-way arrows: share of each round trip spent waiting at the far end before coming back" />
+          <Toggle label="Glow" checked={a.connector.glow} onChange={(v) => cmd.setGlobalArrow({ glow: v })} hint="A soft halo in the highlight colour around the moving highlight (travelling highlight and pulse)" />
         </Section>
         <Section title="Playing in order">
           <p className="note">For arrows that play one step at a time (numbered labels, sequence diagrams, Animation ▸ Play in order).</p>

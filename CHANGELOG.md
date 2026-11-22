@@ -4,6 +4,17 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.51] - 2026-11-22
+
+### Added
+- **Diagram themes:** one click gives the whole diagram a coordinated look — Whiteboard, Pastel, Blueprint, Dark or Mono. Pick one in the Inspector's **Theme** section (nothing selected) or View ▸ Diagram theme. It recolours the background, grid, shapes, text, arrows, containers and arrow highlights on every page, keeps shapes that had different fills different, and new shapes and arrows follow it. Locked items and pictures are left alone. Undo goes back.
+- **Shape motion** in one control: **Still**, **Calm**, **Natural** or **Lively**, in the Inspector (nothing selected), sets how strongly and how fast every shape moves.
+- **Round-trip pause for all arrows:** in the Inspector's **Arrow highlight (all arrows)** section and the Animation settings, how long two-way highlights wait at the far end before coming back.
+
+### Changed
+- The grid is drawn in a light colour on dark canvas backgrounds, so it stays visible.
+- **Glow** on arrow highlights is now a clearly visible soft halo (it was so faint it hardly showed), and Glow, Opacity and Length have tooltips.
+
 ## [0.1.50] - 2026-11-20
 
 ### Added

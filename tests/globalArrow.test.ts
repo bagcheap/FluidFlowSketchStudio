@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { useDoc } from '../src/store/docStore';
 import { useUI } from '../src/store/uiStore';
 import { setAnimation, setGlobalArrow } from '../src/store/commands';
-import { playSchedule, renderDocumentAtTime } from '../src/engine/render';
+import { GLOW_SPREAD, playSchedule, renderDocumentAtTime } from '../src/engine/render';
 import { defaultToolStyle, makeConnector, newDocument } from '../src/model/defaults';
 import { parseDocument, serializeDocument } from '../src/model/schema';
 import type { ConnectorElement, FlowDocument } from '../src/model/types';
@@ -55,11 +55,11 @@ describe('Arrow highlight (all arrows)', () => {
     const doc: FlowDocument = { ...newDocument(), elements: [c] };
     const highlight = (d: FlowDocument) => renderDocumentAtTime(d, 0.3).items[0].parts.filter((p) => p.k === 'line' && p.color === d.animation.connector.highlightColor);
     const base = highlight(doc);
-    expect(Math.max(...base.map((p) => (p as { width: number }).width))).toBeCloseTo(c.style.strokeWidth + 7.5 + 1.5); // glow around a 1.5 px-thicker highlight
+    expect(Math.max(...base.map((p) => (p as { width: number }).width))).toBeCloseTo(c.style.strokeWidth + GLOW_SPREAD + 1.5); // glow around a 1.5 px-thicker highlight
     const thick: FlowDocument = { ...doc, animation: { ...doc.animation, connector: { ...doc.animation.connector, highlightWidth: 6 } } };
     const widths = highlight(thick).map((p) => (p as { width: number }).width);
     expect(widths).toContain(c.style.strokeWidth + 6);
-    expect(Math.max(...widths)).toBeCloseTo(c.style.strokeWidth + 6 + 7.5);
+    expect(Math.max(...widths)).toBeCloseTo(c.style.strokeWidth + 6 + GLOW_SPREAD);
   });
 
   it('arrow speed also sets how fast arrows playing in order move', () => {
