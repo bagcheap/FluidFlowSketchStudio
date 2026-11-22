@@ -10,7 +10,7 @@ import './styles.css';
 import { App } from './App';
 import { useDoc } from './store/docStore';
 import { useUI } from './store/uiStore';
-import { makeLookup, renderDocumentAtTime } from './engine/render';
+import { makeLookup, playSchedule, renderDocumentAtTime } from './engine/render';
 import { connectorPath } from './engine/connectors';
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
@@ -24,6 +24,8 @@ Object.assign(window, {
     setView: (v: { x: number; y: number; zoom: number }) => useUI.getState().setView(v),
     pause: (t?: number) => { useUI.getState().setPlaying(false); if (t !== undefined) useUI.getState().setTime(t); },
     frame: (t: number) => JSON.parse(JSON.stringify(renderDocumentAtTime(useDoc.getState().doc, t))),
+    /** When an arrow plays in the order, as [start, end] fractions of the loop (null if it doesn't). */
+    playWindow: (id: string) => playSchedule(useDoc.getState().doc).win.get(id) ?? null,
     connectorEnds: (id: string) => {
       const d = useDoc.getState().doc;
       const c = d.elements.find((e) => e.id === id);

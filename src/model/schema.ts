@@ -10,7 +10,7 @@ const STEP_PAUSE = 0.35;
 
 /** Arrowhead size limits (a multiple of the usual size). */
 export const HEAD_SIZE_MIN = 0.5, HEAD_SIZE_MAX = 3;
-import { DEFAULT_ANIMATION, DEFAULT_CONNECTOR_ANIM, DEFAULT_SHAPE_ANIM, DEFAULT_STYLE, DEFAULT_TEXT, newDocument, newSeed, uid } from './defaults';
+import { DEFAULT_ANIMATION, DEFAULT_CONNECTOR_ANIM, DEFAULT_SHAPE_ANIM, DEFAULT_STYLE, DEFAULT_TEXT, newDocument, newSeed, uid, withoutPlaySlot } from './defaults';
 
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 export const MAX_ELEMENTS = 5000; // per page
@@ -239,7 +239,7 @@ export function sanitizeToolStyle(v: unknown, fallback: ToolStyle): ToolStyle {
     style: isObj(v.style) ? style({ ...fallback.style, ...v.style }) : fallback.style,
     textStyle: isObj(v.textStyle) ? textStyle({ ...fallback.textStyle, ...v.textStyle }) : fallback.textStyle,
     ...(isObj(v.shapeAnim) ? { shapeAnim: sanitizeShapeAnim(v.shapeAnim, true) } : fallback.shapeAnim ? { shapeAnim: fallback.shapeAnim } : {}),
-    ...(isObj(v.connectorAnim) ? { connectorAnim: sanitizeConnectorAnim(v.connectorAnim, true) } : fallback.connectorAnim ? { connectorAnim: fallback.connectorAnim } : {}),
+    ...(isObj(v.connectorAnim) ? { connectorAnim: withoutPlaySlot(sanitizeConnectorAnim(v.connectorAnim, true)) } : fallback.connectorAnim ? { connectorAnim: withoutPlaySlot(fallback.connectorAnim) } : {}),
     ...(v.routing !== undefined || fallback.routing ? { routing: oneOf(v.routing, ['straight', 'curved', 'elbow'] as const, fallback.routing ?? 'straight') } : {}),
     ...(v.curvature !== undefined ? { curvature: num(v.curvature, 0, -1, 1) } : {}),
     ...(v.elbowRadius !== undefined ? { elbowRadius: num(v.elbowRadius, 0, 0, 500) } : {}),

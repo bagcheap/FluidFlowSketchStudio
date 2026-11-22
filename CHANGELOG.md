@@ -4,6 +4,16 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.53] - 2026-11-22
+
+### Added
+- **Step numbers close up too:** delete arrow 3 (with Delete, Cut or the eraser) or remove the number from its label, and 4 becomes the new 3, 5 the new 4, and so on; the play order follows. Changing "3" to "5" now moves that step like an item in a numbered list. If another arrow still has the number (3a after deleting 3b), nothing moves. Undo puts everything back; Edit ▸ Preferences ▸ **Keep arrow step numbers in sequence** turns it off.
+- **New arrows play last:** while arrows play in order, a newly drawn (or pasted, or duplicated) arrow plays after the last step until you give it a step number; a label without a clear number keeps it there, and removing an arrow's number moves it to the end. Arrows that aren't in the order now play at the end instead of standing still.
+
+### Fixed
+- A new arrow could join the play order on its own, in the middle of it (it took the place of an arrow whose style had been saved as the arrow tool's default, copied with Paste style, or duplicated). Styles and copies no longer carry a place in the play order, and Paste style keeps each arrow's own place.
+- An arrow in the play order whose animation is turned off is now skipped: the steps around it play on without a pause where it was.
+
 ## [0.1.52] - 2026-11-22
 
 ### Added

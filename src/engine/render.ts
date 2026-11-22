@@ -422,14 +422,17 @@ export function playSchedule(doc: FlowDocument): PlaySchedule {
   if (hit) return hit;
   const lookup = makeLookup(doc, null);
   const steps = new Map<number, { ids: string[]; secs: number }>();
-  for (const c of doc.elements) {
-    if (c.type !== 'connector' || c.bar || !c.anim?.window) continue;
+  // an arrow in the order whose animation is off is skipped: the steps around it play on without a gap
+  const inOrder = doc.elements.filter((c): c is ConnectorElement => c.type === 'connector' && !c.bar && !!c.anim?.window && resolveConnectorAnim(doc.animation, c).mode !== 'none');
+  // arrows not in the order (one just drawn, or with no step number) that would animate play after it, together
+  const after = inOrder.length ? doc.elements.filter((c): c is ConnectorElement => c.type === 'connector' && !c.bar && !c.anim?.window && resolveConnectorAnim(doc.animation, c).mode === 'travel') : [];
+  for (const c of [...inOrder, ...after]) {
     const a = resolveConnectorAnim(doc.animation, c);
     const len = connectorPath(c, lookup).length;
     // the whole train crosses, at the play speed scaled by the global arrow speed
     let secs = highlightTrain(len, a.highlightLength, a.segments).total / (PLAY_SPEED * Math.max(0.05, doc.animation.arrowSpeedScale || 1));
     if (a.direction === 'roundTrip') secs = (2 * secs) / Math.max(0.2, 1 - a.turnPause); // out, wait, back
-    const k = Math.round(c.anim.window[0] * 1e4);
+    const k = c.anim?.window ? Math.round(c.anim.window[0] * 1e4) : Number.MAX_SAFE_INTEGER;
     const s = steps.get(k) ?? { ids: [], secs: 0 };
     s.ids.push(c.id); s.secs = Math.max(s.secs, secs);
     steps.set(k, s);
@@ -581,9 +584,13 @@ function connectorItems(doc: FlowDocument, c: ConnectorElement, t: number, looku
   const st = c.style;
   const sw = st.strokeWidth;
   if (c.bar) return [{ id: c.id, opacity: st.opacity, tf: null, parts: barParts(path, st) }];
-  // while arrows play in order, an arrow that isn't in the order stays still (it would otherwise loop all the time)
-  const offOrder = !c.anim?.window && playSchedule(doc).steps.length > 0;
-  const anim = flags?.still || offOrder ? { ...resolveConnectorAnim(doc.animation, c), mode: 'none' as const } : resolveConnectorAnim(doc.animation, c);
+  // while arrows play in order, an arrow that has no part in it stays still (it would otherwise loop all the time);
+  // one not yet in the order that would travel plays in the extra last step (`playSchedule`)
+  const sched = playSchedule(doc);
+  const slot = sched.win.get(c.id);
+  const offOrder = !slot && sched.steps.length > 0;
+  const resolved = resolveConnectorAnim(doc.animation, c);
+  const anim = flags?.still || offOrder ? { ...resolved, mode: 'none' as const } : slot && !resolved.window ? { ...resolved, window: slot } : resolved;
   const settings = doc.animation;
   const L = settings.seamless && settings.loop ? settings.duration : null;
   const tt = t; // connectors share the document clock so flow reads consistently
