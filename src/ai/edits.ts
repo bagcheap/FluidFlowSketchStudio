@@ -24,12 +24,19 @@ export interface PageView { json: string; ids: Map<string, string> } // ids: sho
 
 const shortColor = (c: string) => (/^#[0-9a-f]{6}$/i.test(c) ? c.toLowerCase() : c === 'transparent' ? 'none' : c);
 
-/** The current page as a compact JSON description for the prompt, and the short ids it uses. */
-export function describePage(doc: FlowDocument): PageView {
+/**
+ * The current page as a compact JSON description for the prompt, and the short ids it uses. With `prev` (an earlier
+ * view of the same page, as in a tool session), items keep the short ids they had and new items get the next free
+ * number, so an id never changes meaning during a conversation.
+ */
+export function describePage(doc: FlowDocument, prev?: PageView): PageView {
   const ids = new Map<string, string>(), back = new Map<string, string>();
-  let ns = 0, na = 0, nc = 0, nt = 0;
+  const next: Record<string, number> = { a: 0, c: 0, t: 0, s: 0 };
+  const prefix = (e: DiagramElement) => (e.type === 'connector' ? 'a' : e.type === 'container' ? 'c' : e.type === 'text' ? 't' : 's');
+  if (prev) for (const [k, id] of prev.ids) { const m = /^([a-z])(\d+)$/.exec(k); if (m) next[m[1]] = Math.max(next[m[1]] ?? 0, Number(m[2])); if (doc.elements.some((e) => e.id === id)) { ids.set(k, id); back.set(id, k); } }
   for (const e of doc.elements) {
-    const k = e.type === 'connector' ? `a${++na}` : e.type === 'container' ? `c${++nc}` : e.type === 'text' ? `t${++nt}` : `s${++ns}`;
+    if (back.has(e.id)) continue;
+    const p = prefix(e), k = `${p}${++next[p]}`;
     ids.set(k, e.id); back.set(e.id, k);
   }
   const parent = new Map<string, string>();

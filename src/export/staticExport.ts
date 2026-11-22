@@ -9,6 +9,7 @@ import { useUI } from '../store/uiStore';
 import { exportRect, fitAspect, frameRenderer, MAX_PIXELS, type Framing } from './raster';
 import { renderDocumentAtTime } from '../engine/render';
 import { frameToSvg } from '../engine/svgExport';
+import type { FlowDocument } from '../model/types';
 import { downloadBlob, safeFileName } from '../persistence/files';
 import { serializeDocument } from '../model/schema';
 
@@ -118,4 +119,26 @@ html,body{margin:0;height:100%;background:${esc(doc.canvas.background)};font-fam
 <script>${playerSource.replace(/<\/script/gi, '<\\/script')}</script>
 </body></html>`;
   downloadBlob(new Blob([html], { type: 'text/html' }), safeFileName(doc.title, 'html'));
+}
+
+/**
+ * A PNG of a page (any document, such as an AI tool session's draft) for Claude to look at: the content with a margin,
+ * at most `maxSide` px on the long side, base64-encoded. Null if the browser can't make it.
+ */
+export async function pageSnapshot(doc: FlowDocument, maxSide = 1568): Promise<{ mediaType: 'image/png'; data: string } | null> {
+  try {
+    let rect = exportRect(doc, { fit: 'content', padding: 40 });
+    const k = Math.min(2, maxSide / Math.max(1, rect.w, rect.h));
+    const W = Math.max(1, Math.round(rect.w * k)), H = Math.max(1, Math.round(rect.h * k));
+    rect = fitAspect(rect, W, H);
+    const r = await frameRenderer(doc, rect, W, H, doc.canvas.background);
+    r.render(0);
+    const blob = await new Promise<Blob | null>((res) => r.canvas.toBlob(res, 'image/png'));
+    r.canvas.width = r.canvas.height = 0;
+    if (!blob) return null;
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return { mediaType: 'image/png', data: btoa(bin) };
+  } catch { return null; }
 }

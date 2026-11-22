@@ -3,6 +3,10 @@ import type { Asset, BoxElement, ConnectorAnim, ConnectorElement, ContainerEleme
 import { SCHEMA_VERSION } from '../model/types';
 import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey, withoutPlaySlot } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
+import { itemName, type LintIssue } from '../lint/lint';
+import { separateBoxes } from '../layout/separate';
+import type { ToolContext, ToolSession } from '../ai/toolkit';
+import { pageSnapshot } from '../export/staticExport';
 import { useUI } from './uiStore';
 import { cameraView, compartmentLayout, contentBounds, hasCamera, playSchedule } from '../engine/render';
 import { toAspect } from '../engine/camera';
@@ -465,15 +469,7 @@ function importSequence(text: string): boolean {
   return true;
 }
 
-/**
- * Arrows playing one after another set the loop length: long enough for every step at the shared arrow speed (more or
- * longer arrows, a longer loop). Nothing changes when no arrow is in an order.
- */
-function fitLoopToPlay(d: FlowDocument): FlowDocument {
-  const s = playSchedule(d).seconds;
-  if (!s) return d;
-  return { ...d, animation: { ...d.animation, duration: Math.min(120, Math.max(1, Math.ceil(s * 10) / 10)), loop: true, seamless: true } };
-}
+const fitLoopToPlay = seq.fitLoopToPlay;
 
 /**
  * Animation ▸ Play messages in order: the selected arrows (or every sequence-diagram message on the page) light up
@@ -1248,4 +1244,84 @@ export async function exportMermaid(copy: boolean) {
     return;
   }
   downloadBlob(new Blob([text], { type: 'text/plain' }), safeFileName(D().doc.title, 'mmd'));
+}
+
+// ---- Review (lint) ---------------------------------------------------------------------------------------------------
+
+/** View ▸ Review diagram: open or close the Review panel. */
+export function toggleReview(open = !U().review) {
+  U().setReview(open);
+}
+
+/** Select an issue's items and bring them into view (zooming out if they don't fit). */
+export function focusIssue(issue: LintIssue) {
+  const doc = D().doc;
+  const ids = issue.ids.filter((id) => getElement(doc, id));
+  if (!ids.length) return;
+  U().setTool('select');
+  U().select(ids);
+  const b = selectionBounds(doc, ids);
+  if (!b) return;
+  // already in clear view: leave the view alone; otherwise centre it, keeping the zoom unless it doesn't fit
+  const v = U().view, { top, w, h } = visibleArea(), pad = 60 / v.zoom;
+  const x0 = v.x, y0 = v.y + top / v.zoom, x1 = x0 + w / v.zoom, y1 = y0 + h / v.zoom;
+  if (b.x >= x0 + pad && b.y >= y0 + pad && b.x + b.w <= x1 - pad && b.y + b.h <= y1 - pad) return;
+  fitRect(b, 80, v.zoom);
+}
+
+/** The one-click remedy offered with an issue. One undo step (as the matching command). */
+export function fixLintIssue(issue: LintIssue) {
+  const doc = D().doc;
+  switch (issue.fix?.kind) {
+    case 'renumber': renumberStepLabels(); return;
+    case 'labelOrder': playInLabelOrder(); return;
+    case 'routeArrows': {
+      const arrows = issue.ids.filter((id) => getElement(doc, id)?.type === 'connector');
+      const r = routeArrowsAround(doc, arrows);
+      if (!r.routed) { U().toast('That arrow can’t be routed around shapes (it needs a shape at each end, and nothing locked)', 'error'); return; }
+      D().commit(() => r.doc);
+      U().toast(`Routed ${r.routed} arrow${r.routed === 1 ? '' : 's'} around shapes`, 'success');
+      return;
+    }
+    case 'separate': {
+      const r = separateBoxes(doc, issue.ids[0], issue.ids[1]);
+      if (!r) { U().toast('There’s no free spot nearby to move it to', 'error'); return; }
+      // it joins or leaves containers like a dragged shape, and its elbow arrows find a fresh way round
+      const elbows = r.doc.elements.filter((c) => c.type === 'connector' && c.routing === 'elbow' && !c.locked && (c.start.elementId === r.moved || c.end.elementId === r.moved)).map((c) => c.id);
+      D().commit(() => { const d = updateMembership(r.doc, [r.moved]); return elbows.length ? routeArrowsAround(d, elbows, { keepAnchors: true }).doc : d; });
+      U().select([r.moved]);
+      U().toast(`Moved ${itemName(doc, getElement(doc, r.moved))} clear`, 'success');
+      return;
+    }
+    case 'delete': {
+      U().select(issue.ids.filter((id) => getElement(doc, id)));
+      deleteSelection();
+      return;
+    }
+  }
+}
+
+/** Hide an issue for this session (it comes back if the items change so the issue is different). */
+export function hideIssue(key: string) {
+  U().setReviewHidden([...U().reviewHidden.filter((k) => k !== key), key]);
+}
+export const showHiddenIssues = () => U().setReviewHidden([]);
+
+/** What the AI tool kit needs from the editor: the tools' default styles, and pictures of a draft page. */
+export function toolContext(): ToolContext {
+  const u = U();
+  return {
+    styles: { shape: (k) => u.toolStyle(styleKey('shape', k)), arrow: u.toolStyle('arrow'), container: u.toolStyle('container'), fit: fitShapeToText },
+    snapshot: pageSnapshot,
+  };
+}
+
+/**
+ * Put a tool session's draft into the editor as one undo step (when it changed anything). Refused (false) if the
+ * document was edited, or the page switched, since the session started, so nothing made meanwhile is overwritten.
+ */
+export function applyToolSession(s: ToolSession): boolean {
+  if (!s.changes || D().doc !== s.original) return false;
+  D().commit(() => s.doc);
+  return true;
 }

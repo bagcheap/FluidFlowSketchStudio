@@ -124,6 +124,8 @@ interface UIState {
   playOrderMode: boolean; // "Set play order": clicking arrows numbers them
   /** Find and replace bar (⌘F): null when closed. `index` is the current match (-1: none yet, Enter goes to the first). */
   find: FindState | null;
+  review: boolean; // the Review panel (lint) is open
+  reviewHidden: string[]; // lint issues hidden this session (LintIssue.key)
 }
 
 export interface FindState { query: string; replace: string; matchCase: boolean; allPages: boolean; showReplace: boolean; index: number }
@@ -135,6 +137,8 @@ interface UIActions {
   setEditing(id: string | null, seed?: string): void;
   setPlaying(p: boolean): void;
   setFind(f: Partial<FindState> | null): void;
+  setReview(open: boolean): void;
+  setReviewHidden(keys: string[]): void;
   setTime(t: number): void;
   openDialog(d: DialogId): void;
   setPresentation(p: boolean): void;
@@ -183,6 +187,8 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   contextMenu: null,
   playOrderMode: false,
   find: null,
+  review: false,
+  reviewHidden: [],
   reducedMotionOS: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
 
   setTool(tool, shape, seq) { set((s) => ({ tool, shapeKind: shape ?? s.shapeKind, seqKind: seq ?? s.seqKind, selection: tool === 'select' ? s.selection : [], editingId: null, welcomeDismissed: s.welcomeDismissed || (tool !== 'select' && tool !== 'hand') })); },
@@ -230,6 +236,8 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   setMenuOpen(m) { set({ menuOpen: m }); },
   setContextMenu(at) { set({ contextMenu: at, menuOpen: null }); },
   setPlayOrderMode(on) { set({ playOrderMode: on }); },
+  setReview(open) { set({ review: open }); },
+  setReviewHidden(keys) { set({ reviewHidden: keys.slice(-500) }); },
   setFind(f) { set((s) => ({ find: f === null ? null : { ...(s.find ?? { query: '', replace: '', matchCase: false, allPages: true, showReplace: false, index: -1 }), ...f } })); },
   ask(message, ok = 'Continue') {
     get().confirmReq?.resolve('cancel');

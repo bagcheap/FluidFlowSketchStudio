@@ -5,7 +5,7 @@
 import type { BoxElement, ConnectorElement, ContainerElement, DiagramElement, Endpoint, FlowDocument, Point, ToolStyle } from '../model/types';
 import { baseFields, makeConnector, makeShape } from '../model/defaults';
 import { isLifeline } from '../editor/hitTest';
-import { BAR_W, makeLookup } from '../engine/render';
+import { BAR_W, makeLookup, playSchedule } from '../engine/render';
 import { connectorPath } from '../engine/connectors';
 
 export { BAR_W };
@@ -539,4 +539,14 @@ export function renumberForEdit(doc: FlowDocument, id: string, oldText: string, 
   if (was && was.depth === 0 && now?.n !== was.n) ({ doc: d, shifted } = closeStepGaps(d, [was.n], id));
   const r = makeRoomForStep(d, id, oldText, newText);
   return { doc: r.doc, shifted: shifted + r.shifted };
+}
+
+/**
+ * Arrows playing one after another set the loop length: long enough for every step at the shared arrow speed (more or
+ * longer arrows, a longer loop). Nothing changes when no arrow is in an order.
+ */
+export function fitLoopToPlay(d: FlowDocument): FlowDocument {
+  const s = playSchedule(d).seconds;
+  if (!s) return d;
+  return { ...d, animation: { ...d.animation, duration: Math.min(120, Math.max(1, Math.ceil(s * 10) / 10)), loop: true, seamless: true } };
 }
