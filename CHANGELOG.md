@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.52] - 2026-11-22
 
 ### Added
 - **Step numbers renumber themselves:** change an arrow label from "7b" to "8" and the arrows already numbered 8, 9… become 9, 10…, like a numbered list (dotted sub-steps such as 8a.1 move with their step). A letter ("8a") still joins step 8 instead. One Undo puts them back. Turn it off in Edit ▸ Preferences.
