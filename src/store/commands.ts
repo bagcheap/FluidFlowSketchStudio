@@ -6,18 +6,19 @@ import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from
 import { itemName, type LintIssue } from '../lint/lint';
 import { separateBoxes } from '../layout/separate';
 import type { ToolContext, ToolSession } from '../ai/toolkit';
-import type { AiReview } from '../ai/review';
+import { reviewToMarkdown, type AiReview } from '../ai/review';
+import { AI_MODELS } from '../ai/describe';
 import { pageSnapshot } from '../export/staticExport';
 import { useUI } from './uiStore';
 import { cameraView, compartmentLayout, contentBounds, hasCamera, playSchedule } from '../engine/render';
 import { toAspect } from '../engine/camera';
 import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
-import { downloadBlob, openDocumentFile, pickFile, resetFileHandle, restoreFileFor, safeFileName, saveDocumentFile } from '../persistence/files';
+import { downloadBlob, openDocumentFile, pickFile, resetFileHandle, restoreFileFor, safeFileName, saveDocumentFile, saveFileAs } from '../persistence/files';
 import { rememberMermaid } from '../persistence/storage';
 import { findMatches, replaceAll, replaceOne } from './find';
 import { toMermaid } from '../export/mermaidExport';
-import { cleanNote, DocumentError, MAX_PAGES, parseDocument, sanitizeBrief, serializeDocument, SHAPE_KINDS } from '../model/schema';
+import { allPages, cleanNote, DocumentError, MAX_PAGES, parseDocument, sanitizeBrief, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
 import { COMPARTMENTS, geometryFor, LABEL_BELOW, SHAPE_LABELS } from '../engine/shapes';
 import { loadIconSet } from '../icons/sets';
@@ -1342,4 +1343,22 @@ export function setBrief(b: DiagramBrief) {
 export function showAiReview(r: AiReview) {
   U().setAiReview(r);
   U().setReview(true);
+}
+
+/** Save Claude's review of this page as Markdown notes, in a file the user chooses. */
+export async function saveAiReview() {
+  const r = U().aiReview, doc = D().doc;
+  if (!r) return;
+  const page = allPages(doc).find((p) => p.id === r.pageId);
+  const md = reviewToMarkdown(r, {
+    title: doc.title, page: page?.name ?? '', brief: doc.brief ?? null,
+    nameOf: (id) => { const e = getElement(doc, id); return e ? itemName(doc, e) : null; },
+    modelLabel: AI_MODELS.find((m) => m.id === r.model)?.label.replace(/ \(.*\)$/, '') ?? r.model,
+    when: new Date(r.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }),
+  });
+  try {
+    if (await saveFileAs(new Blob([md], { type: 'text/markdown' }), safeFileName(`${doc.title || 'Diagram'} review`, 'md'), { description: 'Markdown notes', mime: 'text/markdown', ext: 'md' })) U().toast('Review notes saved', 'success');
+  } catch (e) {
+    U().toast(`Couldn't save the review notes: ${(e as Error)?.message ?? e}`, 'error');
+  }
 }

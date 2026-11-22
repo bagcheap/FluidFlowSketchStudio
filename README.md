@@ -171,7 +171,9 @@ Insert ▸ **Review with Claude (AI)…** (also on the canvas right-click menu, 
 
 1. Fill in the **brief**: what the diagram shows, the system or domain (for example "Microsoft Entra ID, OAuth 2.0"), who it's for, any assumptions, and what you want checked. The brief is saved with the diagram, so next time it's already there.
 2. Choose **Effort**: Medium (recommended) or High (for large or important diagrams; costs more). Leave **Include a picture of the page** on so Claude can see the layout. **Search the web for current facts** lets Claude look up things that may have changed since it was trained; each search costs extra, and your organisation may need to turn web search on in the Anthropic Console first.
-3. Press **Review**. The findings appear at the top of the Review panel. Each has a severity, what's wrong and a suggested change. Click a finding to select the items it's about. Claude may also ask you questions, and with web search it lists its sources.
+3. Press **Review**. The findings appear at the top of the Review panel. Each has a severity, what's wrong and a suggested change. Click a finding to select the items it's about. Claude may also ask you questions, and with web search it lists its sources. The download button at the top of Claude's review saves it as **Markdown notes** in a file you choose.
+
+The dialog remembers what you entered: the brief is saved with the diagram as you type, and your choices are kept for next time. **Clear form** empties the brief and puts the options back to how they started (your key and model stay).
 
 A review usually costs a few cents with Opus 5.5 at Medium; the panel shows the estimate (web searches are extra). Claude can be wrong, so treat findings as a second opinion.
 

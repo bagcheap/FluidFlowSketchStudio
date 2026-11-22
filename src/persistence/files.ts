@@ -93,6 +93,24 @@ export function downloadBlob(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+/**
+ * Save a file and let the user choose where: the native Save dialog in the desktop app, the browser's Save dialog where
+ * it has one (File System Access), else a download. Resolves false if the user cancelled.
+ */
+export async function saveFileAs(blob: Blob, name: string, kind: { description: string; mime: string; ext: string }): Promise<boolean> {
+  if (isDesktopApp || !hasFSAccess) { downloadBlob(blob, name); return true; }
+  try {
+    const h = await (w.showSaveFilePicker as (o: unknown) => Promise<Handle>)({ suggestedName: name, types: [{ description: kind.description, accept: { [kind.mime]: [`.${kind.ext}`] } }] });
+    const out = await h.createWritable();
+    await out.write(blob);
+    await out.close();
+    return true;
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') return false;
+    throw e;
+  }
+}
+
 /** Save. Returns the file name used, or null if the user cancelled. */
 export async function saveDocumentFile(doc: FlowDocument, saveAs = false): Promise<string | null> {
   const json = serializeDocument(doc);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
 import { parseDocument, sanitizeBrief, serializeDocument } from '../src/model/schema';
-import { estimateCost, FINDINGS_TOOL, parseReview, reviewText, reviewWithClaude } from '../src/ai/review';
+import { estimateCost, FINDINGS_TOOL, mdText, parseReview, reviewText, reviewToMarkdown, reviewWithClaude, type AiReview } from '../src/ai/review';
 import type { DiagramBrief, FlowDocument, ShapeElement } from '../src/model/types';
 
 const KEY = 'sk-ant-test-0000000000';
@@ -125,5 +125,41 @@ describe('AI review', () => {
       if (s.type === 'array') check(s.items as Record<string, unknown>);
     };
     check(FINDINGS_TOOL.input_schema);
+  });
+});
+
+describe('review notes (Markdown)', () => {
+  const review = (over: Partial<AiReview> = {}): AiReview => ({
+    docId: 'd', pageId: 'p', at: 0, model: 'claude-opus-5-5', effort: 'medium', summary: 'Mostly right.', verdict: 'minor issues',
+    findings: [{ severity: 'error', category: 'factual', title: 'Wrong grant', explanation: 'Line one\nline two', suggestion: 'Use PKCE', ids: ['x1', 'gone'] }],
+    questions: ['Is there a BFF?'], sources: [{ url: 'https://example.com/a(b) c', title: 'RFC [9700]' }],
+    usage: { input: 1000, output: 200, cacheRead: 0, webSearches: 2 }, dropped: 0, ...over,
+  });
+  const opts = { title: 'Sign-in', page: 'Page 1', brief, nameOf: (id: string) => (id === 'x1' ? 'arrow “1. login”' : null), modelLabel: 'Claude Opus 5.5', when: '22 Nov 2026, 17:20' };
+
+  it('has the title, verdict, summary, brief, findings with item names, questions and sources', () => {
+    const md = reviewToMarkdown(review(), opts);
+    expect(md).toContain('# Review: Sign-in · Page 1');
+    expect(md).toContain('_Claude Opus 5.5 · Medium effort · 22 Nov 2026, 17:20 · about $0.01 + 2 web searches_');
+    expect(md).toContain('**Verdict:** minor issues');
+    expect(md).toContain('- **System or domain:** OAuth 2.0 / OIDC');
+    expect(md).toContain('### 1. Wrong grant');
+    expect(md).toContain('**Error** · factual');
+    expect(md).toContain('**Items:** arrow “1. login”'); // items no longer on the page are left out
+    expect(md).toContain('Line one  \nline two'); // line breaks kept
+    expect(md).toContain('**Suggested:** Use PKCE');
+    expect(md).toContain('- Is there a BFF?');
+    expect(md).toContain('- [RFC \\[9700\\]](https://example.com/a%28b%29%20c)');
+    expect(reviewToMarkdown(review({ findings: [], questions: [], sources: [] }), { ...opts, brief: null })).toContain('No problems found.');
+  });
+
+  it('text from Claude or the brief cannot add links, images, HTML or headings', () => {
+    const evil = '![x](https://tracker.example/p.png) [click](javascript:alert(1)) <img src=x onerror=alert(1)> # heading';
+    const md = reviewToMarkdown(review({ summary: evil, findings: [{ severity: 'warning', category: 'other', title: evil, explanation: evil, suggestion: evil, ids: [] }] }), { ...opts, title: evil });
+    expect(md).not.toMatch(/(^|[^\\])!\[/);
+    expect(md).not.toMatch(/(^|[^\\])\[click\]/);
+    expect(md).not.toMatch(/(^|[^\\])<img/);
+    expect(md).toContain('\\!\\[x\\](https://tracker.example/p.png)');
+    expect(mdText('a*b_c`d')).toBe('a\\*b\\_c\\`d');
   });
 });

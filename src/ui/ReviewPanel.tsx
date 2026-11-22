@@ -2,7 +2,7 @@
 // selects its items and brings them into view; issues with a one-click remedy show a button for it; any issue can be
 // hidden for the session.
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, EyeOff, Info, Lightbulb, Sparkles, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, EyeOff, FileDown, Info, Lightbulb, Sparkles, X, XCircle } from 'lucide-react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import { lintPage, type LintIssue, type LintSeverity } from '../lint/lint';
@@ -107,6 +107,7 @@ function AiReviewView({ r }: { r: AiReview }) {
         <Sparkles size={14} aria-hidden />
         <strong>Claude’s review</strong>
         <span className={`ai-verdict ${r.verdict.replace(' ', '-')}`}>{r.verdict}</span>
+        <button className="icon-btn sm" aria-label="Save review notes" title="Save as notes (Markdown)…" onClick={() => void cmd.saveAiReview()}><FileDown size={13} /></button>
         <button className="icon-btn sm" aria-label="Clear Claude’s review" title="Clear" onClick={() => useUI.getState().setAiReview(null)}><X size={13} /></button>
       </div>
       {r.summary && <p className="ai-summary">{r.summary}</p>}

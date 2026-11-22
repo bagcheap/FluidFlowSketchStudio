@@ -237,3 +237,42 @@ export function loadChoices(): ReviewChoices {
   } catch { return DEFAULT_CHOICES; }
 }
 export function saveChoices(c: ReviewChoices) { try { localStorage.setItem(OPTS, JSON.stringify(c)); } catch { /* storage unavailable */ } }
+
+// ---- saving a review as Markdown notes ----------------------------------------------------------------------------
+
+/** Text from the brief or from Claude, made inert in Markdown (no links, images, HTML, headings or emphasis). */
+export function mdText(s: string): string {
+  return s.replace(/[\\`*_[\]<>!#|~]/g, (c) => `\\${c}`).replace(/\r?\n/g, '  \n');
+}
+
+/** A checked web link (`safeUrl`) written so it can't break out of the Markdown link. */
+const mdUrl = (u: string) => u.replace(/[()\s<>]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+
+const SEV_WORD: Record<FindingSeverity, string> = { error: 'Error', warning: 'Warning', suggestion: 'Suggestion' };
+
+/**
+ * The review as Markdown notes: title, model and cost, verdict and summary, the brief, each finding (with the names of
+ * the items it concerns, from `nameOf`), questions and sources. All text from Claude or the brief is escaped.
+ */
+export function reviewToMarkdown(r: AiReview, o: { title: string; page: string; brief: DiagramBrief | null; nameOf: (id: string) => string | null; modelLabel: string; when: string }): string {
+  const out: string[] = [];
+  out.push(`# Review: ${mdText(o.title || 'Untitled diagram')}${o.page ? ` · ${mdText(o.page)}` : ''}`, '');
+  out.push(`_${mdText(o.modelLabel)} · ${r.effort === 'high' ? 'High' : 'Medium'} effort · ${mdText(o.when)} · about $${estimateCost(r.model, r.usage).toFixed(2)}${r.usage.webSearches ? ` + ${r.usage.webSearches} web search${r.usage.webSearches === 1 ? '' : 'es'}` : ''}_`, '');
+  out.push(`**Verdict:** ${r.verdict}`, '');
+  if (r.summary) out.push(mdText(r.summary), '');
+  const b = o.brief ? (Object.keys(BRIEF_LABELS) as (keyof DiagramBrief)[]).filter((k) => o.brief![k].trim()) : [];
+  if (b.length) { out.push('## Brief', ''); for (const k of b) out.push(`- **${BRIEF_LABELS[k]}:** ${mdText(o.brief![k].trim())}`); out.push(''); }
+  out.push('## Findings', '');
+  if (!r.findings.length) out.push('No problems found.', '');
+  r.findings.forEach((f, i) => {
+    out.push(`### ${i + 1}. ${mdText(f.title)}`, '', `**${SEV_WORD[f.severity]}** · ${f.category}`, '');
+    const names = f.ids.map(o.nameOf).filter((n): n is string => !!n);
+    if (names.length) out.push(`**Items:** ${names.map(mdText).join(', ')}`, '');
+    if (f.explanation) out.push(mdText(f.explanation), '');
+    if (f.suggestion) out.push(`**Suggested:** ${mdText(f.suggestion)}`, '');
+  });
+  if (r.questions.length) { out.push('## Questions', ''); for (const q of r.questions) out.push(`- ${mdText(q)}`); out.push(''); }
+  if (r.sources.length) { out.push('## Sources', ''); for (const s of r.sources) out.push(`- [${mdText(s.title || new URL(s.url).host)}](${mdUrl(s.url)})`); out.push(''); }
+  out.push('---', '_Made with FlowSketch Studio’s Review with Claude. Checks may be wrong, so judge them yourself._', '');
+  return out.join('\n');
+}

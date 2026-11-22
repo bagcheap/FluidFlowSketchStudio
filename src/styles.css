@@ -432,7 +432,7 @@ code { font-size: 12px; }
 .review-panel .ai-review { border-bottom: 1px solid var(--line); padding: 8px 8px 4px; }
 .review-panel .ai-review-head { display: flex; align-items: center; gap: 6px; padding: 0 4px; }
 .review-panel .ai-review-head svg { color: var(--accent); }
-.review-panel .ai-review-head .icon-btn { margin-left: auto; }
+.review-panel .ai-review-head .icon-btn:first-of-type { margin-left: auto; }
 .review-panel .ai-verdict { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--panel-2); color: var(--fg-2); }
 .review-panel .ai-verdict.looks-right { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
 .review-panel .ai-verdict.needs-changes { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }

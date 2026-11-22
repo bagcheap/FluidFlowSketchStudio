@@ -1503,6 +1503,22 @@ def main():
                 panel.get_by_role('button', name='Password grant is deprecated', exact=False).click(); page.wait_for_timeout(80)
                 assert app.ui()['selection'] == [arrow['id']], app.ui()['selection']
                 assert app.doc()['brief']['about'] == 'How a single-page app signs a user in' and app.doc()['brief']['domain'] == 'OAuth 2.0'
+                # save the review as Markdown notes
+                with page.expect_download() as dl:
+                    panel.get_by_role('button', name='Save review notes').click()
+                assert dl.value.suggested_filename.endswith('review.md'), dl.value.suggested_filename
+                md = open(dl.value.path(), encoding='utf-8').read()
+                assert '### 1. Password grant is deprecated' in md and '**Suggested:** Use authorization code with PKCE.' in md and '- **What the diagram shows:** How a single-page app signs a user in' in md, md
+                # the dialog remembers the brief and the choices; Clear form empties them
+                page.get_by_role('menuitem', name='Insert').click()
+                page.get_by_role('menuitem', name='Review with Claude (AI)…').click()
+                assert page.get_by_label('What it shows').input_value() == 'How a single-page app signs a user in'
+                assert page.get_by_role('radiogroup', name='Effort').get_by_role('radio', name='High').get_attribute('aria-checked') == 'true'
+                page.get_by_role('button', name='Clear form').click(); page.wait_for_timeout(60)
+                assert page.get_by_label('What it shows').input_value() == '' and page.get_by_label('System or domain').input_value() == ''
+                assert page.get_by_role('radiogroup', name='Effort').get_by_role('radio', name='Medium').get_attribute('aria-checked') == 'true'
+                assert 'brief' not in app.doc()
+                page.locator('.modal .modal-x').click(); page.wait_for_timeout(60)  # the ✕ closes it (the brief was already saved as typed)
                 panel.get_by_role('button', name='Clear Claude’s review').click(); page.wait_for_timeout(60)
                 assert not page.get_by_role('region', name='Claude’s review').is_visible()
                 page.get_by_role('button', name='Close review').click()

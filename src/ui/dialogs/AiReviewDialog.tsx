@@ -9,7 +9,7 @@ import { Modal } from './Modal';
 import { Segmented } from '../controls';
 import { KeyRows, useApiKey } from './AiDialog';
 import { savedModel, storeModel, type AiModel } from '../../ai/describe';
-import { estimateCost, loadChoices, reviewText, reviewWithClaude, saveChoices, type ReviewChoices } from '../../ai/review';
+import { DEFAULT_CHOICES, estimateCost, loadChoices, reviewText, reviewWithClaude, saveChoices, type ReviewChoices } from '../../ai/review';
 import { pageSnapshot } from '../../export/staticExport';
 import { BRIEF_MAX } from '../../model/schema';
 import type { DiagramBrief } from '../../model/types';
@@ -36,7 +36,10 @@ export function AiReviewDialog() {
   const [error, setError] = useState('');
   const abort = useRef<AbortController | null>(null);
   const choose = (c: Partial<ReviewChoices>) => setChoices((o) => { const n = { ...o, ...c }; saveChoices(n); return n; });
-  const close = () => { abort.current?.abort(); cmd.setBrief(brief); useUI.getState().openDialog(null); };
+  // the brief is saved with the diagram as you type (one undo step for a run of typing), so closing never loses it
+  const edit = (k: keyof DiagramBrief, v: string) => { const b = { ...brief, [k]: v }; setBrief(b); cmd.setBrief(b); };
+  const clearForm = () => { setBrief(EMPTY); cmd.setBrief(EMPTY); setChoices(DEFAULT_CHOICES); saveChoices(DEFAULT_CHOICES); setError(''); };
+  const close = () => { abort.current?.abort(); useUI.getState().openDialog(null); };
   const preview = reviewText(doc, brief, choices.includeNotes).text;
   const empty = !doc.elements.length;
 
@@ -64,18 +67,19 @@ export function AiReviewDialog() {
   };
 
   return (
-    <Modal title="Review with Claude (AI)" wide footer={<>
+    <Modal title="Review with Claude (AI)" wide onClose={close} footer={<>
+      <button className="btn" style={{ marginRight: 'auto' }} disabled={busy} title="Empty the brief and put the options back to how they started (your API key and model stay)" onClick={clearForm}>Clear form</button>
       <button className="btn" onClick={close}>{busy ? 'Cancel' : 'Close'}</button>
       <button className="btn primary" data-testid="ai-review" disabled={busy || empty || !api.key.trim()} onClick={() => void review()}>{busy ? 'Reviewing…' : 'Review'}</button>
     </>}>
       <p className="note">Claude checks this page against what you say it shows and what it knows about the subject: wrong or outdated facts, missing steps, wrong order or direction, naming. The findings appear in the Review panel. This needs internet and your own <b>Anthropic API key</b>, and costs a few cents. When you press <b>Review</b>, the brief and this page's labels, shapes and arrows are sent to Anthropic (see what will be sent below). Other pages are not sent.</p>
       <fieldset className="ai-brief">
-        <legend>Brief <span className="note">(saved with the diagram)</span></legend>
+        <legend>Brief <span className="note">(saved with the diagram as you type)</span></legend>
         {FIELDS.map((f) => <div className="ai-row" key={f.key}>
           <label className="row-label" htmlFor={`brief-${f.key}`}>{f.label}</label>
           {f.rows > 1
-            ? <textarea id={`brief-${f.key}`} rows={f.rows} maxLength={BRIEF_MAX} placeholder={f.placeholder} value={brief[f.key]} onChange={(e) => setBrief({ ...brief, [f.key]: e.target.value })} />
-            : <input id={`brief-${f.key}`} maxLength={BRIEF_MAX} placeholder={f.placeholder} value={brief[f.key]} onChange={(e) => setBrief({ ...brief, [f.key]: e.target.value })} />}
+            ? <textarea id={`brief-${f.key}`} rows={f.rows} maxLength={BRIEF_MAX} placeholder={f.placeholder} value={brief[f.key]} onChange={(e) => edit(f.key, e.target.value)} />
+            : <input id={`brief-${f.key}`} maxLength={BRIEF_MAX} placeholder={f.placeholder} value={brief[f.key]} onChange={(e) => edit(f.key, e.target.value)} />}
         </div>)}
       </fieldset>
       <KeyRows api={api} model={model} setModel={setModel} />
