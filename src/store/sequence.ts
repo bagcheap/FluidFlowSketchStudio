@@ -400,3 +400,94 @@ export function clearPlayOrder(doc: FlowDocument, ids: string[]): FlowDocument {
     }),
   };
 }
+
+// ---- keeping step numbers tidy ------------------------------------------------------------------------------------
+
+/** Arrows whose labels can carry step numbers (not lifelines, activation bars or locked arrows). */
+function steppable(e: DiagramElement): e is ConnectorElement {
+  return e.type === 'connector' && !e.bar && !e.locked && !isLifeline(e);
+}
+
+/** The label with its leading step number (and letter) replaced; dotted levels and the rest are kept. */
+function withTop(text: string, top: string): string {
+  return text.replace(/^(\s*)\d{1,3}[a-z]?/i, (_m, sp: string) => `${sp}${top}`);
+}
+
+/**
+ * Do the play windows on this page match the order the labels give? Order inside a step doesn't matter, and an arrow
+ * with no step number that isn't playing (one just drawn, not labelled yet) doesn't count against it.
+ */
+export function orderFollowsLabels(doc: FlowDocument): boolean {
+  const played = readPlaySteps(doc);
+  if (!played.length) return false;
+  const byId = new Map(doc.elements.map((e) => [e.id, e]));
+  const counts = (id: string) => { const e = byId.get(id); return e?.type === 'connector' && (!!e.anim?.window || !!labelStep(e.text)); };
+  const want = labelSteps(doc).map((g) => g.filter(counts)).filter((g) => g.length);
+  const key = (s: string[][]) => s.map((g) => [...g].sort().join(',')).join('|');
+  return key(played) === key(want);
+}
+
+/**
+ * Typing a plain step number that another arrow already has ("7b" → "8" while another arrow is "8") makes room for it,
+ * like a numbered list: every other arrow numbered 8 or more moves up by one (8 → 9, 8a.1 → 9a.1, 9 → 10…). Nothing
+ * moves when the number didn't change ("7a" → "7"), when it has a letter ("8a" joins step 8), or when no other arrow
+ * has it. Returns the arrows renumbered.
+ */
+export function makeRoomForStep(doc: FlowDocument, id: string, oldText: string, newText: string): { doc: FlowDocument; shifted: number } {
+  const now = labelStep(newText), was = labelStep(oldText);
+  if (!now || now.sub || now.depth || (was && was.n === now.n)) return { doc, shifted: 0 };
+  const N = now.n;
+  const others = doc.elements.filter((e): e is ConnectorElement => steppable(e) && e.id !== id);
+  if (!others.some((e) => labelStep(e.text)?.n === N)) return { doc, shifted: 0 };
+  let shifted = 0;
+  const elements = doc.elements.map((e) => {
+    if (e.id === id || !steppable(e)) return e;
+    const s = labelStep(e.text);
+    if (!s || s.n < N || s.n >= 999) return e;
+    shifted++;
+    return { ...e, text: withTop(e.text, `${s.n + 1}${s.sub}`) };
+  });
+  return { doc: { ...doc, elements }, shifted };
+}
+
+/**
+ * Renumber the arrows' labels to match the play order (or, with none set, the label order): numbered arrows in each
+ * step get 1, 2, 3… in turn, with letters when a step has several (4a, 4b); dotted sub-steps keep their levels under
+ * their parent's new number (8a.1 → 7a.1). Arrows without a number keep their labels and add no number. Locked arrows
+ * aren't changed. Returns how many labels changed.
+ */
+export function renumberSteps(doc: FlowDocument): { doc: FlowDocument; changed: number } {
+  const steps = readPlaySteps(doc).length ? readPlaySteps(doc) : labelSteps(doc);
+  const byId = new Map(doc.elements.map((e) => [e.id, e]));
+  const newText = new Map<string, string>();
+  const tops = new Map<string, string>(); // old "8a" -> new "7a"
+  const firstOf = new Map<number, number>(); // old 8 -> new 7
+  let k = 0;
+  const deeper: { c: ConnectorElement; s: NonNullable<ReturnType<typeof labelStep>> }[] = [];
+  for (const g of steps) {
+    const top = g.map((id) => byId.get(id)).filter((e): e is ConnectorElement => !!e && steppable(e))
+      .map((c) => ({ c, s: labelStep(c.text) })).filter((x): x is { c: ConnectorElement; s: NonNullable<ReturnType<typeof labelStep>> } => !!x.s);
+    const level0 = top.filter((x) => x.s.depth === 0);
+    deeper.push(...top.filter((x) => x.s.depth > 0));
+    if (!level0.length) continue;
+    k++;
+    level0.forEach((x, i) => {
+      const t = `${k}${level0.length > 1 && i < 26 ? String.fromCharCode(97 + i) : ''}`;
+      if (!tops.has(`${x.s.n}${x.s.sub}`)) tops.set(`${x.s.n}${x.s.sub}`, t);
+      if (!firstOf.has(x.s.n)) firstOf.set(x.s.n, k);
+      newText.set(x.c.id, withTop(x.c.text, t));
+    });
+  }
+  for (const { c, s } of deeper) {
+    const t = tops.get(`${s.n}${s.sub}`) ?? (firstOf.has(s.n) ? `${firstOf.get(s.n)}${s.sub}` : null);
+    if (t) newText.set(c.id, withTop(c.text, t));
+  }
+  let changed = 0;
+  const elements = doc.elements.map((e) => {
+    const t = newText.get(e.id);
+    if (t === undefined || t === e.text || e.type !== 'connector') return e;
+    changed++;
+    return { ...e, text: t };
+  });
+  return { doc: { ...doc, elements }, changed };
+}

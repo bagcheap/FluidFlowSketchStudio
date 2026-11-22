@@ -22,7 +22,7 @@ import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { Copy } from 'lucide-react';
 import { liveCameraView, visibleArea } from '../store/commands';
-import { applyStyle, clearAllPlayOrder, playInLabelOrder, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
+import { afterLabelEdit, applyStyle, clearAllPlayOrder, playInLabelOrder, renumberStepLabels, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
 import { placeSizeMarks, sizeSnap, spacingSnap, type GapMark } from './spacing';
@@ -1275,6 +1275,7 @@ export function Canvas() {
         <div className="order-bar no-canvas" role="toolbar" aria-label="Set play order">
           <span><b>Play order:</b> click arrows in turn · Shift: same step · again: remove</span>
           <button className="btn small" title="Order the arrows by the numbers at the start of their labels (1, 2, 4a, 4b…)" onClick={playInLabelOrder}>From labels</button>
+          <button className="btn small" title="Rewrite the step numbers at the start of the arrows' labels to match this order (1, 2, 3…; 4a, 4b for arrows playing together)" onClick={renumberStepLabels}>Renumber labels</button>
           <button className={`btn small ${doc.animation.captions ? 'on' : ''}`} aria-pressed={!!doc.animation.captions} title="Show each step's arrow labels as a subtitle while it plays" onClick={() => setAnimation({ captions: !doc.animation.captions })}>Captions</button>
           <button className={`btn small ${doc.animation.stepFocus ? 'on' : ''}`} aria-pressed={!!doc.animation.stepFocus} title="Make the shapes in the playing step glow and dim the rest" onClick={() => setAnimation({ stepFocus: !doc.animation.stepFocus })}>Highlight</button>
           <button className={`btn small ${doc.animation.camera ? 'on' : ''}`} aria-pressed={!!doc.animation.camera} title="Zoom to each step as it plays, then back out to the whole picture" onClick={() => setAnimation({ camera: !doc.animation.camera })}>Camera</button>
@@ -1326,6 +1327,13 @@ export function Canvas() {
         }
         if (el.type === 'text' && !text.trim()) { D.commit((d) => deleteElements(d, new Set([id]))); useUI.getState().select([]); return; }
         if (text === el.text) return;
+        if (el.type === 'connector') {
+          // step numbers: make room for a taken number, and keep a label-made play order in step with the labels
+          let shifted = 0;
+          D.commit((d) => { const r = afterLabelEdit(d, mapElements(d, [id], (x) => ({ ...x, text } as DiagramElement)), id, el.text, text); shifted = r.shifted; return r.doc; });
+          if (shifted) useUI.getState().toast(`Moved ${shifted} later step${shifted === 1 ? '' : 's'} up by one to make room (Undo to put them back)`);
+          return;
+        }
         // typing a label on an icon whose label is hidden shows it
         D.commit((d) => updateMembership(mapElements(d, [id], (x) => fitShapeToText({ ...x, text, ...(x.type === 'icon' && x.labelPos === 'none' && text.trim() ? { labelPos: 'below' } : {}) } as DiagramElement)), [id])); // a shape that grew to fit its text grows its container too
       }} />}
