@@ -173,8 +173,15 @@ export function makeConnector(start: Endpoint, end: Endpoint, tool: ToolStyle): 
     startHead: tool.startHead ?? 'none', endHead: tool.endHead ?? 'arrow',
     labelPos: 0.5, labelOffset: 0,
     textStyle: { ...tool.textStyle, fontSize: Math.max(12, tool.textStyle.fontSize - 4), padding: 4 },
-    ...(tool.connectorAnim && Object.keys(tool.connectorAnim).length ? { anim: { ...tool.connectorAnim } } : {}),
+    ...(tool.connectorAnim && Object.keys(withoutPlaySlot(tool.connectorAnim)).length ? { anim: withoutPlaySlot(tool.connectorAnim) } : {}),
   };
+}
+
+/** An arrow's animation without its place in a play order (`window`): a style or a copy never carries one. */
+export function withoutPlaySlot<T extends { window?: unknown }>(a: T): Omit<T, 'window'> {
+  const { window: _w, ...rest } = a;
+  void _w;
+  return rest;
 }
 
 export function makeIcon(iconId: string, x: number, y: number, size: number, tool: ToolStyle): IconElement {

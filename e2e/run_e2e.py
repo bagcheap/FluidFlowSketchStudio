@@ -737,8 +737,9 @@ def main():
             def lit(t):
                 f = app.js('(t) => window.__flowsketch.frame(t)', t)
                 return [any(p['k'] == 'line' and p.get('color') == '#3b82f6' for p in [x for x in f['items'] if x['id'] == c['id']][0]['parts']) for c in cs]
-            assert lit(L * 0.2) == [False, False, True], lit(L * 0.2)
-            assert lit(L * 0.7) == [True, True, False], lit(L * 0.7)
+            mid = lambda c: (lambda w: (w[0] + w[1]) / 2 * L)(app.js('(id) => window.__flowsketch.playWindow(id)', c['id']))
+            assert lit(mid(cs[2])) == [False, False, True], lit(mid(cs[2]))
+            assert lit(mid(cs[0])) == [True, True, False], lit(mid(cs[0]))
             # clicking a numbered arrow takes it out; Esc finishes
             app.click(along(cs[2], 0.3))
             assert not [e for e in app.els('connector') if e['id'] == cs[2]['id']][0].get('anim', {}).get('window')
@@ -1379,7 +1380,18 @@ def main():
             # draw a new arrow and type "3. new": it becomes step 3, the old 3 and 4 move up, and the order follows
             box = {e['text']: e for e in app.els() if e['type'] == 'shape'}
             mid = lambda e: (e['x'] + e['w'] / 2, e['y'] + e['h'] / 2)
+            # the bug: "Set as default style" on an arrow in the order made new arrows join its step
+            ask_id = arrows()['1. ask']['id']
+            app.key('Control+f'); page.keyboard.type('1. ask'); page.keyboard.press('Enter'); page.wait_for_timeout(80)
+            app.key('Escape')
+            assert app.ui()['selection'] == [ask_id], app.ui()['selection']
+            page.get_by_role('menuitem', name='Edit').click()
+            page.get_by_role('menuitem', name='Set as default style').click(); page.wait_for_timeout(60)
+            assert 'window' not in (app.js("() => window.__flowsketch.toolStyle('arrow')").get('connectorAnim') or {})
+            n_before = len(app.els())
             app.tool('a'); app.drag(mid(box['C']), mid(box['E'])); page.wait_for_timeout(80)
+            fresh = app.els()[n_before]
+            assert fresh['type'] == 'connector' and not (fresh.get('anim') or {}).get('window'), fresh.get('anim')
             page.keyboard.type('3. new'); page.wait_for_selector('.text-editor'); page.keyboard.press('Escape'); page.wait_for_timeout(100)
             a = arrows()
             assert set(a) >= {'1. ask', '2. look up', '3. new', '4. fetch', '5. reply'}, list(a)
@@ -1601,9 +1613,10 @@ def main():
                     it = [x for x in f['items'] if x['id'] == m['id']][0]
                     out.append(any(p['k'] == 'line' and p.get('color') == '#3b82f6' for p in it['parts']))
                 return out
-            assert lit(L * 0.15) == [True, False, False], lit(L * 0.15)
-            assert lit(L * 0.48) == [False, True, False], lit(L * 0.48)
-            assert lit(L * 0.80) == [False, False, True], lit(L * 0.80)
+            mid = lambda m: (lambda w: (w[0] + w[1]) / 2 * L)(app.js('(id) => window.__flowsketch.playWindow(id)', m['id']))
+            assert lit(mid(msgs[0])) == [True, False, False], lit(mid(msgs[0]))
+            assert lit(mid(msgs[1])) == [False, True, False], lit(mid(msgs[1]))
+            assert lit(mid(msgs[2])) == [False, False, True], lit(mid(msgs[2]))
             # right-click a message: Play arrows together
             app.key('Escape')
             m = [e for e in app.els() if e['id'] == msgs[0]['id']][0]
@@ -1652,7 +1665,7 @@ def main():
                 mx, my = app.js('''([id, f]) => { const it = window.__flowsketch.frame(0).items.find((i) => i.id === id);
                   const p = it.parts.find((q) => q.k === 'line').pts; const k = Math.floor(p.length / 2 * f) * 2; return [p[k], p[k + 1]]; }''', [c['id'], frac])
                 app.js('([x, y]) => window.__flowsketch.setView({x: x - 450, y: y - 380, zoom: 1})', [mx, my])  # the point in clear view
-                page.wait_for_timeout(50)
+                page.wait_for_timeout(200)
                 app.click((mx, my))
                 if app.ui()['selection'] == [c['id']]: break
                 app.key('Escape')

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
-import { afterLabelEdit, deleteSelection, playInLabelOrderAllPages, renumberStepLabels } from '../src/store/commands';
+import { afterLabelEdit, applyStyle, cloneElements, deleteSelection, playInLabelOrderAllPages, renumberStepLabels, styleOf } from '../src/store/commands';
+import { playSchedule } from '../src/engine/render';
+import { sanitizeToolStyle } from '../src/model/schema';
 import { useDoc } from '../src/store/docStore';
 import { useUI } from '../src/store/uiStore';
 import { applyPlaySteps, labelSteps, makeRoomForStep, orderFollowsLabels, readPlaySteps, renumberSteps } from '../src/store/sequence';
@@ -162,5 +164,54 @@ describe('closing gaps', () => {
     useUI.getState().select([ids[1]]);
     deleteSelection();
     expect(texts(useDoc.getState().doc, [ids[0], ids[2]])).toEqual(['1. a', '3. c']);
+  });
+});
+
+describe('new arrows and the play order', () => {
+  beforeEach(() => useUI.setState((s) => ({ prefs: { ...s.prefs, autoRenumberSteps: true } })));
+  const ordered = (labels: string[]) => { const { doc, ids } = chain(labels); return { doc: applyPlaySteps(doc, labelSteps(doc)), ids }; };
+  const lastStep = (d: FlowDocument) => playSchedule(d).steps.at(-1)!.ids;
+
+  it('a style taken from an arrow in the order never carries its place (tool defaults, paste style, copies)', () => {
+    const { doc, ids } = ordered(['1. a', '2. b', '3. c']);
+    const two = doc.elements.find((e) => e.id === ids[1]) as ConnectorElement;
+    expect(styleOf(two).connectorAnim?.window).toBeUndefined();
+    expect(sanitizeToolStyle({ ...styleOf(two), connectorAnim: { window: [0.2, 0.3], speed: 2 } }, defaultToolStyle('arrow')).connectorAnim).toEqual({ speed: 2 });
+    expect(makeConnector({ x: 0, y: 0 }, { x: 9, y: 0 }, { ...defaultToolStyle('arrow'), connectorAnim: { window: [0.2, 0.3] } } as never).anim?.window).toBeUndefined();
+    const [copy] = cloneElements(doc, [two], 10, 10) as ConnectorElement[];
+    expect(copy.anim?.window).toBeUndefined();
+    expect((cloneElements(doc, [two], 0, 0, true)[0] as ConnectorElement).anim?.window).toEqual(two.anim!.window); // a duplicated page keeps its order
+    useDoc.getState().load(doc);
+    applyStyle([ids[2]], styleOf(two)); // paste style: arrow 3 keeps its own place
+    expect(readPlaySteps(useDoc.getState().doc)).toEqual([[ids[0]], [ids[1]], [ids[2]]]);
+  });
+
+  it('1) a new arrow plays last; 2) labelling it places it; 3) a label without a clear number keeps it last', () => {
+    const { doc, ids } = ordered(['1. a', '2. b', '3. c']);
+    const shapes = doc.elements.filter((e) => e.type === 'shape');
+    const fresh = makeConnector({ x: 0, y: 0, elementId: shapes[3].id }, { x: 0, y: 0, elementId: shapes[0].id }, defaultToolStyle('arrow'));
+    const before = { ...doc, elements: [...doc.elements, fresh] };
+    expect(lastStep(before)).toEqual([fresh.id]); // 1) plays after step 3
+    const r = afterLabelEdit(before, relabel(before, fresh.id, '2. new'), fresh.id, '', '2. new');
+    expect(readPlaySteps(r.doc)).toEqual([[ids[0]], [fresh.id], [ids[1]], [ids[2]]]); // 2) it is step 2, the rest move up
+    expect(texts(r.doc, ids)).toEqual(['1. a', '3. b', '4. c']);
+    const oops = afterLabelEdit(before, relabel(before, fresh.id, 'two'), fresh.id, '', 'two');
+    expect(readPlaySteps(oops.doc)).toEqual([[ids[0]], [ids[1]], [ids[2]]]); // 3) not placed…
+    expect(lastStep(oops.doc)).toEqual([fresh.id]); // …so it still plays last
+  });
+
+  it('removing an arrow\'s number moves it to the end (the others close up)', () => {
+    const { doc, ids } = ordered(['1. a', '2. b', '3. c']);
+    const r = afterLabelEdit(doc, relabel(doc, ids[1], 'b'), ids[1], '2. b', 'b');
+    expect(texts(r.doc, ids)).toEqual(['1. a', 'b', '2. c']);
+    expect(readPlaySteps(r.doc)).toEqual([[ids[0]], [ids[2]]]);
+    expect(lastStep(r.doc)).toEqual([ids[1]]);
+  });
+
+  it('an arrow in the order with its animation turned off is skipped: no gap where it was', () => {
+    const { doc, ids } = ordered(['1. a', '2. b', '3. c']);
+    const off = { ...doc, elements: doc.elements.map((e) => (e.id === ids[1] ? { ...e, anim: { ...(e as ConnectorElement).anim, mode: 'none' as const } } : e)) } as FlowDocument;
+    expect(playSchedule(off).steps.map((g) => g.ids)).toEqual([[ids[0]], [ids[2]]]);
+    expect(playSchedule(off).seconds).toBeLessThan(playSchedule(doc).seconds);
   });
 });

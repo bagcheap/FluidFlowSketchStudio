@@ -348,7 +348,7 @@ export function numberedSteps(doc: FlowDocument): string[][] {
  * with any others that follow step k. The earliest such step wins; chains (an unnumbered arrow after another) follow
  * on in turn. Arrows with nothing in the order leading in stay out of it.
  */
-export function withFollowers(doc: FlowDocument, steps: string[][]): string[][] {
+export function withFollowers(doc: FlowDocument, steps: string[][], only?: Set<string>): string[][] {
   const notLifeline = (e: DiagramElement): boolean => !isLifeline(e);
   const byId = new Map(doc.elements.map((e) => [e.id, e]));
   const out = steps.map((g) => [...g]);
@@ -367,7 +367,7 @@ export function withFollowers(doc: FlowDocument, steps: string[][]): string[][] 
     if (c.end.elementId && c.startHead !== 'none' && c.endHead !== 'none') r.push(c.end.elementId);
     return r;
   };
-  let free = doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && !e.bar && !e.locked && notLifeline(e) && !placed.has(e.id) && !!e.start.elementId && !!e.end.elementId && e.start.elementId !== e.end.elementId);
+  let free = doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && !e.bar && !e.locked && notLifeline(e) && !placed.has(e.id) && (!only || only.has(e.id)) && !!e.start.elementId && !!e.end.elementId && e.start.elementId !== e.end.elementId);
   for (let pass = 0; pass < 100 && free.length; pass++) {
     // the earliest step leading into each free arrow's start
     const reach = new Map<string, number>(); // shape id -> earliest step leading into it
@@ -414,15 +414,24 @@ function withTop(text: string, top: string): string {
 }
 
 /**
- * Do the play windows on this page match the order the labels give? Order inside a step doesn't matter, and an arrow
- * with no step number that isn't playing (one just drawn, not labelled yet) doesn't count against it.
+ * The label order for keeping an existing order up to date: numbered arrows by number, and arrows without a number
+ * only if they are already in the order (they keep following the arrow before them). Anything else (an arrow just
+ * drawn, or labelled without a clear number) isn't placed, so it plays after the order. `drop` leaves arrows out
+ * of the followers (one whose number was just removed goes to the end).
+ */
+export function labelStepsKeeping(doc: FlowDocument, drop: string[] = []): string[][] {
+  const placed = new Set(doc.elements.filter((e) => e.type === 'connector' && !!e.anim?.window && !drop.includes(e.id)).map((e) => e.id));
+  return withFollowers(doc, numberedSteps(doc), placed);
+}
+
+/**
+ * Do the play windows on this page match the order the labels give (`labelStepsKeeping`)? Order inside a step
+ * doesn't matter; arrows not in the order (one just drawn, not labelled yet) don't count against it.
  */
 export function orderFollowsLabels(doc: FlowDocument): boolean {
   const played = readPlaySteps(doc);
   if (!played.length) return false;
-  const byId = new Map(doc.elements.map((e) => [e.id, e]));
-  const counts = (id: string) => { const e = byId.get(id); return e?.type === 'connector' && (!!e.anim?.window || !!labelStep(e.text)); };
-  const want = labelSteps(doc).map((g) => g.filter(counts)).filter((g) => g.length);
+  const want = labelStepsKeeping(doc);
   const key = (s: string[][]) => s.map((g) => [...g].sort().join(',')).join('|');
   return key(played) === key(want);
 }

@@ -1,7 +1,7 @@
 // Editor commands shared by menus, keyboard shortcuts, toolbar and inspector.
 import type { Asset, BoxElement, ConnectorAnim, ConnectorElement, ContainerElement, DiagramElement, FlowDocument, IconAsset, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
 import { SCHEMA_VERSION } from '../model/types';
-import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey } from '../model/defaults';
+import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey, withoutPlaySlot } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { useUI } from './uiStore';
 import { cameraView, compartmentLayout, contentBounds, hasCamera, playSchedule } from '../engine/render';
@@ -137,7 +137,11 @@ let internalClip: string | null = null;
 let internalClipShared = false;
 
 /** Copies with fresh ids/seeds, their own groups (never the originals'), unlocked, internal connections remapped. */
-export function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: number, dy: number): DiagramElement[] {
+/**
+ * Copies with fresh ids. Copied arrows leave the play order (they play after it, like any new arrow) unless
+ * `keepPlayOrder` (a duplicated page keeps its order).
+ */
+export function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: number, dy: number, keepPlayOrder = false): DiagramElement[] {
   const idMap = new Map<string, string>();
   const groupMap = new Map<string, string>();
   for (const e of els) idMap.set(e.id, uid());
@@ -155,6 +159,7 @@ export function cloneElements(doc: FlowDocument, els: DiagramElement[], dx: numb
         if (end.elementId) end.elementId = idMap.get(end.elementId) ?? (getElement(doc, end.elementId) ? end.elementId : null);
       }
       n.bends = n.bends.map((b) => ({ x: b.x + dx, y: b.y + dy }));
+      if (n.anim?.window && !keepPlayOrder) n.anim = withoutPlaySlot(n.anim);
     } else { n.x += dx; n.y += dy; }
     return n;
   });
@@ -224,7 +229,7 @@ function topLevel(els: DiagramElement[]): string[] {
 // ---- style --------------------------------------------------------------------
 export function styleOf(e: DiagramElement): ToolStyle {
   const s: ToolStyle = { style: { ...e.style }, textStyle: { ...e.textStyle } };
-  if (e.type === 'connector') { s.routing = e.routing; s.curvature = e.curvature; s.elbowRadius = e.elbowRadius ?? 0; s.headSize = e.headSize ?? 1; s.startHead = e.startHead; s.endHead = e.endHead; if (e.anim) s.connectorAnim = { ...e.anim }; }
+  if (e.type === 'connector') { s.routing = e.routing; s.curvature = e.curvature; s.elbowRadius = e.elbowRadius ?? 0; s.headSize = e.headSize ?? 1; s.startHead = e.startHead; s.endHead = e.endHead; if (e.anim) s.connectorAnim = withoutPlaySlot(e.anim); }
   else if (e.anim) s.shapeAnim = { ...e.anim };
   return s;
 }
@@ -237,7 +242,7 @@ export function copyStyle() {
 export function applyStyle(ids: string[], s: ToolStyle) {
   D().commit((d) => mapElements(d, ids, (e) => {
     if (e.locked) return e;
-    if (e.type === 'connector') return { ...e, style: { ...s.style, fillStyle: 'none' }, textStyle: { ...s.textStyle }, ...(s.routing ? { routing: s.routing } : {}), ...(s.curvature !== undefined ? { curvature: s.curvature } : {}), ...(s.elbowRadius !== undefined ? { elbowRadius: s.elbowRadius } : {}), ...(s.headSize !== undefined ? { headSize: s.headSize } : {}), ...(s.endHead ? { endHead: s.endHead, startHead: s.startHead ?? 'none' } : {}), ...(s.connectorAnim ? { anim: { ...s.connectorAnim } } : {}) };
+    if (e.type === 'connector') return { ...e, style: { ...s.style, fillStyle: 'none' }, textStyle: { ...s.textStyle }, ...(s.routing ? { routing: s.routing } : {}), ...(s.curvature !== undefined ? { curvature: s.curvature } : {}), ...(s.elbowRadius !== undefined ? { elbowRadius: s.elbowRadius } : {}), ...(s.headSize !== undefined ? { headSize: s.headSize } : {}), ...(s.endHead ? { endHead: s.endHead, startHead: s.startHead ?? 'none' } : {}), ...(s.connectorAnim ? { anim: { ...withoutPlaySlot(s.connectorAnim), ...(e.anim?.window ? { window: e.anim.window } : {}) } } : {}) }; // each arrow keeps its own place in the play order
     return { ...e, style: { ...s.style }, textStyle: { ...s.textStyle, ...(e.type === 'text' ? { padding: e.textStyle.padding } : {}) }, ...(s.shapeAnim ? { anim: { ...s.shapeAnim } } : {}) } as DiagramElement;
   }));
 }
@@ -537,12 +542,13 @@ export function playInLabelOrder() {
 export function afterLabelEdit(before: FlowDocument, after: FlowDocument, id: string, oldText: string, newText: string): { doc: FlowDocument; shifted: number } {
   let d = after, shifted = 0;
   if (U().prefs.autoRenumberSteps) ({ doc: d, shifted } = seq.renumberForEdit(d, id, oldText, newText));
-  return { doc: keepLabelOrder(before, d), shifted };
+  // an arrow whose label lost its number (or never had a clear one) plays after the order, not in it
+  return { doc: keepLabelOrder(before, d, seq.labelStep(newText) ? [] : [id]), shifted };
 }
 
 /** A play order that came from the labels is worked out again after labels change (current page). */
-function keepLabelOrder(before: FlowDocument, after: FlowDocument): FlowDocument {
-  return seq.orderFollowsLabels(before) ? fitLoopToPlay(seq.applyPlaySteps(after, seq.labelSteps(after))) : after;
+function keepLabelOrder(before: FlowDocument, after: FlowDocument, drop: string[] = []): FlowDocument {
+  return seq.orderFollowsLabels(before) ? fitLoopToPlay(seq.applyPlaySteps(after, seq.labelStepsKeeping(after, drop))) : after;
 }
 
 /**
@@ -1110,7 +1116,7 @@ export function newPage() {
 }
 export function duplicatePage(id = D().doc.activePage) {
   if (D().doc.pages.length >= MAX_PAGES) { U().toast(`A document can have up to ${MAX_PAGES} pages`); return; }
-  changePage((d) => pages.duplicatePage(d, id, (els) => cloneElements(d, els, 0, 0)), true);
+  changePage((d) => pages.duplicatePage(d, id, (els) => cloneElements(d, els, 0, 0, true)), true);
 }
 export async function deletePage(id = D().doc.activePage) {
   const d = D().doc;
