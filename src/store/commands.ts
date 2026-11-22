@@ -3,7 +3,8 @@ import type { Asset, BoxElement, ConnectorAnim, ConnectorElement, ContainerEleme
 import { SCHEMA_VERSION } from '../model/types';
 import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey, withoutPlaySlot } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
-import type { LintIssue } from '../lint/lint';
+import { itemName, type LintIssue } from '../lint/lint';
+import { separateBoxes } from '../layout/separate';
 import type { ToolContext, ToolSession } from '../ai/toolkit';
 import { pageSnapshot } from '../export/staticExport';
 import { useUI } from './uiStore';
@@ -1280,6 +1281,16 @@ export function fixLintIssue(issue: LintIssue) {
       if (!r.routed) { U().toast('That arrow can’t be routed around shapes (it needs a shape at each end, and nothing locked)', 'error'); return; }
       D().commit(() => r.doc);
       U().toast(`Routed ${r.routed} arrow${r.routed === 1 ? '' : 's'} around shapes`, 'success');
+      return;
+    }
+    case 'separate': {
+      const r = separateBoxes(doc, issue.ids[0], issue.ids[1]);
+      if (!r) { U().toast('There’s no free spot nearby to move it to', 'error'); return; }
+      // it joins or leaves containers like a dragged shape, and its elbow arrows find a fresh way round
+      const elbows = r.doc.elements.filter((c) => c.type === 'connector' && c.routing === 'elbow' && !c.locked && (c.start.elementId === r.moved || c.end.elementId === r.moved)).map((c) => c.id);
+      D().commit(() => { const d = updateMembership(r.doc, [r.moved]); return elbows.length ? routeArrowsAround(d, elbows, { keepAnchors: true }).doc : d; });
+      U().select([r.moved]);
+      U().toast(`Moved ${itemName(doc, getElement(doc, r.moved))} clear`, 'success');
       return;
     }
     case 'delete': {

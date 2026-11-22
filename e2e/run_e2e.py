@@ -1438,6 +1438,13 @@ def main():
             assert 'Nothing to fix on this page' in panel.inner_text() and 'Show 1 hidden' in panel.inner_text(), panel.inner_text()
             panel.get_by_role('button', name='Show 1 hidden').click(); page.wait_for_timeout(60)
             assert 'Alone' in panel.inner_text()
+            # drag one shape onto another: the overlap is listed with "Move apart", which separates them
+            api = [e for e in app.els() if e['type'] == 'shape' and e['text'] == 'API'][0]
+            app.key('Escape')
+            app.drag((alone['x'] + alone['w'] / 2, alone['y'] + alone['h'] / 2), (api['x'] + api['w'] / 2 + 20, api['y'] + api['h'] / 2 + 10)); page.wait_for_timeout(400)
+            assert '“API” and “Alone” overlap' in panel.inner_text() or '“Alone” and “API” overlap' in panel.inner_text(), panel.inner_text()
+            panel.get_by_role('button', name='Move apart').click(); page.wait_for_timeout(400)
+            assert 'overlap' not in panel.inner_text(), panel.inner_text()
             snap = app.js('() => window.__flowsketch.snapshot()')
             assert snap and snap['png'] and 100 < snap['width'] <= 1568 and 50 < snap['height'] <= 1568, snap
             panel.get_by_role('button', name='Close review').click(); page.wait_for_timeout(60)

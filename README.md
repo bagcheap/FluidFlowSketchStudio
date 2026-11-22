@@ -241,7 +241,7 @@ The 60 FPS target for 100+150 objects is **not demonstrated** here, because no G
 * Continuous drawing with per-tool remembered styles and an optional shared style; copy/paste style and a format painter
 * Selection: marquee, shift-select, select similar (same kind, look, fill, line colour or animation; then edit them all at once in the Inspector), groups, lock, z-order, align/distribute, flip
 * Transforms: rotate, numeric geometry, keyboard nudging, alt-drag duplicate
-* Review panel (View ▸ Review diagram): lists likely mistakes as you edit, such as loose arrow ends, arrows through shapes, overlapping shapes, missing or duplicate step numbers and unconnected shapes. Click one to find it, fix some with one click. Works offline, no AI
+* Review panel (View ▸ Review diagram): lists likely mistakes as you edit, such as loose arrow ends, arrows through shapes, overlapping shapes, missing or duplicate step numbers and unconnected shapes. Click one to find it, fix some with one click (for example Move apart for overlapping shapes). Works offline, no AI
 * Diagram themes: Whiteboard, Pastel, Blueprint, Dark and Mono recolour the whole diagram in one click (Inspector ▸ Theme or View ▸ Diagram theme); new shapes and arrows follow
 * Canvas: smart guides, grid snapping, pinch/space/hand/wheel pan-zoom, light/dark themes
 * Undo/redo; real menus

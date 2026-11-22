@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
-- **Review panel** (View ▸ Review diagram, or right-click the canvas): lists likely mistakes on the page and keeps the list up to date as you edit: arrows with a loose end or cutting through shapes, shapes on top of each other, duplicate or missing step numbers, a play order that doesn't follow the numbers, arrows without a step number, shapes without a label or not connected to anything, and empty containers. Click an issue to select its items and bring them into view; some have a one-click fix (**Renumber steps**, **Play in label order**, **Route around shapes**, **Delete it**); hide the ones you don't care about. It works offline and uses no AI.
+- **Review panel** (View ▸ Review diagram, or right-click the canvas): lists likely mistakes on the page and keeps the list up to date as you edit: arrows with a loose end or cutting through shapes, shapes on top of each other, duplicate or missing step numbers, a play order that doesn't follow the numbers, arrows without a step number, shapes without a label or not connected to anything, and empty containers. Click an issue to select its items and bring them into view; some have a one-click fix (**Move apart** for overlapping shapes, **Renumber steps**, **Play in label order**, **Route around shapes**, **Delete it**); hide the ones you don't care about. It works offline and uses no AI.
 
 ## [0.1.53] - 2026-11-22
 

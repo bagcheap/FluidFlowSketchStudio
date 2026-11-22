@@ -13,7 +13,7 @@ export type LintRule =
   | 'loose-end' | 'through-shape' | 'overlap' | 'duplicate-step' | 'step-gap' | 'order-mismatch' | 'not-in-order'
   | 'no-order' | 'unlabelled' | 'unconnected' | 'empty-container';
 /** One-click remedies the editor offers (cmd.fixLintIssue). */
-export type LintFix = 'renumber' | 'labelOrder' | 'routeArrows' | 'delete';
+export type LintFix = 'renumber' | 'labelOrder' | 'routeArrows' | 'delete' | 'separate';
 
 export interface LintIssue {
   key: string; // stable while the issue stays the same (rule + items), for hiding it
@@ -124,7 +124,7 @@ export function lintPage(doc: FlowDocument): LintIssue[] {
       const o = overlapArea(a, b);
       if (!o || inside(a, b) || inside(b, a)) continue; // one placed inside the other is usually on purpose
       if (o < 0.15 * Math.min(area(a), area(b))) continue; // touching edges
-      add('overlap', 'warning', `${cap(name(boxes[i].id))} and ${name(boxes[j].id)} overlap`, [boxes[i].id, boxes[j].id]);
+      add('overlap', 'warning', `${cap(name(boxes[i].id))} and ${name(boxes[j].id)} overlap`, [boxes[i].id, boxes[j].id], boxes[i].locked && boxes[j].locked ? undefined : { kind: 'separate', label: 'Move apart' });
     }
   }
 
