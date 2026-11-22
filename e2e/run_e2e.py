@@ -1452,6 +1452,66 @@ def main():
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
         treview()
 
+        @test('Review with Claude (AI): the brief and page go with the request (strict report tool, picture); findings show in the Review panel; click selects; the brief is saved')
+        def taireview():
+            app.key('Escape')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            page.get_by_role('button', name='Add page').click(); page.wait_for_timeout(100)
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('flowchart LR\n  B[Browser] -->|1. password grant| S[Auth server]')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            app.key('Escape'); app.key('Escape')
+            arrow = app.els('connector')[0]
+            sent = []
+            def handle(route):
+                req = route.request
+                if req.method == 'OPTIONS':
+                    return route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'})
+                body = json.loads(req.post_data or '{}'); sent.append(body)
+                report = {'summary': 'A SPA sign-in using the password grant, which is no longer recommended.', 'verdict': 'needs changes',
+                    'findings': [{'severity': 'error', 'category': 'factual', 'items': ['a1'], 'title': 'Password grant is deprecated',
+                                  'explanation': 'The OAuth 2.0 Security BCP says not to use it.', 'suggestion': 'Use authorization code with PKCE.'}],
+                    'questions': ['Is there a backend for the frontend?']}
+                route.fulfill(status=200, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
+                    'id': 'msg_e2e', 'type': 'message', 'role': 'assistant', 'model': 'claude-opus-5-5', 'stop_reason': 'tool_use', 'stop_sequence': None,
+                    'content': [{'type': 'tool_use', 'id': 'toolu_1', 'name': 'report_findings', 'input': report}], 'usage': {'input_tokens': 4000, 'output_tokens': 600}}))
+            page.route('https://api.anthropic.com/**', handle)
+            try:
+                page.get_by_role('menuitem', name='Insert').click()
+                page.get_by_role('menuitem', name='Review with Claude (AI)…').click()
+                page.get_by_label('What it shows').fill('How a single-page app signs a user in')
+                page.get_by_label('System or domain').fill('OAuth 2.0')
+                page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
+                page.locator('.ai-sent summary').click()
+                preview = page.get_by_test_id('ai-review-preview').inner_text()
+                assert 'What the diagram shows: How a single-page app signs a user in' in preview and '1. password grant' in preview, preview
+                page.get_by_role('radiogroup', name='Effort').get_by_role('radio', name='High').click()
+                page.get_by_test_id('ai-review').click()
+                panel = page.get_by_role('region', name='Claude’s review')
+                panel.wait_for(timeout=10000)
+                assert len(sent) == 1
+                b = sent[0]
+                assert b['tools'][0]['name'] == 'report_findings' and b['tools'][0]['strict'] is True and len(b['tools']) == 1, b['tools']
+                assert b['output_config']['effort'] == 'high'
+                assert [c['type'] for c in b['messages'][0]['content']] == ['text', 'image']
+                assert 'System or domain: OAuth 2.0' in b['messages'][0]['content'][0]['text']
+                text = panel.inner_text()
+                assert 'Password grant is deprecated' in text and 'Suggested: Use authorization code with PKCE.' in text and 'Is there a backend for the frontend?' in text, text
+                assert 'needs changes' in text
+                panel.screenshot(path=f'{OUT}/e2e-ai-review.png')
+                panel.get_by_role('button', name='Password grant is deprecated', exact=False).click(); page.wait_for_timeout(80)
+                assert app.ui()['selection'] == [arrow['id']], app.ui()['selection']
+                assert app.doc()['brief']['about'] == 'How a single-page app signs a user in' and app.doc()['brief']['domain'] == 'OAuth 2.0'
+                panel.get_by_role('button', name='Clear Claude’s review').click(); page.wait_for_timeout(60)
+                assert not page.get_by_role('region', name='Claude’s review').is_visible()
+                page.get_by_role('button', name='Close review').click()
+            finally:
+                page.unroute('https://api.anthropic.com/**')
+                if page.locator('.modal').count(): app.key('Escape')
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+        taireview()
+
         @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
         def tmermaid():
             app.key('Escape')
@@ -1762,7 +1822,7 @@ def main():
                 app.key(f'{mod}+s')
             dl.value.save_as(saved_path)
             data = json.load(open(saved_path))
-            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 18
+            assert data['format'] == 'flowsketch' and data['schemaVersion'] == 19
             page_els = [p for p in data['pages'] if p['id'] == data['activePage']][0]['elements']
             assert len(page_els) == len(app.els())
         t7()

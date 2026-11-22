@@ -1,11 +1,12 @@
 // Editor commands shared by menus, keyboard shortcuts, toolbar and inspector.
-import type { Asset, BoxElement, ConnectorAnim, ConnectorElement, ContainerElement, DiagramElement, FlowDocument, IconAsset, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
+import type { Asset, BoxElement, DiagramBrief, ConnectorAnim, ConnectorElement, ContainerElement, DiagramElement, FlowDocument, IconAsset, ShapeAnim, ShapeElement, ShapeKind, ToolStyle } from '../model/types';
 import { SCHEMA_VERSION } from '../model/types';
 import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed, SHAPE_DEFAULT_SIZE, uid, styleKey, withoutPlaySlot } from '../model/defaults';
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { itemName, type LintIssue } from '../lint/lint';
 import { separateBoxes } from '../layout/separate';
 import type { ToolContext, ToolSession } from '../ai/toolkit';
+import type { AiReview } from '../ai/review';
 import { pageSnapshot } from '../export/staticExport';
 import { useUI } from './uiStore';
 import { cameraView, compartmentLayout, contentBounds, hasCamera, playSchedule } from '../engine/render';
@@ -16,7 +17,7 @@ import { downloadBlob, openDocumentFile, pickFile, resetFileHandle, restoreFileF
 import { rememberMermaid } from '../persistence/storage';
 import { findMatches, replaceAll, replaceOne } from './find';
 import { toMermaid } from '../export/mermaidExport';
-import { cleanNote, DocumentError, MAX_PAGES, parseDocument, serializeDocument, SHAPE_KINDS } from '../model/schema';
+import { cleanNote, DocumentError, MAX_PAGES, parseDocument, sanitizeBrief, serializeDocument, SHAPE_KINDS } from '../model/schema';
 import { layoutText } from '../engine/text';
 import { COMPARTMENTS, geometryFor, LABEL_BELOW, SHAPE_LABELS } from '../engine/shapes';
 import { loadIconSet } from '../icons/sets';
@@ -1254,9 +1255,12 @@ export function toggleReview(open = !U().review) {
 }
 
 /** Select an issue's items and bring them into view (zooming out if they don't fit). */
-export function focusIssue(issue: LintIssue) {
+export const focusIssue = (issue: LintIssue) => focusItems(issue.ids);
+
+/** Select these items (those still on the page) and bring them into view, zooming out only if they don't fit. */
+export function focusItems(want: string[]) {
   const doc = D().doc;
-  const ids = issue.ids.filter((id) => getElement(doc, id));
+  const ids = want.filter((id) => getElement(doc, id));
   if (!ids.length) return;
   U().setTool('select');
   U().select(ids);
@@ -1324,4 +1328,18 @@ export function applyToolSession(s: ToolSession): boolean {
   if (!s.changes || D().doc !== s.original) return false;
   D().commit(() => s.doc);
   return true;
+}
+
+/** Save the diagram brief (Review with Claude) in the document; typing coalesces into one undo step. */
+export function setBrief(b: DiagramBrief) {
+  const next = sanitizeBrief(b);
+  const cur = D().doc.brief;
+  if (JSON.stringify(next ?? null) === JSON.stringify(cur ?? null)) return;
+  D().commit((d) => { const { brief: _old, ...rest } = d; void _old; return next ? { ...rest, brief: next } : rest; }, 'brief');
+}
+
+/** Show a finished review by Claude in the Review panel. */
+export function showAiReview(r: AiReview) {
+  U().setAiReview(r);
+  U().setReview(true);
 }

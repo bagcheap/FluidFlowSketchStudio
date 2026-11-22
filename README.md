@@ -165,6 +165,18 @@ What it can do: add shapes (next to a shape you name), connect shapes, remove th
 
 **What is sent for a change:** this page's text, the kinds of shapes, their colours and positions, the arrows between them and the containers, with your request. Pictures, other pages and anything else in the file are not sent. Claude's reply is a list of changes in a fixed format. Each one is checked (it must name something that's on the page, a known shape kind, a real colour) before it's shown to you, and nothing in it is ever run.
 
+### 4. Have Claude check a diagram
+
+Insert ▸ **Review with Claude (AI)…** (also on the canvas right-click menu, and at the bottom of the Review panel) checks that the page is *right*, not just tidy.
+
+1. Fill in the **brief**: what the diagram shows, the system or domain (for example "Microsoft Entra ID, OAuth 2.0"), who it's for, any assumptions, and what you want checked. The brief is saved with the diagram, so next time it's already there.
+2. Choose **Effort**: Medium (recommended) or High (for large or important diagrams; costs more). Leave **Include a picture of the page** on so Claude can see the layout. **Search the web for current facts** lets Claude look up things that may have changed since it was trained; each search costs extra, and your organisation may need to turn web search on in the Anthropic Console first.
+3. Press **Review**. The findings appear at the top of the Review panel. Each has a severity, what's wrong and a suggested change. Click a finding to select the items it's about. Claude may also ask you questions, and with web search it lists its sources.
+
+A review usually costs a few cents with Opus 5.5 at Medium; the panel shows the estimate (web searches are extra). Claude can be wrong, so treat findings as a second opinion.
+
+**What is sent for a review:** the brief, this page's labels, shape kinds, colours, positions, arrows and containers, the play order and the automatic checks, plus a picture of the page and the hover notes if you tick them. Open **What will be sent** in the dialog to see the exact text. Other pages and anything else in the file are not sent. Claude's reply comes back in a fixed format and is checked before it's shown; nothing in it is ever run.
+
 **Where your prompts and drafts are kept:** in local storage on this computer only, until you press **Start over**. They're never sent anywhere except with a request you make.
 
 **Where the key is kept:** without **Remember**, only in memory until you close the window. With it:

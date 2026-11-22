@@ -93,6 +93,7 @@ export function TopBar() {
       { label: 'Diagram from text (Mermaid)…', run: () => ui.openDialog('mermaid') },
       { label: 'Describe a diagram (AI)…', run: () => ui.openDialog('ai') },
       { label: 'Change this page (AI)…', run: () => ui.openDialog('aiEdit') },
+      { label: 'Review with Claude (AI)…', note: 'check it is right', run: () => ui.openDialog('aiReview') },
       { label: 'New page', run: cmd.newPage },
       { label: 'Container around selection', run: cmd.addContainer, disabled: !hasSel },
       { label: 'Group selection', shortcut: `${MOD}G`, run: cmd.groupSelection, disabled: sel.length < 2 },

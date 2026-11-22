@@ -84,6 +84,7 @@ function canvasItems(): MenuItem[] {
     { label: 'Diagram from text…', run: () => ui.openDialog('mermaid') },
     { label: 'Describe a diagram (AI)…', run: () => ui.openDialog('ai') },
     { label: 'Change this page (AI)…', run: () => ui.openDialog('aiEdit') },
+    { label: 'Review with Claude (AI)…', run: () => ui.openDialog('aiReview') },
     { label: 'Auto-layout diagram', sub: AUTO_LAYOUT_ITEMS, disabled: !doc.elements.length },
     { label: 'Route arrows around shapes', run: cmd.routeArrows, disabled: !doc.elements.some((e) => e.type === 'connector') },
     { sep: true },
