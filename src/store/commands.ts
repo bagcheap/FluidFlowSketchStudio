@@ -124,8 +124,10 @@ export function deleteSelection() {
   // deleting a container deletes what is inside it too (Remove container keeps the contents)
   const ids = new Set(withMembers(doc, [...selected()].filter((id) => !locked.includes(id))));
   if (!ids.size) return;
-  D().commit((d) => deleteElements(d, ids));
+  let shifted = 0;
+  D().commit((d) => { const r = afterDelete(d, deleteElements(d, ids)); shifted = r.shifted; return r.doc; });
   U().select(locked);
+  renumberedToast(shifted);
 }
 
 // ---- clipboard -----------------------------------------------------------------
@@ -534,13 +536,28 @@ export function playInLabelOrder() {
  */
 export function afterLabelEdit(before: FlowDocument, after: FlowDocument, id: string, oldText: string, newText: string): { doc: FlowDocument; shifted: number } {
   let d = after, shifted = 0;
-  if (U().prefs.autoRenumberSteps) ({ doc: d, shifted } = seq.makeRoomForStep(d, id, oldText, newText));
+  if (U().prefs.autoRenumberSteps) ({ doc: d, shifted } = seq.renumberForEdit(d, id, oldText, newText));
   return { doc: keepLabelOrder(before, d), shifted };
 }
 
 /** A play order that came from the labels is worked out again after labels change (current page). */
 function keepLabelOrder(before: FlowDocument, after: FlowDocument): FlowDocument {
   return seq.orderFollowsLabels(before) ? fitLoopToPlay(seq.applyPlaySteps(after, seq.labelSteps(after))) : after;
+}
+
+/**
+ * After arrows were deleted (`before` → `after`): the step numbers they took with them close up (pref
+ * `autoRenumberSteps`), and a play order made from the labels is worked out again. Used inside the delete's own commit.
+ */
+export function afterDelete(before: FlowDocument, after: FlowDocument): { doc: FlowDocument; shifted: number } {
+  let d = after, shifted = 0;
+  if (U().prefs.autoRenumberSteps) ({ doc: d, shifted } = seq.closeStepGaps(d, seq.deletedStepNumbers(before, after)));
+  return { doc: keepLabelOrder(before, d), shifted };
+}
+
+/** Toast after other arrows' step numbers moved. */
+export function renumberedToast(shifted: number) {
+  if (shifted) U().toast(`Renumbered ${shifted} other step label${shifted === 1 ? '' : 's'} to keep the numbers in sequence (Undo to put them back)`);
 }
 
 /**

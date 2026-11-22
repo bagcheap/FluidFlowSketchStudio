@@ -22,7 +22,7 @@ import { ShapeIcon } from '../ui/ShapeIcon';
 import { SHAPE_LABELS } from '../engine/shapes';
 import { Copy } from 'lucide-react';
 import { liveCameraView, visibleArea } from '../store/commands';
-import { afterLabelEdit, applyStyle, clearAllPlayOrder, playInLabelOrder, renumberStepLabels, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
+import { afterDelete, afterLabelEdit, renumberedToast, applyStyle, clearAllPlayOrder, playInLabelOrder, renumberStepLabels, setAnimation, cloneElements, endPlayOrder, playOrderClick, dropSvgIcons, expandGroups, fitShapeToText, importIconLibraryFiles, insertIcon, insertImage, quickConnect, stage, styleOf, zoomAt } from '../store/commands';
 import { ICON_DRAG_TYPE } from '../ui/IconsPanel';
 import { TextEditor } from './TextEditor';
 import { placeSizeMarks, sizeSnap, spacingSnap, type GapMark } from './spacing';
@@ -66,7 +66,7 @@ type Interaction =
   | { k: 'labelWidth'; id: string; cx: number; side: number } // a label's side handle: its width (symmetric about its centre)
   | { k: 'segment'; id: string; control: Point[]; index: number; horiz: boolean; moved: boolean } // sliding a segment of an elbow arrow
   | { k: 'freehand'; id: string; pts: Point[] }
-  | { k: 'erase'; ids: Set<string> }
+  | { k: 'erase'; ids: Set<string>; base: FlowDocument }
   | { k: 'quick'; src: string; side: Side; start: Point; connId: string | null } // dragging from a quick-connect handle
   | { k: 'seqmsg'; id: string; from: string; y: number; start: Point; moved: boolean } // Sequence ▸ Message / Reply: lifeline to lifeline, level
   | { k: 'seqframe'; id: string; start: Point; moved: boolean } // Sequence ▸ Frame: drag out a loop/alt frame
@@ -456,7 +456,7 @@ export function Canvas() {
         return;
       case 'eraser': {
         D.begin();
-        inter.current = { k: 'erase', ids: new Set() };
+        inter.current = { k: 'erase', ids: new Set(), base: D.doc };
         eraseAt(p);
         return;
       }
@@ -964,6 +964,14 @@ export function Canvas() {
       }
       case 'marquee': return;
       case 'pan': return;
+      case 'erase': {
+        // erased arrows' step numbers close up, and a label-made play order follows
+        let shifted = 0;
+        if (it.ids.size) D.live((d) => { const r = afterDelete(it.base, d); shifted = r.shifted; return r.doc; });
+        D.end();
+        renumberedToast(shifted);
+        return;
+      }
       case 'resize':
       case 'resizeMulti':
         D.live((d) => updateMembership(d, it.k === 'resize' ? [it.id] : it.ids));
@@ -1331,7 +1339,7 @@ export function Canvas() {
           // step numbers: make room for a taken number, and keep a label-made play order in step with the labels
           let shifted = 0;
           D.commit((d) => { const r = afterLabelEdit(d, mapElements(d, [id], (x) => ({ ...x, text } as DiagramElement)), id, el.text, text); shifted = r.shifted; return r.doc; });
-          if (shifted) useUI.getState().toast(`Moved ${shifted} later step${shifted === 1 ? '' : 's'} up by one to make room (Undo to put them back)`);
+          renumberedToast(shifted);
           return;
         }
         // typing a label on an icon whose label is hidden shows it

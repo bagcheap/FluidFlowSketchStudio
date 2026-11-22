@@ -29,7 +29,7 @@ export interface Prefs {
   hiddenIconSets: string[]; // built-in icon sets switched off in Manage icon libraries
   recentQuickShapes: ShapeKind[]; // shapes picked in the quick-connect picker, most recent first
   matchSizeKeepsProportions: boolean; // Match size ▸ Width/Height also scales the other side
-  autoRenumberSteps: boolean; // typing a step number another arrow has moves the later steps up
+  autoRenumberSteps: boolean; // arrow step numbers stay in sequence when one is typed, removed or its arrow deleted
 }
 
 const PREFS_KEY = 'flowsketch.prefs.v1';

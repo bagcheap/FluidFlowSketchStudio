@@ -491,3 +491,43 @@ export function renumberSteps(doc: FlowDocument): { doc: FlowDocument; changed: 
   });
   return { doc: { ...doc, elements }, changed };
 }
+
+/**
+ * Step numbers in `gone` that no arrow has any more close up, like a numbered list: every arrow numbered above a gap
+ * moves down by one per gap below it (with 3 gone: 4 → 3, 4a.1 → 3a.1, 5 → 4…). A number some arrow still has (3a
+ * left after 3b was deleted) isn't a gap. `except` (the arrow being edited) keeps the number typed for it.
+ */
+export function closeStepGaps(doc: FlowDocument, gone: number[], except?: string): { doc: FlowDocument; shifted: number } {
+  const present = new Set(doc.elements.filter(steppable).map((e) => labelStep(e.text)?.n).filter((n): n is number => n !== undefined));
+  const gaps = [...new Set(gone)].filter((g) => !present.has(g)).sort((a, b) => a - b);
+  if (!gaps.length) return { doc, shifted: 0 };
+  let shifted = 0;
+  const elements = doc.elements.map((e) => {
+    if (e.id === except || !steppable(e)) return e;
+    const s = labelStep(e.text);
+    const by = s ? gaps.filter((g) => g < s.n).length : 0;
+    if (!s || !by) return e;
+    shifted++;
+    return { ...e, text: withTop(e.text, `${s.n - by}${s.sub}`) };
+  });
+  return { doc: { ...doc, elements }, shifted };
+}
+
+/** The step numbers of arrows in `before` that aren't in `after` (deleted). */
+export function deletedStepNumbers(before: FlowDocument, after: FlowDocument): number[] {
+  const still = new Set(after.elements.map((e) => e.id));
+  return before.elements.filter((e) => steppable(e) && !still.has(e.id)).map((e) => labelStep((e as ConnectorElement).text)?.n).filter((n): n is number => n !== undefined);
+}
+
+/**
+ * An arrow's label changed from `oldText` to `newText`: its old number closes up if no other arrow has it (removing
+ * "3." makes 4 the new 3), then the new number makes room if it's taken (`makeRoomForStep`). Together that reads like
+ * moving an item in a numbered list. Returns how many other arrows were renumbered.
+ */
+export function renumberForEdit(doc: FlowDocument, id: string, oldText: string, newText: string): { doc: FlowDocument; shifted: number } {
+  const was = labelStep(oldText), now = labelStep(newText);
+  let d = doc, shifted = 0;
+  if (was && was.depth === 0 && now?.n !== was.n) ({ doc: d, shifted } = closeStepGaps(d, [was.n], id));
+  const r = makeRoomForStep(d, id, oldText, newText);
+  return { doc: r.doc, shifted: shifted + r.shifted };
+}

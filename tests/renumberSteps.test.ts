@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
-import { afterLabelEdit, playInLabelOrderAllPages, renumberStepLabels } from '../src/store/commands';
+import { afterLabelEdit, deleteSelection, playInLabelOrderAllPages, renumberStepLabels } from '../src/store/commands';
 import { useDoc } from '../src/store/docStore';
 import { useUI } from '../src/store/uiStore';
 import { applyPlaySteps, labelSteps, makeRoomForStep, orderFollowsLabels, readPlaySteps, renumberSteps } from '../src/store/sequence';
@@ -115,5 +115,52 @@ describe('commands', () => {
     const other = useDoc.getState().doc.pages.find((p) => p.id === 'p2')!;
     expect(readPlaySteps({ ...doc, elements: other.elements })).toEqual([[p2.ids[0]], [p2.ids[1]]]);
     expect(useDoc.getState().past.length).toBe(h + 2);
+  });
+});
+
+describe('closing gaps', () => {
+  beforeEach(() => useUI.setState((s) => ({ prefs: { ...s.prefs, autoRenumberSteps: true } })));
+
+  it('deleting arrow 3: 4 becomes the new 3, and the label-made play order follows (one undo step)', () => {
+    const { doc, ids } = chain(['1. a', '2. b', '3. c', '4. d', '4a.1 e', '5) f']);
+    useDoc.getState().load(applyPlaySteps(doc, labelSteps(doc)));
+    useUI.getState().select([ids[2]]);
+    const h = useDoc.getState().past.length;
+    deleteSelection();
+    const d = useDoc.getState().doc;
+    const left = [ids[0], ids[1], ids[3], ids[4], ids[5]];
+    expect(texts(d, left)).toEqual(['1. a', '2. b', '3. d', '3a.1 e', '4) f']);
+    expect(readPlaySteps(d)).toEqual([[ids[0]], [ids[1]], [ids[3]], [ids[4]], [ids[5]]]);
+    expect(useDoc.getState().past.length).toBe(h + 1);
+    useDoc.getState().undo();
+    expect(texts(useDoc.getState().doc, ids)).toEqual(['1. a', '2. b', '3. c', '4. d', '4a.1 e', '5) f']);
+  });
+
+  it('deleting one of 3a and 3b leaves the numbers alone (3 is still there); deleting 2 and 4 closes both gaps', () => {
+    const { doc, ids } = chain(['1. a', '2. b', '3a. c', '3b. d', '4. e', '5. f']);
+    useDoc.getState().load(doc);
+    useUI.getState().select([ids[3]]);
+    deleteSelection();
+    expect(texts(useDoc.getState().doc, [ids[0], ids[1], ids[2], ids[4], ids[5]])).toEqual(['1. a', '2. b', '3a. c', '4. e', '5. f']);
+    useUI.getState().select([ids[1], ids[4]]);
+    deleteSelection();
+    expect(texts(useDoc.getState().doc, [ids[0], ids[2], ids[5]])).toEqual(['1. a', '2a. c', '3. f']);
+  });
+
+  it('removing the number from a label closes the gap; changing 3 to 5 moves it like a list item', () => {
+    const { doc, ids } = chain(['1. a', '2. b', '3. c', '4. d', '5. e', '6. f']);
+    let r = afterLabelEdit(doc, relabel(doc, ids[2], 'c'), ids[2], '3. c', 'c');
+    expect(texts(r.doc, ids)).toEqual(['1. a', '2. b', 'c', '3. d', '4. e', '5. f']);
+    r = afterLabelEdit(doc, relabel(doc, ids[2], '5. c'), ids[2], '3. c', '5. c');
+    expect(texts(r.doc, ids)).toEqual(['1. a', '2. b', '5. c', '3. d', '4. e', '6. f']);
+  });
+
+  it('with the setting off, nothing is renumbered', () => {
+    useUI.setState((s) => ({ prefs: { ...s.prefs, autoRenumberSteps: false } }));
+    const { doc, ids } = chain(['1. a', '2. b', '3. c']);
+    useDoc.getState().load(doc);
+    useUI.getState().select([ids[1]]);
+    deleteSelection();
+    expect(texts(useDoc.getState().doc, [ids[0], ids[2]])).toEqual(['1. a', '3. c']);
   });
 });

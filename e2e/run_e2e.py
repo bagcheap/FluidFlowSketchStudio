@@ -1385,6 +1385,15 @@ def main():
             assert set(a) >= {'1. ask', '2. look up', '3. new', '4. fetch', '5. reply'}, list(a)
             steps = sorted((e['anim']['window'][0], e['text']) for e in a.values() if (e.get('anim') or {}).get('window'))
             assert [t for _, t in steps] == ['1. ask', '2. look up', '3. new', '4. fetch', '5. reply'], steps
+            # delete the new step 3 with the Delete key: 4 and 5 close up again, and the order follows
+            new_id = arrows()['3. new']['id']
+            app.key('Control+f'); page.keyboard.type('3. new'); page.keyboard.press('Enter'); page.wait_for_timeout(80)
+            app.key('Escape')
+            assert app.ui()['selection'] == [new_id], app.ui()['selection']
+            app.key('Delete'); page.wait_for_timeout(100)
+            a = arrows()
+            steps = sorted((e['anim']['window'][0], e['text']) for e in a.values() if (e.get('anim') or {}).get('window'))
+            assert [t for _, t in steps] == ['1. ask', '2. look up', '3. fetch', '4. reply'], steps
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
             app.js('(v) => window.__flowsketch.setView(v)', v)
         trenumber()
