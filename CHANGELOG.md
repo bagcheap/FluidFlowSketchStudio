@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.53] - 2026-11-22
 
 ### Added
 - **Step numbers close up too:** delete arrow 3 (with Delete, Cut or the eraser) or remove the number from its label, and 4 becomes the new 3, 5 the new 4, and so on; the play order follows. Changing "3" to "5" now moves that step like an item in a numbered list. If another arrow still has the number (3a after deleting 3b), nothing moves. Undo puts everything back; Edit ▸ Preferences ▸ **Keep arrow step numbers in sequence** turns it off.
