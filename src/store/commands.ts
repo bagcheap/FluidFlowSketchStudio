@@ -31,6 +31,7 @@ import type { LayoutDir } from '../layout/layered';
 import { colorLabel } from '../ui/colorNames';
 import { svgToIcon } from '../icons/svgToIcon';
 import { applyEdits, type EditOp, type PageView } from '../ai/edits';
+import { applyThemeToDoc, THEMES, themeToolStyle } from './themes';
 import { selectSimilar as similarIds, SIMILAR_LABELS, type SimilarBy } from './similar';
 
 const D = () => useDoc.getState();
@@ -840,8 +841,52 @@ export function setAnimation(patch: Partial<FlowDocument['animation']>, key = 'a
   }, key);
 }
 
+/**
+ * Apply a diagram theme (Inspector ▸ Theme, View ▸ Diagram theme): the whole diagram, every page, recoloured as one
+ * undo step; every drawing tool's remembered colours follow, so new shapes, arrows and text match.
+ */
+export function applyTheme(id: string) {
+  const t = THEMES.find((x) => x.id === id);
+  if (!t) return;
+  D().commit((d) => applyThemeToDoc(d, t));
+  const u = U();
+  const keys = [...SHAPE_KINDS.map((k) => `shape:${k}`), 'arrow', 'line', 'text', 'container', 'pen', 'icon', 'seq:reply', 'seq:bar', 'seq:frame'];
+  for (const key of keys) u.setToolStyle(key, themeToolStyle(key, u.toolStyle(key), t));
+  u.toast(`Theme: ${t.name} (Undo to go back)`, 'success');
+}
+
+/** One-click shape motion levels: the document's default shape motion plus the global strength and speed. */
+export const MOTION_LEVELS = {
+  still: null,
+  calm: { intensityScale: 0.5, speedScale: 0.7 },
+  natural: { intensityScale: 1, speedScale: 1 },
+  lively: { intensityScale: 1.8, speedScale: 1.4 },
+} as const;
+export type MotionLevel = keyof typeof MOTION_LEVELS;
+
+/** Which level the document's settings match, or null (set by hand). */
+export function motionLevelOf(a: FlowDocument['animation']): MotionLevel | null {
+  if (a.shape.mode === 'off') return 'still';
+  for (const [k, v] of Object.entries(MOTION_LEVELS)) {
+    if (v && Math.abs(a.intensityScale - v.intensityScale) < 0.01 && Math.abs(a.speedScale - v.speedScale) < 0.01) return k as MotionLevel;
+  }
+  return null;
+}
+
+/**
+ * Shape motion for the whole diagram in one click: Still turns the default shape motion off; the others turn it on
+ * (combined organic motion, unless another style is already chosen) and set the global strength and speed. Shapes
+ * with their own motion setting keep it (e.g. sequence-diagram participants stay still). One undo step.
+ */
+export function setMotionLevel(level: MotionLevel) {
+  const a = D().doc.animation;
+  const v = MOTION_LEVELS[level];
+  if (!v) { setAnimation({ shape: { ...a.shape, mode: 'off' } }, 'motion-level'); return; }
+  setAnimation({ shape: { ...a.shape, mode: a.shape.mode === 'off' ? 'combined' : a.shape.mode }, ...v }, 'motion-level');
+}
+
 /** Arrow-highlight settings that "all arrows" controls set for every arrow at once. */
-export const GLOBAL_ARROW_KEYS = ['highlightWidth', 'highlightColor', 'returnColor', 'segments', 'highlightLength', 'highlightOpacity', 'glow'] as const;
+export const GLOBAL_ARROW_KEYS = ['highlightWidth', 'highlightColor', 'returnColor', 'segments', 'highlightLength', 'highlightOpacity', 'glow', 'turnPause'] as const;
 export type GlobalArrowKey = (typeof GLOBAL_ARROW_KEYS)[number];
 
 /**
@@ -862,7 +907,7 @@ export function setGlobalArrow(patch: Partial<Pick<ConnectorAnim, GlobalArrowKey
   });
   D().commit((d) => {
     const next = { ...d, animation: { ...d.animation, connector: { ...d.animation.connector, ...patch } }, elements: strip(d.elements), pages: d.pages.map((p) => ({ ...p, elements: strip(p.elements) })) };
-    return (patch.segments !== undefined || patch.highlightLength !== undefined) && playSchedule(next).steps.length ? fitLoopToPlay(next) : next;
+    return (patch.segments !== undefined || patch.highlightLength !== undefined || patch.turnPause !== undefined) && playSchedule(next).steps.length ? fitLoopToPlay(next) : next;
   }, `global-arrow:${keys.join()}`);
   // new arrows follow too: tool styles stop remembering these settings
   const u = U();

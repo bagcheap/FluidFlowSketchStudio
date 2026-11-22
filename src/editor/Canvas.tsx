@@ -1374,14 +1374,15 @@ function drawGrid(ctx: CanvasRenderingContext2D, doc: FlowDocument, v: { x: numb
   let g = doc.canvas.gridSize;
   while (g * v.zoom < 12) g *= 2;
   const step = g * v.zoom * dpr; // device px between grid points
-  const key = `${doc.canvas.grid}|${step.toFixed(2)}|${dpr}`;
+  const dark = isDarkColor(doc.canvas.background); // a light grid on a dark canvas
+  const key = `${doc.canvas.grid}|${step.toFixed(2)}|${dpr}|${dark}`;
   let tile = gridTiles.get(key);
   if (!tile) {
     const n = Math.max(2, Math.round(step));
     tile = document.createElement('canvas');
     tile.width = tile.height = n;
     const t = tile.getContext('2d')!;
-    t.fillStyle = t.strokeStyle = 'rgba(100,100,120,0.24)';
+    t.fillStyle = t.strokeStyle = dark ? 'rgba(220,226,240,0.22)' : 'rgba(100,100,120,0.24)';
     if (doc.canvas.grid === 'dots') { const r = Math.max(0.9, 1.1 * dpr); t.fillRect(0, 0, r, r); }
     else { t.globalAlpha = 0.5; t.fillRect(0, 0, n, 1); t.fillRect(0, 0, 1, n); }
     if (gridTiles.size > 40) gridTiles.clear();
@@ -1396,4 +1397,12 @@ function drawGrid(ctx: CanvasRenderingContext2D, doc: FlowDocument, v: { x: numb
   ctx.fillStyle = pat;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.restore();
+}
+
+/** Is a #rrggbb colour dark (so a light grid shows on it)? */
+function isDarkColor(c: string): boolean {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c.trim());
+  if (!m) return false;
+  const [r, g, b] = [m[1], m[2], m[3]].map((h) => parseInt(h, 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.4;
 }

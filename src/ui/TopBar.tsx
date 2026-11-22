@@ -3,6 +3,7 @@ import { Download, Moon, Play, Redo2, Sun, Undo2, Monitor } from 'lucide-react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
+import { THEMES } from '../store/themes';
 import { AUTO_LAYOUT_ITEMS, matchSizeItems, MenuBar, SELECT_SIMILAR_ITEMS, type MenuDef, type MenuItem } from './MenuBar';
 import { ALT, MOD, SHIFT } from './shortcuts';
 import { SHAPE_LABELS } from '../engine/shapes';
@@ -164,6 +165,7 @@ export function TopBar() {
       { label: 'Fullscreen', run: () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => ui.toast('Fullscreen is not available here', 'error')) },
       { sep: true },
       { label: 'Grid', sub: (['dots', 'lines', 'none'] as const).map((g) => ({ label: g === 'none' ? 'Plain' : g === 'dots' ? 'Dot grid' : 'Line grid', checked: doc.canvas.grid === g, run: () => useDoc.getState().commit((d) => ({ ...d, canvas: { ...d.canvas, grid: g } })) })) },
+      { label: 'Diagram theme', sub: THEMES.map((t) => ({ label: t.name, run: () => cmd.applyTheme(t.id) })) },
       { label: 'Line jumps', note: 'arrows hop where they cross', checked: !!doc.canvas.lineJumps, run: cmd.toggleLineJumps },
       { label: 'Alignment guides', checked: prefs.smartGuides, run: toggle('smartGuides') },
       { label: 'Show inspector', checked: prefs.showInspector, run: toggle('showInspector') },

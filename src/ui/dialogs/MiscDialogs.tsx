@@ -70,6 +70,7 @@ export function AnimationDialog() {
           <Slider label="Segments" value={a.connector.segments} min={1} max={8} onChange={(v) => cmd.setGlobalArrow({ segments: v })} />
           <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} />
           <Slider label="Opacity" value={Math.round(a.connector.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => cmd.setGlobalArrow({ highlightOpacity: v / 100 })} />
+          <Slider label="Round-trip pause" value={Math.round(a.connector.turnPause * 100)} min={0} max={60} unit="%" onChange={(v) => cmd.setGlobalArrow({ turnPause: v / 100 })} hint="For two-way arrows: share of each round trip spent waiting at the far end before coming back" />
           <Toggle label="Glow" checked={a.connector.glow} onChange={(v) => cmd.setGlobalArrow({ glow: v })} />
           <h3>Playing in order</h3>
           <Slider label="Pause between steps" value={a.stepPause ?? 0.35} min={0} max={5} step={0.05} unit="s" onChange={(v) => cmd.setAnimation({ stepPause: v }, 'step-pause')} />

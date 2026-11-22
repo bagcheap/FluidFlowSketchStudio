@@ -1318,6 +1318,38 @@ def main():
             app.js('(v) => window.__flowsketch.setView(v)', v)
         tplaysettings()
 
+        @test('Diagram theme, shape motion levels and the all-arrows round-trip pause')
+        def tthemes():
+            app.key('Escape')
+            v = app.ui()['view']
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            bg0 = app.doc()['canvas']['background']
+            app.js('() => window.__flowsketch.setView({x: 12000, y: 34000, zoom: 1})')
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('flowchart LR\n  A[Ask] <--> B[Answer]')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            app.key('Escape'); app.key('Escape')
+            page.locator('[data-theme-id=blueprint]').click(); page.wait_for_timeout(100)
+            d = app.doc()
+            assert d['canvas']['background'] == '#1c3f72' and d['canvas']['grid'] == 'lines', d['canvas']
+            shapes = [e for e in d['elements'] if e['type'] == 'shape' and not e.get('locked')]
+            assert shapes and all(e['style']['stroke'] == shapes[0]['style']['stroke'] for e in shapes)
+            ts = app.js("() => window.__flowsketch.toolStyle('shape:rectangle')")
+            assert ts['style']['stroke'] == shapes[0]['style']['stroke'], ts['style']
+            page.locator('[data-testid=stage]').screenshot(path=f'{OUT}/e2e-theme-blueprint.png')
+            page.get_by_label('Shape motion').get_by_role('radio', name='Lively').click(); page.wait_for_timeout(60)
+            a = app.doc()['animation']
+            assert a['shape']['mode'] != 'off' and a['intensityScale'] == 1.8, a
+            page.get_by_label('Shape motion').get_by_role('radio', name='Still').click(); page.wait_for_timeout(60)
+            assert app.doc()['animation']['shape']['mode'] == 'off'
+            page.get_by_label('Round-trip pause value').fill('30'); page.keyboard.press('Enter'); page.wait_for_timeout(80)
+            assert abs(app.doc()['animation']['connector']['turnPause'] - 0.3) < 1e-6
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+            assert app.doc()['canvas']['background'] == bg0
+            app.js('(v) => window.__flowsketch.setView(v)', v)
+        tthemes()
+
         @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
         def tmermaid():
             app.key('Escape')
