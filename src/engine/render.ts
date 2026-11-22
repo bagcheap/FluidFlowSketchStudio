@@ -295,11 +295,15 @@ function wiggled(p: ConnectorPath, s0: number, s1: number, rough: number, seed: 
 }
 
 /** Soft glow drawn as wide translucent strokes (cheap everywhere, identical in canvas and SVG). */
+/** How far the glow reaches in total beyond the highlight (px, both sides together). */
+export const GLOW_SPREAD = 18;
 function halo(pts: number[], color: string, hw: number, alpha: number): Part[] {
   // hw = the highlight's own width; the glow reaches the same distance beyond it whatever its thickness
+  // three stacked layers fade out to GLOW_SPREAD / 2 px either side, so it reads as a soft halo even on thin arrows
   return [
-    { k: 'line', pts, color, width: hw + 7.5, alpha: alpha * 0.12, cap: 'round', dash: null },
-    { k: 'line', pts, color, width: hw + 3.5, alpha: alpha * 0.2, cap: 'round', dash: null },
+    { k: 'line', pts, color, width: hw + GLOW_SPREAD, alpha: alpha * 0.1, cap: 'round', dash: null },
+    { k: 'line', pts, color, width: hw + GLOW_SPREAD * 0.6, alpha: alpha * 0.16, cap: 'round', dash: null },
+    { k: 'line', pts, color, width: hw + GLOW_SPREAD * 0.28, alpha: alpha * 0.3, cap: 'round', dash: null },
   ];
 }
 

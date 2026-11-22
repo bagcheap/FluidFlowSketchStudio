@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 - The grid is drawn in a light colour on dark canvas backgrounds, so it stays visible.
+- **Glow** on arrow highlights is now a clearly visible soft halo (it was so faint it hardly showed), and Glow, Opacity and Length have tooltips.
 
 ## [0.1.50] - 2026-11-20
 

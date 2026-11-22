@@ -276,11 +276,11 @@ export function Inspector() {
               {(ca.mode === 'travel' || ca.mode === 'pulse') && <>
                 <ColorPicker label={roundTrip ? 'Outgoing colour' : 'Highlight colour'} value={ca.highlightColor} palette={HIGHLIGHT_COLORS} onChange={(c) => setConnAnim({ highlightColor: c })} />
                 {roundTrip && <ColorPicker label="Return colour" value={ca.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => setConnAnim({ returnColor: c })} />}
-                <Slider label="Opacity" value={Math.round(ca.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => setConnAnim({ highlightOpacity: v / 100 })} />
-                <Toggle label="Glow" checked={ca.glow} onChange={(v) => setConnAnim({ glow: v })} />
+                <Slider label="Opacity" value={Math.round(ca.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => setConnAnim({ highlightOpacity: v / 100 })} hint="How strongly the highlight shows over the line (its glow follows)" />
+                <Toggle label="Glow" checked={ca.glow} onChange={(v) => setConnAnim({ glow: v })} hint="A soft halo in the highlight colour around the moving highlight (travelling highlight and pulse)" />
               </>}
               {ca.mode === 'travel' && <>
-                <Slider label="Length" value={ca.highlightLength} min={4} max={300} unit="px" overridden={'highlightLength' in connOv} onReset={() => resetConnAnimKey('highlightLength')} onChange={(v) => setConnAnim({ highlightLength: v })} />
+                <Slider label="Length" value={ca.highlightLength} min={4} max={300} unit="px" overridden={'highlightLength' in connOv} onReset={() => resetConnAnimKey('highlightLength')} onChange={(v) => setConnAnim({ highlightLength: v })} hint="How long each moving highlight is" />
                 <Slider label="Thickness" value={ca.highlightWidth} min={0} max={12} step={0.5} unit="px" overridden={'highlightWidth' in connOv} onReset={() => resetConnAnimKey('highlightWidth')} onChange={(v) => setConnAnim({ highlightWidth: v })} hint="How much thicker the highlight is than the line" />
                 {roundTrip && <Slider label="Pause at turn-around" value={Math.round(ca.turnPause * 100)} min={0} max={60} unit="%" onChange={(v) => setConnAnim({ turnPause: v / 100 })} hint="Share of each round trip spent waiting at the far end before coming back" />}
                 <Slider label="Segments" value={ca.segments} min={1} max={8} onChange={(v) => setConnAnim({ segments: v })} hint={conn?.anim?.window ? "Highlights following each other along the arrow during its step" : "Highlights moving at the same time, evenly spaced"} />
@@ -425,10 +425,10 @@ function CanvasPanel() {
           <ColorPicker label="Highlight colour" value={a.connector.highlightColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ highlightColor: c })} />
           <ColorPicker label="Return colour" value={a.connector.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ returnColor: c })} />
           <Slider label="Segments" value={a.connector.segments} min={1} max={8} onChange={(v) => cmd.setGlobalArrow({ segments: v })} hint="Highlights per arrow: moving together when looping, one after another in a play step" />
-          <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} />
-          <Slider label="Opacity" value={Math.round(a.connector.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => cmd.setGlobalArrow({ highlightOpacity: v / 100 })} />
+          <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} hint="How long each moving highlight is" />
+          <Slider label="Opacity" value={Math.round(a.connector.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => cmd.setGlobalArrow({ highlightOpacity: v / 100 })} hint="How strongly the highlight shows over the line (its glow follows)" />
           <Slider label="Round-trip pause" value={Math.round(a.connector.turnPause * 100)} min={0} max={60} unit="%" onChange={(v) => cmd.setGlobalArrow({ turnPause: v / 100 })} hint="For two-way arrows: share of each round trip spent waiting at the far end before coming back" />
-          <Toggle label="Glow" checked={a.connector.glow} onChange={(v) => cmd.setGlobalArrow({ glow: v })} />
+          <Toggle label="Glow" checked={a.connector.glow} onChange={(v) => cmd.setGlobalArrow({ glow: v })} hint="A soft halo in the highlight colour around the moving highlight (travelling highlight and pulse)" />
         </Section>
         <Section title="Playing in order">
           <p className="note">For arrows that play one step at a time (numbered labels, sequence diagrams, Animation ▸ Play in order).</p>

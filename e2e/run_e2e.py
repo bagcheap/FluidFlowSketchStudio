@@ -1279,7 +1279,7 @@ def main():
             assert app.doc()['animation']['connector']['highlightWidth'] == 5
             f = app.js('(id) => window.__flowsketch.frame(0.4).items.find((i) => i.id === id)', c['id'])
             widths = [p['width'] for p in f['parts'] if p['k'] == 'line' and p['color'] == '#22c55e']
-            assert widths and abs(max(widths) - (mine['style']['strokeWidth'] + 5 + 7.5)) < 0.01, widths
+            assert widths and abs(max(widths) - (mine['style']['strokeWidth'] + 5 + 18)) < 0.01, widths
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
             back = [e for e in app.els() if e['id'] == c['id']][0]
             assert (back.get('anim') or {}).get('highlightColor') != '#ec4899'

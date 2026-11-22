@@ -68,10 +68,10 @@ export function AnimationDialog() {
           <ColorPicker label="Highlight colour" value={a.connector.highlightColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ highlightColor: c })} />
           <ColorPicker label="Return colour" value={a.connector.returnColor} palette={HIGHLIGHT_COLORS} onChange={(c) => cmd.setGlobalArrow({ returnColor: c })} />
           <Slider label="Segments" value={a.connector.segments} min={1} max={8} onChange={(v) => cmd.setGlobalArrow({ segments: v })} />
-          <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} />
-          <Slider label="Opacity" value={Math.round(a.connector.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => cmd.setGlobalArrow({ highlightOpacity: v / 100 })} />
+          <Slider label="Highlight length" value={a.connector.highlightLength} min={4} max={300} unit="px" onChange={(v) => cmd.setGlobalArrow({ highlightLength: v })} hint="How long each moving highlight is" />
+          <Slider label="Opacity" value={Math.round(a.connector.highlightOpacity * 100)} min={10} max={100} unit="%" onChange={(v) => cmd.setGlobalArrow({ highlightOpacity: v / 100 })} hint="How strongly the highlight shows over the line (its glow follows)" />
           <Slider label="Round-trip pause" value={Math.round(a.connector.turnPause * 100)} min={0} max={60} unit="%" onChange={(v) => cmd.setGlobalArrow({ turnPause: v / 100 })} hint="For two-way arrows: share of each round trip spent waiting at the far end before coming back" />
-          <Toggle label="Glow" checked={a.connector.glow} onChange={(v) => cmd.setGlobalArrow({ glow: v })} />
+          <Toggle label="Glow" checked={a.connector.glow} onChange={(v) => cmd.setGlobalArrow({ glow: v })} hint="A soft halo in the highlight colour around the moving highlight (travelling highlight and pulse)" />
           <h3>Playing in order</h3>
           <Slider label="Pause between steps" value={a.stepPause ?? 0.35} min={0} max={5} step={0.05} unit="s" onChange={(v) => cmd.setAnimation({ stepPause: v }, 'step-pause')} />
           <Row label="Caption size"><Segmented label="Caption size" value={a.captionSize ?? 'medium'} onChange={(v) => cmd.setAnimation({ captionSize: v })} options={[{ v: 'small', label: 'Small' }, { v: 'medium', label: 'Medium' }, { v: 'large', label: 'Large' }]} /></Row>
