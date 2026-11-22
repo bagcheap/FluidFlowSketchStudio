@@ -413,11 +413,16 @@ function withTop(text: string, top: string): string {
   return text.replace(/^(\s*)\d{1,3}[a-z]?/i, (_m, sp: string) => `${sp}${top}`);
 }
 
-/** Do the play windows on this page match the order the labels give? (Order inside a step doesn't matter.) */
+/**
+ * Do the play windows on this page match the order the labels give? Order inside a step doesn't matter, and an arrow
+ * with no step number that isn't playing (one just drawn, not labelled yet) doesn't count against it.
+ */
 export function orderFollowsLabels(doc: FlowDocument): boolean {
   const played = readPlaySteps(doc);
   if (!played.length) return false;
-  const want = labelSteps(doc);
+  const byId = new Map(doc.elements.map((e) => [e.id, e]));
+  const counts = (id: string) => { const e = byId.get(id); return e?.type === 'connector' && (!!e.anim?.window || !!labelStep(e.text)); };
+  const want = labelSteps(doc).map((g) => g.filter(counts)).filter((g) => g.length);
   const key = (s: string[][]) => s.map((g) => [...g].sort().join(',')).join('|');
   return key(played) === key(want);
 }

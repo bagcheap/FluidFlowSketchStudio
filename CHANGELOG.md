@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 - **Step numbers renumber themselves:** change an arrow label from "7b" to "8" and the arrows already numbered 8, 9… become 9, 10…, like a numbered list (dotted sub-steps such as 8a.1 move with their step). A letter ("8a") still joins step 8 instead. One Undo puts them back. Turn it off in Edit ▸ Preferences.
-- **The play order follows the labels:** when a page's play order came from its step numbers, editing a label (or Find and replace) works the order out again, so the animation stays in step with the numbers.
+- **The play order follows the labels:** when a page's play order came from its step numbers, editing a label (or Find and replace) works the order out again, so the animation stays in step with the numbers. This includes a newly drawn arrow: label it "6c" and it plays with 6a and 6b; label it "3" and it becomes step 3, with the old 3 onwards moving up.
 - **Renumber step labels** (Animation menu, and **Renumber labels** on the Set play order bar): rewrites the numbers at the start of arrow labels to match the play order — 1, 2, 3…, with 4a, 4b for arrows playing together — closing gaps. Reorder by clicking in Set play order, then renumber.
 - **Play in label order on every page** (Animation menu): works out the play order from the labels on all pages at once.
 

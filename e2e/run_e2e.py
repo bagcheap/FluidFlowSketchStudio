@@ -1376,6 +1376,15 @@ def main():
             page.get_by_role('menuitem', name='Animation').click()
             page.get_by_role('menuitem', name='Renumber step labels').click(); page.wait_for_timeout(80)
             assert '2. look up' in arrows(), list(arrows())
+            # draw a new arrow and type "3. new": it becomes step 3, the old 3 and 4 move up, and the order follows
+            box = {e['text']: e for e in app.els() if e['type'] == 'shape'}
+            mid = lambda e: (e['x'] + e['w'] / 2, e['y'] + e['h'] / 2)
+            app.tool('a'); app.drag(mid(box['C']), mid(box['E'])); page.wait_for_timeout(80)
+            page.keyboard.type('3. new'); page.wait_for_selector('.text-editor'); page.keyboard.press('Escape'); page.wait_for_timeout(100)
+            a = arrows()
+            assert set(a) >= {'1. ask', '2. look up', '3. new', '4. fetch', '5. reply'}, list(a)
+            steps = sorted((e['anim']['window'][0], e['text']) for e in a.values() if (e.get('anim') or {}).get('window'))
+            assert [t for _, t in steps] == ['1. ask', '2. look up', '3. new', '4. fetch', '5. reply'], steps
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
             app.js('(v) => window.__flowsketch.setView(v)', v)
         trenumber()

@@ -66,6 +66,34 @@ describe('commands', () => {
     expect(readPlaySteps(r.doc)).toEqual([[ids[0]], [ids[1]], [ids[2]], [ids[3]]]); // 2b now plays on its own
   });
 
+  describe('a newly drawn arrow, then labelled', () => {
+    /** A page whose order came from its labels, plus one new, unlabelled arrow from shape `from` to shape `to`. */
+    function withNewArrow(labels: string[], from: number, to: number) {
+      const { doc, ids } = chain(labels);
+      const ordered = applyPlaySteps(doc, labelSteps(doc));
+      const shapes = ordered.elements.filter((e) => e.type === 'shape');
+      const fresh = makeConnector({ x: 0, y: 0, elementId: shapes[from].id }, { x: 0, y: 0, elementId: shapes[to].id }, defaultToolStyle('arrow'));
+      return { before: { ...ordered, elements: [...ordered.elements, fresh] }, ids, id: fresh.id };
+    }
+    const stepTexts = (d: FlowDocument) => readPlaySteps(d).map((g) => g.map((id) => (d.elements.find((e) => e.id === id) as ConnectorElement).text).sort());
+
+    it('6a, 6b + a new arrow labelled 6c: it joins step 6', () => {
+      const { before, id } = withNewArrow(['5. x', '6a. y', '6b. z', '7. w'], 3, 1);
+      expect(orderFollowsLabels(before)).toBe(true); // the unlabelled new arrow doesn't count against it
+      const r = afterLabelEdit(before, relabel(before, id, '6c. new'), id, '', '6c. new');
+      expect(r.shifted).toBe(0);
+      expect(stepTexts(r.doc)).toEqual([['5. x'], ['6a. y', '6b. z', '6c. new'], ['7. w']]);
+    });
+
+    it('2, 3 + a new arrow labelled 3: it becomes step 3 and the old 3 onwards move up', () => {
+      const { before, ids, id } = withNewArrow(['1. a', '2. b', '3. c', '4. d'], 4, 0);
+      const r = afterLabelEdit(before, relabel(before, id, '3. new'), id, '', '3. new');
+      expect(r.shifted).toBe(2);
+      expect(texts(r.doc, ids)).toEqual(['1. a', '2. b', '4. c', '5. d']);
+      expect(stepTexts(r.doc)).toEqual([['1. a'], ['2. b'], ['3. new'], ['4. c'], ['5. d']]);
+    });
+  });
+
   it('a play order set by hand is left alone; the setting can turn the shifting off', () => {
     const { doc, ids } = chain(['1. a', '2. b', '3. c']);
     const before = applyPlaySteps(doc, [[ids[2]], [ids[0]], [ids[1]]]);
