@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.51] - 2026-11-22
 
 ### Added
 - **Diagram themes:** one click gives the whole diagram a coordinated look — Whiteboard, Pastel, Blueprint, Dark or Mono. Pick one in the Inspector's **Theme** section (nothing selected) or View ▸ Diagram theme. It recolours the background, grid, shapes, text, arrows, containers and arrow highlights on every page, keeps shapes that had different fills different, and new shapes and arrows follow it. Locked items and pictures are left alone. Undo goes back.
