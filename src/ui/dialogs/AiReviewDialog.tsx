@@ -67,7 +67,7 @@ export function AiReviewDialog() {
   };
 
   return (
-    <Modal title="Review with Claude (AI)" wide onClose={close} footer={<>
+    <Modal title="Review this page (AI)" wide onClose={close} footer={<>
       <button className="btn" style={{ marginRight: 'auto' }} disabled={busy} title="Empty the brief and put the options back to how they started (your API key and model stay)" onClick={clearForm}>Clear form</button>
       <button className="btn" onClick={close}>{busy ? 'Cancel' : 'Close'}</button>
       <button className="btn primary" data-testid="ai-review" disabled={busy || empty || !api.key.trim()} onClick={() => void review()}>{busy ? 'Reviewing…' : 'Review'}</button>

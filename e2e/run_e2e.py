@@ -914,8 +914,8 @@ def main():
             page.route('https://api.anthropic.com/**', handle)
             try:
                 n0 = len(app.els())
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Describe a diagram…').click()
                 assert page.get_by_test_id('ai-draw').is_disabled()  # no key, no description: nothing can be sent
                 page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
                 page.get_by_test_id('ai-prompt').fill('A user signs in to the web app, which checks the auth service')
@@ -945,8 +945,8 @@ def main():
                 assert app.js("() => localStorage.getItem('flowsketch:anthropicKey')") is None
                 # reopening shows the prompts used and the Mermaid that was drawn; tweak a prompt and draw again
                 app.key('Escape')
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Describe a diagram…').click()
                 assert 'Cache' in page.get_by_test_id('ai-draft').input_value()
                 assert page.get_by_test_id('ai-prompt').input_value() == 'Add a cache the web app loads from'
                 assert page.locator('.ai-prompt-text').all_inner_texts() == ['A user signs in to the web app, which checks the auth service', 'Add a cache the web app loads from']
@@ -998,8 +998,8 @@ def main():
                     'content': [{'type': 'text', 'text': json.dumps(reply)}], 'usage': {'input_tokens': 1, 'output_tokens': 1}}))
             page.route('https://api.anthropic.com/**', handle)
             try:
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Change this page (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Quick change…').click()
                 page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
                 page.get_by_test_id('ai-edit-prompt').fill('Add a cache below the API and make the database green')
                 page.get_by_test_id('ai-suggest').click()
@@ -1041,8 +1041,8 @@ def main():
                         'content': [{'type': 'text', 'text': '```mermaid\nflowchart LR\nA-->B\n```'}], 'usage': {'input_tokens': 1, 'output_tokens': 1}}))
                 p7.route('https://api.anthropic.com/**', api)
                 def open_dialog():
-                    p7.get_by_role('menuitem', name='Insert').click()
-                    p7.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                    p7.get_by_role('menuitem', name='AI', exact=True).click()
+                    p7.get_by_role('menuitem', name='Describe a diagram…').click()
                 open_dialog()
                 p7.get_by_label('API key').fill('sk-ant-e2e-0123456789')
                 p7.get_by_label('Remember in this browser (encrypted with a passphrase)').check()
@@ -1478,8 +1478,8 @@ def main():
                     'content': [{'type': 'tool_use', 'id': 'toolu_1', 'name': 'report_findings', 'input': report}], 'usage': {'input_tokens': 4000, 'output_tokens': 600}}))
             page.route('https://api.anthropic.com/**', handle)
             try:
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Review with Claude (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Review this page…').click()
                 page.get_by_label('What it shows').fill('How a single-page app signs a user in')
                 page.get_by_label('System or domain').fill('OAuth 2.0')
                 page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
@@ -1510,8 +1510,8 @@ def main():
                 md = open(dl.value.path(), encoding='utf-8').read()
                 assert '### 1. Password grant is deprecated' in md and '**Suggested:** Use authorization code with PKCE.' in md and '- **What the diagram shows:** How a single-page app signs a user in' in md, md
                 # the dialog remembers the brief and the choices; Clear form empties them
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Review with Claude (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Review this page…').click()
                 assert page.get_by_label('What it shows').input_value() == 'How a single-page app signs a user in'
                 assert page.get_by_role('radiogroup', name='Effort').get_by_role('radio', name='High').get_attribute('aria-checked') == 'true'
                 page.get_by_role('button', name='Clear form').click(); page.wait_for_timeout(60)
@@ -1559,8 +1559,8 @@ def main():
                     'content': content, 'usage': {'input_tokens': 3000, 'output_tokens': 300}}))
             page.route('https://api.anthropic.com/**', handle)
             try:
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Edit with Claude (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Edit with Claude…').click()
                 panel = page.get_by_role('region', name='Edit with Claude')
                 panel.get_by_test_id('agent-ask').fill('Add a cache below the API')
                 panel.get_by_label('API key').fill('sk-ant-e2e-0123456789')
@@ -1602,8 +1602,8 @@ def main():
                 assert len(app.els()) == n0
                 # a second run, then Discard: the page stays as it was
                 sent.clear()
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Edit with Claude (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Edit with Claude…').click()
                 panel.get_by_test_id('agent-ask').fill('Add a cache below the API')
                 panel.get_by_test_id('agent-run').click()
                 panel.get_by_test_id('agent-reply').wait_for(timeout=10000)

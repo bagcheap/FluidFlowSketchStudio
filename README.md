@@ -126,7 +126,7 @@ GIFs are limited to 256 colours and compress poorly. For long or large animation
 
 ## Describe a diagram with AI (optional)
 
-Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu). You describe a diagram in plain words and Claude drafts it. You can check or edit the draft, ask for changes, and then insert it. This is the only FlowSketch feature that uses the internet. It is off until you use it, and it needs your own Anthropic API key. Everything else keeps working without one.
+AI ▸ **Describe a diagram…** (also under AI on the canvas right-click menu). You describe a diagram in plain words and Claude drafts it. You can check or edit the draft, ask for changes, and then insert it. This is the only FlowSketch feature that uses the internet. It is off until you use it, and it needs your own Anthropic API key. Everything else keeps working without one.
 
 ### 1. Get an Anthropic API key (one time)
 
@@ -138,7 +138,7 @@ Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu).
 
 ### 2. Use it in FlowSketch
 
-1. Open Insert ▸ **Describe a diagram (AI)…**.
+1. Open AI ▸ **Describe a diagram…**.
 2. Paste the key into **API key**. To avoid pasting it again next time, tick **Remember in the macOS Keychain** (desktop app) or **Remember in this browser (encrypted with a passphrase)** (browser; choose a passphrase of at least 8 characters, and type it once per tab to unlock the key). **Forget key** removes it.
 3. Choose a **Model**: Opus (best, the default), Sonnet (faster, cheaper) or Haiku (fastest, cheapest).
 4. Describe the diagram, for example: *"A user signs in through the web app, which checks the auth service, then loads their orders from the API and its database. Number the steps."* Then press **Draw it**. It takes a few seconds to a minute.
@@ -155,7 +155,7 @@ Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu).
 
 ### 3. Change a diagram that's already on the page
 
-Insert ▸ **Change this page (AI)…** (also on the canvas right-click menu) works on what you've already drawn.
+AI ▸ **Quick change…** (also under AI on the canvas right-click menu) works on what you've already drawn, in one go.
 
 1. Type what should change, for example: *"Add a cache between the API and the database, colour all databases green, and number the arrows in the order a request flows."* Then press **Suggest changes**.
 2. Claude's suggestions are listed in plain words, for example "Add cylinder “Cache” below “API”" and "Connect “API” → “Cache”". Untick any you don't want.
@@ -167,7 +167,7 @@ What it can do: add shapes (next to a shape you name), connect shapes, remove th
 
 ### 4. Have Claude check a diagram
 
-Insert ▸ **Review with Claude (AI)…** (also on the canvas right-click menu, and at the bottom of the Review panel) checks that the page is *right*, not just tidy.
+AI ▸ **Review this page…** (also under AI on the canvas right-click menu, and **Review with Claude…** at the bottom of the Review panel) checks that the page is *right*, not just tidy.
 
 1. Fill in the **brief**: what the diagram shows, the system or domain (for example "Microsoft Entra ID, OAuth 2.0"), who it's for, any assumptions, and what you want checked. The brief is saved with the diagram, so next time it's already there.
 2. Choose **Effort**: Medium (recommended) or High (for large or important diagrams; costs more). Leave **Include a picture of the page** on so Claude can see the layout. **Search the web for current facts** lets Claude look up things that may have changed since it was trained; each search costs extra, and your organisation may need to turn web search on in the Anthropic Console first.
@@ -181,7 +181,7 @@ A review usually costs a few cents with Opus 5.5 at Medium; the panel shows the 
 
 ### 5. Let Claude make the changes, step by step
 
-Insert ▸ **Edit with Claude (AI)…** (also on the canvas right-click menu, and **Fix with Claude…** on each finding of a review) lets Claude change the page itself, for example *"Add a token cache between the API and the identity provider, connect it, and renumber the steps."*
+AI ▸ **Edit with Claude…** (also under AI on the canvas right-click menu, and **Fix with Claude…** on each finding of a review) lets Claude change the page itself, for example *"Add a token cache between the API and the identity provider, connect it, and renumber the steps."*
 
 1. Type what should change, choose **Effort** (Medium for most changes, High for large restructures) and whether Claude may **look at pictures of the draft** to check its work, then press **Run**.
 2. Claude works on a **draft**: the panel lists each step as it happens and the cost so far, and the canvas shows the draft with additions outlined in green, changes in amber and removed items in red. Press **Stop** to halt it.

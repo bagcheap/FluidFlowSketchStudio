@@ -1,4 +1,4 @@
-// Insert ▸ Describe a diagram (AI): type what you want, Claude replies with Mermaid, you check (or edit) the draft,
+// AI ▸ Describe a diagram: type what you want, Claude replies with Mermaid, you check (or edit) the draft,
 // ask for changes, then insert it. Opt-in: nothing is sent until Draw is pressed, and only with the user's own key.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useUI } from '../../store/uiStore';
@@ -225,7 +225,7 @@ export function AiEditDialog() {
   const apply = () => { if (plan && cmd.applyAiEdits(plan.view, chosen)) close(); };
 
   return (
-    <Modal title="Change this page (AI)" wide footer={<>
+    <Modal title="Quick change (AI)" wide footer={<>
       <button className="btn" onClick={close}>{busy ? 'Cancel' : 'Close'}</button>
       <button className="btn primary" data-testid="ai-apply" disabled={busy || !chosen.length} onClick={apply}>
         {chosen.length ? `Apply ${chosen.length} change${chosen.length === 1 ? '' : 's'}` : 'Apply'}

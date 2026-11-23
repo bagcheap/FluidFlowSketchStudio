@@ -5,6 +5,7 @@ import { useUI } from '../store/uiStore';
 import * as cmd from '../store/commands';
 import { AUTO_LAYOUT_ITEMS, ItemList, matchSizeItems, SELECT_SIMILAR_ITEMS, type MenuItem } from './MenuBar';
 import { ALT, MOD, SHIFT } from './shortcuts';
+import { aiMenuItems } from './aiMenu';
 
 function selectionItems(): MenuItem[] {
   const doc = useDoc.getState().doc;
@@ -82,10 +83,7 @@ function canvasItems(): MenuItem[] {
     { label: 'Paste', shortcut: `${MOD}V`, run: () => void cmd.paste() },
     { label: 'Select all', shortcut: `${MOD}A`, run: cmd.selectAll, disabled: !doc.elements.length },
     { label: 'Diagram from text…', run: () => ui.openDialog('mermaid') },
-    { label: 'Describe a diagram (AI)…', run: () => ui.openDialog('ai') },
-    { label: 'Edit with Claude (AI)…', run: () => cmd.openAgent() },
-    { label: 'Change this page (AI)…', run: () => ui.openDialog('aiEdit') },
-    { label: 'Review with Claude (AI)…', run: () => ui.openDialog('aiReview') },
+    { label: 'AI', sub: aiMenuItems() },
     { label: 'Auto-layout diagram', sub: AUTO_LAYOUT_ITEMS, disabled: !doc.elements.length },
     { label: 'Route arrows around shapes', run: cmd.routeArrows, disabled: !doc.elements.some((e) => e.type === 'connector') },
     { sep: true },
