@@ -1560,6 +1560,10 @@ def main():
             page.route('https://api.anthropic.com/**', handle)
             try:
                 page.get_by_role('menuitem', name='AI', exact=True).click()
+                # one highlighted row: the one under the mouse (the first row loses its highlight)
+                page.get_by_role('menuitem', name='Edit with Claude…').hover(); page.wait_for_timeout(60)
+                lit = page.evaluate('''() => [...document.querySelectorAll('.menu-pop .menu-item')].filter((e) => getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)').map((e) => e.textContent)''')
+                assert len(lit) == 1 and lit[0].startswith('Edit with Claude'), lit
                 page.get_by_role('menuitem', name='Edit with Claude…').click()
                 panel = page.get_by_role('region', name='Edit with Claude')
                 panel.get_by_test_id('agent-ask').fill('Add a cache below the API')

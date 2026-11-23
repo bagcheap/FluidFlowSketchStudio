@@ -14,6 +14,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 - **New AI menu:** everything that uses Claude is now in one place, the **AI** menu: Describe a diagram, Review this page, Edit with Claude, Quick change (the former Change this page) and Forget saved API key. The canvas right-click menu has the same items under **AI**, instead of four separate entries. They are no longer in the Insert menu.
 
+### Fixed
+- Menus showed two highlighted rows while you moved the mouse: the first row stayed highlighted along with the one under the pointer. Now only the row under the pointer (or the one chosen with the arrow keys) is highlighted, in the menu bar and the right-click menu; an item whose submenu is open stays marked.
+
 ## [0.1.55] - 2026-11-23
 
 ### Added

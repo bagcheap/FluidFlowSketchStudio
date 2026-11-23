@@ -54,8 +54,10 @@ export function ItemList({ items, onClose, depth = 0 }: { items: MenuItem[]; onC
             aria-disabled={it.disabled || undefined}
             aria-haspopup={hasSub || undefined}
             tabIndex={-1}
-            className="menu-item"
-            onMouseEnter={() => setOpenSub(hasSub ? i : null)}
+            className={`menu-item${hasSub && openSub === i ? ' sub-open' : ''}`}
+            aria-expanded={hasSub ? openSub === i : undefined}
+            // the item under the mouse takes the keyboard focus, so only one row is ever highlighted
+            onMouseEnter={(e) => { setOpenSub(hasSub ? i : null); e.currentTarget.focus({ preventScroll: true }); }}
             onClick={() => { if (it.disabled) return; if (hasSub) { setOpenSub(i); return; } onClose(); it.run?.(); }}
             onKeyDown={(e) => {
               if ((e.key === 'Enter' || e.key === ' ') && !it.disabled) { e.preventDefault(); if (hasSub) setOpenSub(i); else { onClose(); it.run?.(); } }

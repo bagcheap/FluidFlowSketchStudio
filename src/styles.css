@@ -69,7 +69,7 @@ code { font-size: 12px; }
 .menu-pop { position: absolute; top: calc(100% + 4px); left: 0; min-width: 240px; background: var(--panel); border: 1px solid var(--line); border-radius: 11px; box-shadow: var(--shadow-lg); padding: 5px; z-index: 100; }
 .menu-pop.sub { top: -6px; left: calc(100% + 2px); }
 .menu-item { position: relative; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 7px; white-space: nowrap; cursor: default; outline: none; }
-.menu-item:hover, .menu-item:focus { background: var(--accent-soft); }
+.menu-item:focus, .menu-item.sub-open { background: var(--accent-soft); }
 .menu-item[aria-disabled='true'] { opacity: .4; }
 .menu-check { width: 16px; display: inline-flex; color: var(--accent); }
 .menu-label { flex: 1; }
