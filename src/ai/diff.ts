@@ -2,7 +2,7 @@
 // page, what kind of change each was, and plain lines for the agent panel. Used to preview an AI agent's draft.
 import type { DiagramElement, FlowDocument } from '../model/types';
 import { elementBounds } from '../engine/render';
-import { itemName } from '../lint/lint';
+import { itemName, lintPage } from '../lint/lint';
 
 type Rect = { x: number; y: number; w: number; h: number };
 export interface PageDiff {
@@ -56,4 +56,13 @@ export function diffPage(before: FlowDocument, after: FlowDocument): PageDiff {
     ...settings.map((s) => `${cap(s)} changed`),
   ];
   return { added, removed, changed, settings, lines };
+}
+
+/**
+ * Problems the draft brings in that the page didn't have (the Review panel's checks; notes left out), for judging an
+ * agent's result alongside its own confidence.
+ */
+export function newProblems(before: FlowDocument, after: FlowDocument): string[] {
+  const had = new Set(lintPage(before).map((i) => `${i.rule}|${i.message}`));
+  return lintPage(after).filter((i) => i.severity !== 'info' && !had.has(`${i.rule}|${i.message}`)).map((i) => i.message).slice(0, 20);
 }

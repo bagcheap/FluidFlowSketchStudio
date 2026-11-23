@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultToolStyle, makeConnector, makeShape, newDocument } from '../src/model/defaults';
-import { firstMessage, runAgent, startAgent, MAX_TURNS } from '../src/ai/agent';
-import { diffPage } from '../src/ai/diff';
+import { DEFAULT_STEPS, estimateAgentCost, firstMessage, runAgent, runEstimate, startAgent } from '../src/ai/agent';
+import { diffPage, newProblems } from '../src/ai/diff';
 import { estimateCost } from '../src/ai/review';
 import type { EditTools } from '../src/ai/edits';
 import type { FlowDocument, ShapeElement } from '../src/model/types';
@@ -42,7 +42,7 @@ describe('AI agent', () => {
     const text = firstMessage(state, 'Add a cache below the API', null, [doc.elements[1].id]);
     expect(text).toContain('## Request\nAdd a cache below the API');
     expect(text).toContain('(The user has selected: s2)');
-    const reply = await runAgent(state, text, { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, fetch: f }, (e) => events.push(`${e.name}:${e.ok}`));
+    const reply = await runAgent(state, text, { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, fetch: f }, (e) => { if (e.kind === 'tool') events.push(`${e.name}:${e.ok}`); });
     expect(reply).toBe('Added a cache below the API and connected it.');
     expect(events).toEqual(['add_shape:true', 'connect:true', 'lint:true']);
     expect(calls).toHaveLength(3);
@@ -101,8 +101,9 @@ describe('AI agent', () => {
     const loop = fakeApi(msg([use('t', 'lint', {})]));
     const state = startAgent(doc, { styles }, 'claude-opus-5-5');
     const reply = await runAgent(state, 'Keep checking', { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, fetch: loop.f });
-    expect(loop.calls).toHaveLength(MAX_TURNS);
-    expect(reply).toContain('Stopped after many steps');
+    expect(loop.calls).toHaveLength(DEFAULT_STEPS);
+    expect(reply).toContain('Stopped at the step limit (12)');
+    expect(state.stop).toBe('steps');
     const s2 = startAgent(doc, { styles }, 'claude-opus-5-5');
     await expect(runAgent(s2, 'x', { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, fetch: fakeApi(msg([], 'refusal')).f })).rejects.toThrow('declined');
     await expect(runAgent(s2, 'x', { apiKey: '', model: 'claude-opus-5-5', effort: 'medium', pictures: false })).rejects.toThrow('API key');
@@ -110,5 +111,87 @@ describe('AI agent', () => {
     const s3 = startAgent(doc, { styles }, 'claude-opus-5-5');
     await expect(runAgent(s3, 'x', { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, fetch: bad })).rejects.toThrow('did not accept that API key');
     expect(s3.messages).toEqual([]);
+  });
+});
+
+describe('agent cost control', () => {
+  const lint = (id: string) => use(id, 'lint', {});
+
+  it('a chosen step limit stops the run there, and Claude is warned when two steps are left', async () => {
+    const doc = sample();
+    const state = startAgent(doc, { styles }, 'claude-opus-5-5');
+    const { f, calls } = fakeApi(msg([lint('a')]), msg([lint('b')]), msg([lint('c')]), msg([lint('d')]));
+    await runAgent(state, 'Check', { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, maxSteps: 3, fetch: f });
+    expect(calls).toHaveLength(3);
+    expect(state.stop).toBe('steps');
+    expect(calls[0].messages[0].content as unknown as { text: string }[]).toEqual([expect.objectContaining({ text: expect.stringContaining('You have at most 3 steps') })]);
+    const lastResults = calls[1].messages.at(-1)!.content as { content: { text: string }[] }[];
+    expect(lastResults.at(-1)!.content.at(-1)!.text).toBe('2 steps left: wrap up and call finish.');
+    const final = calls[2].messages.at(-1)!.content as { content: { text: string }[] }[];
+    expect(final.at(-1)!.content.at(-1)!.text).toBe('This is your last step: call finish now.');
+  });
+
+  it('a spending limit stops before the next request would go over it', async () => {
+    const doc = sample();
+    const state = startAgent(doc, { styles }, 'claude-opus-5-5');
+    // each request: 2000 in, 300 out, 1000 cache reads, 500 cache writes ≈ $0.0166 at Opus prices
+    const { f, calls } = fakeApi(msg([lint('a')]));
+    const reply = await runAgent(state, 'Check', { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, maxSteps: 25, maxSpend: 0.05, fetch: f });
+    expect(calls).toHaveLength(2); // a third would pass $0.05
+    expect(state.stop).toBe('spend');
+    expect(reply).toContain('spending limit ($0.05)');
+    expect(state.spent).toBeLessThanOrEqual(0.05);
+    // no limit: runs to the step limit
+    const s2 = startAgent(doc, { styles }, 'claude-opus-5-5');
+    await runAgent(s2, 'Check', { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, maxSteps: 4, maxSpend: null, fetch: fakeApi(msg([lint('a')])).f });
+    expect(s2.steps).toBe(4);
+  });
+
+  it('finish ends the run with a summary, Claude’s own confidence and what is left; a follow-up can go on', async () => {
+    const doc = sample();
+    const state = startAgent(doc, { styles }, 'claude-opus-5-5');
+    const { f } = fakeApi(
+      msg([use('t1', 'set_label', { id: 's1', label: 'Browser' }), use('t2', 'finish', { summary: 'Renamed Web to Browser.', confidence: 'medium', remaining: ['Check the arrow label still fits.'] })]),
+    );
+    const reply = await runAgent(state, 'Rename Web', { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, fetch: f });
+    expect(reply).toBe('Renamed Web to Browser.');
+    expect(state).toMatchObject({ stop: 'finished', confidence: 'medium', remaining: ['Check the arrow label still fits.'], steps: 1 });
+    expect(state.session.doc.elements[0].text).toBe('Browser');
+    const more = fakeApi(msg([use('t3', 'finish', { summary: 'Nothing else needed.', confidence: 'high', remaining: [] })]));
+    await runAgent(state, 'Anything else?', { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, fetch: more.f });
+    expect(state).toMatchObject({ confidence: 'high', steps: 1 });
+  });
+
+  it('Stop (abort) ends the run calmly and keeps the draft', async () => {
+    const doc = sample();
+    const state = startAgent(doc, { styles }, 'claude-opus-5-5');
+    const ac = new AbortController();
+    const f = (async (_u: string | URL | Request, init?: RequestInit) => {
+      ac.abort();
+      return new Response(JSON.stringify(msg([use('t1', 'set_label', { id: 's1', label: 'Browser' })])), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    const reply = await runAgent(state, 'Rename', { apiKey: KEY, model: 'claude-opus-5-5', effort: 'medium', pictures: false, signal: ac.signal, fetch: f }).catch((e) => String(e));
+    expect(state.stop === 'cancelled' || /Cancelled/.test(String(reply))).toBe(true);
+  });
+
+  it('estimates: more steps, high effort and pictures cost more; the limit caps the worst case', () => {
+    const text = 'x'.repeat(14000); // about 4,000 tokens of page
+    const m = estimateAgentCost('claude-opus-5-5', 'medium', false, text, 5);
+    expect(m).toBeGreaterThan(0.01);
+    expect(m).toBeLessThan(0.3);
+    expect(estimateAgentCost('claude-opus-5-5', 'medium', false, text, 12)).toBeGreaterThan(m);
+    expect(estimateAgentCost('claude-opus-5-5', 'high', false, text, 5)).toBeGreaterThan(m);
+    expect(estimateAgentCost('claude-opus-5-5', 'medium', true, text, 5)).toBeGreaterThan(m);
+    expect(estimateAgentCost('claude-haiku-5-5', 'medium', false, text, 5)).toBeLessThan(m / 10);
+    const e = runEstimate('claude-opus-5-5', 'high', true, text, 25, 0.25);
+    expect(e.typical).toBeLessThan(e.atLimit + 1e-9);
+    expect(e.atLimit).toBeLessThanOrEqual(0.25);
+  });
+
+  it('new problems: what the draft breaks that the page did not have', () => {
+    const doc = sample();
+    const loose = { ...makeConnector({ x: 0, y: 0, elementId: doc.elements[0].id }, { x: 900, y: 0, elementId: null }, defaultToolStyle('arrow')), text: 'dangling' };
+    expect(newProblems(doc, doc)).toEqual([]);
+    expect(newProblems(doc, { ...doc, elements: [...doc.elements, loose] })).toEqual(['Arrow “dangling” has an end that isn’t attached to anything']);
   });
 });

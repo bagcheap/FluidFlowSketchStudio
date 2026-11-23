@@ -10,8 +10,9 @@ import { Segmented } from './controls';
 import { KeyRows, useApiKey } from './dialogs/AiDialog';
 import { money } from './dialogs/AiReviewDialog';
 import { MAX_PROMPT_CHARS, savedModel, storeModel, type AiModel } from '../ai/describe';
-import { firstMessage, runAgent, startAgent, type AgentState } from '../ai/agent';
-import { estimateCost, type ReviewEffort } from '../ai/review';
+import { DEFAULT_SPEND, DEFAULT_STEPS, firstMessage, runAgent, runEstimate, SPEND_LIMITS, startAgent, STEP_LIMITS, type AgentState } from '../ai/agent';
+import { reviewText, type ReviewEffort } from '../ai/review';
+import { newProblems } from '../ai/diff';
 
 
 /** What each tool did, in words, for the progress list. */
@@ -23,9 +24,23 @@ const DID: Record<string, string> = {
   apply_theme: 'Applied a theme', lint: 'Checked the page', snapshot: 'Looked at a picture of the draft',
 };
 const OPTS = 'flowsketch:aiAgentOptions';
-function loadOpts(): { effort: ReviewEffort; pictures: boolean } {
-  try { const o = JSON.parse(localStorage.getItem(OPTS) ?? 'null'); return { effort: o?.effort === 'high' ? 'high' : 'medium', pictures: typeof o?.pictures === 'boolean' ? o.pictures : true }; } catch { return { effort: 'medium', pictures: true }; }
+interface AgentChoices { effort: ReviewEffort; pictures: boolean; maxSteps: number; maxSpend: number | null }
+const DEFAULT_OPTS: AgentChoices = { effort: 'medium', pictures: true, maxSteps: DEFAULT_STEPS, maxSpend: DEFAULT_SPEND };
+function loadOpts(): AgentChoices {
+  try {
+    const o = JSON.parse(localStorage.getItem(OPTS) ?? 'null');
+    if (!o || typeof o !== 'object') return DEFAULT_OPTS;
+    return {
+      effort: o.effort === 'high' ? 'high' : 'medium',
+      pictures: typeof o.pictures === 'boolean' ? o.pictures : true,
+      maxSteps: (STEP_LIMITS as readonly number[]).includes(o.maxSteps) ? o.maxSteps : DEFAULT_STEPS,
+      maxSpend: o.maxSpend === null ? null : (SPEND_LIMITS as readonly number[]).includes(o.maxSpend) ? o.maxSpend : DEFAULT_SPEND,
+    };
+  } catch { return DEFAULT_OPTS; }
 }
+const STOPPED: Record<string, string> = {
+  steps: 'Stopped at the step limit.', spend: 'Stopped at the spending limit.', cancelled: 'Stopped by you.', replied: 'Claude finished without a confidence report.',
+};
 
 export function AgentPanel() {
   const open = useUI((s) => s.agentOpen);
@@ -53,6 +68,12 @@ function AgentBody() {
 
   const s = state.current;
   const changes = draft ? draft.diff.lines : [];
+  const doc = useDoc((x) => x.doc);
+  const brief = doc.brief ?? null;
+  // the estimate shown before Run (rough: from the page size, effort and options, at list prices with caching)
+  const est = !s && count ? runEstimate(model, opts.effort, opts.pictures, `${ask}\n${reviewText(doc, brief, false).text}`, opts.maxSteps, opts.maxSpend) : null;
+  const problems = s && !busy && s.session.changes ? newProblems(s.session.original, s.session.doc) : [];
+  const limits = `${opts.maxSteps} steps${opts.maxSpend === null ? '' : `, ${money(opts.maxSpend).replace('about ', '')}`}`;
 
   const run = async (text: string, fresh: boolean) => {
     if (busy || !text.trim()) return;
@@ -69,9 +90,9 @@ function AgentBody() {
     setBusy(true); setError('');
     abort.current = new AbortController();
     try {
-      await runAgent(st, text, { apiKey: api.key, model: st.model, effort: opts.effort, pictures: opts.pictures, signal: abort.current.signal }, (e) => {
+      await runAgent(st, text, { apiKey: api.key, model: st.model, effort: opts.effort, pictures: opts.pictures, maxSteps: opts.maxSteps, maxSpend: opts.maxSpend, signal: abort.current.signal }, (e) => {
         if (state.current !== st) return; // discarded meanwhile
-        setLog((l) => [...l, { text: `${DID[e.name] ?? e.name}${e.ok ? '' : ' (couldn’t)'}`, ok: e.ok }]);
+        if (e.kind === 'tool') setLog((l) => [...l, { text: `${DID[e.name] ?? e.name}${e.ok ? '' : ' (couldn’t)'}`, ok: e.ok }]);
         cmd.showDraft(st.session);
         setTick((t) => t + 1);
       });
@@ -98,7 +119,7 @@ function AgentBody() {
       <header>
         <Bot size={15} aria-hidden />
         <strong>Edit with Claude</strong>
-        <span className="agent-cost">{s ? money(estimateCost(s.model, s.usage)) : ''}</span>
+        <span className="agent-cost" data-testid="agent-cost">{s ? `${busy ? `step ${s.steps + 1} of ${opts.maxSteps} · ` : ''}${money(s.spent).replace('about ', '')}${opts.maxSpend === null ? '' : ` of ${money(opts.maxSpend).replace('about ', '')}`}` : ''}</span>
         <button className="icon-btn sm" aria-label="Close Edit with Claude" title="Close" onClick={() => void close()}><X size={14} /></button>
       </header>
       <div className="agent-scroll">
@@ -113,6 +134,17 @@ function AgentBody() {
             <Segmented label="Agent effort" value={opts.effort} onChange={(v) => choose({ effort: v })} options={[{ v: 'medium', label: 'Medium', title: 'Good for most changes' }, { v: 'high', label: 'High', title: 'For large restructures; costs more' }]} />
           </div>
           <label className="ai-check"><input type="checkbox" checked={opts.pictures} onChange={(e) => choose({ pictures: e.target.checked })} /> Let Claude look at pictures of the draft</label>
+          <div className="ai-row agent-limits">
+            <label className="row-label" htmlFor="agent-steps">Limits</label>
+            <select id="agent-steps" aria-label="Step limit" title="Most requests to Claude in one run (each may make several changes)" value={opts.maxSteps} onChange={(e) => choose({ maxSteps: Number(e.target.value) })}>
+              {STEP_LIMITS.map((n) => <option key={n} value={n}>{n} steps</option>)}
+            </select>
+            <select aria-label="Spending limit" title="Stop before a run costs more than this (list prices)" value={opts.maxSpend === null ? 'none' : String(opts.maxSpend)} onChange={(e) => choose({ maxSpend: e.target.value === 'none' ? null : Number(e.target.value) })}>
+              {SPEND_LIMITS.map((n) => <option key={n} value={n}>stop at ${n.toFixed(2)}</option>)}
+              <option value="none">no spending limit</option>
+            </select>
+          </div>
+          {est && <p className="note agent-estimate" data-testid="agent-estimate">Estimated cost: {money(est.typical)} for a typical run; at most {money(est.atLimit).replace('about ', '')}{opts.maxSpend === null ? ` if it uses all ${opts.maxSteps} steps` : ` (it stops at ${opts.maxSteps} steps or ${money(opts.maxSpend).replace('about ', '')})`}. Rough: list prices, actual use varies.</p>}
           <div className="ai-row">
             <button className="btn primary" data-testid="agent-run" disabled={busy || !ask.trim() || !api.key.trim() || !count} onClick={() => void run(ask, true)}>Run</button>
             {!count && <span className="note">This page is empty: use Describe a diagram instead.</span>}
@@ -124,7 +156,16 @@ function AgentBody() {
             {log.map((l, i) => <li key={i} className={l.ok ? '' : 'failed'}>{l.text}</li>)}
             {busy && <li className="working">Working…</li>}
           </ol>
-          {s.reply && !busy && <p className="agent-reply" data-testid="agent-reply">{s.reply}</p>}
+          {s.reply && !busy && <div className="agent-reply" data-testid="agent-reply">
+            <p>{s.reply}</p>
+            {s.confidence && <p className={`agent-conf ${s.confidence}`}>Claude’s confidence: <b>{s.confidence}</b> <span className="note">(its own judgement; check the changes yourself)</span></p>}
+            {!s.confidence && s.stop && STOPPED[s.stop] && <p className="note">{STOPPED[s.stop]}</p>}
+            {s.remaining.length > 0 && <><b>Left to check</b><ul>{s.remaining.map((r, i) => <li key={i}>{r}</li>)}</ul></>}
+            <p className="note">{s.steps} step{s.steps === 1 ? '' : 's'} · {money(s.spent)} · limits {limits}</p>
+          </div>}
+          {!busy && s.session.changes > 0 && <div className={`agent-checks ${problems.length ? 'bad' : 'ok'}`} data-testid="agent-checks">
+            {problems.length ? <><b>New problems in the draft</b> (automatic checks)<ul>{problems.map((p, i) => <li key={i}>{p}</li>)}</ul></> : <b>Automatic checks: no new problems</b>}
+          </div>}
           {!busy && <div className="agent-changes">
             <b>{changes.length ? `${changes.length} change${changes.length === 1 ? '' : 's'} in the draft` : 'No changes in the draft'}</b>
             {changes.length > 0 && <ul>{changes.slice(0, 60).map((l, i) => <li key={i}>{l}</li>)}</ul>}

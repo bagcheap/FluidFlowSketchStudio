@@ -461,6 +461,17 @@ code { font-size: 12px; }
 .agent-panel .agent-log li.working { color: var(--accent); }
 .agent-panel .agent-reply { margin: 6px 0; padding: 8px; border-radius: 8px; background: var(--panel-2); line-height: 1.4; }
 .agent-panel .agent-changes ul { margin: 4px 0; padding-left: 18px; }
+.agent-panel .agent-reply p { margin: 0 0 4px; }
+.agent-panel .agent-reply ul { margin: 2px 0 4px; padding-left: 18px; }
+.agent-panel .agent-conf.high b { color: var(--ok); }
+.agent-panel .agent-conf.medium b { color: #d97706; }
+.agent-panel .agent-conf.low b { color: var(--danger); }
+.agent-panel .agent-checks { margin: 6px 0; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); }
+.agent-panel .agent-checks.ok b { color: var(--ok); }
+.agent-panel .agent-checks.bad { border-color: #f08c00; }
+.agent-panel .agent-checks ul { margin: 4px 0 0; padding-left: 18px; }
+.agent-panel .agent-limits select { height: 28px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel); color: var(--fg); font: inherit; }
+.agent-panel .agent-estimate { margin: 4px 0 8px; }
 .agent-panel .mk { display: inline-block; padding: 0 6px; border-radius: 4px; border: 2px solid; font-size: 11px; }
 .agent-panel .mk.add { border-color: #2f9e44; }
 .agent-panel .mk.chg { border-color: #f08c00; }

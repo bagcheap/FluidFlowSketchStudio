@@ -1545,7 +1545,7 @@ def main():
                  {'type': 'tool_use', 'id': 't1', 'name': 'add_shape', 'input': {'label': 'Cache', 'shape': 'cylinder', 'near': 's2', 'place': 'below', 'container': None}},
                  {'type': 'tool_use', 'id': 't2', 'name': 'connect', 'input': {'from': 's2', 'to': 's3', 'label': '2. look up', 'style': 'dashed', 'heads': 'end'}}],
                 [{'type': 'tool_use', 'id': 't3', 'name': 'lint', 'input': {}}],
-                [{'type': 'text', 'text': 'Added a cache below the API and connected it as step 2.'}],
+                [{'type': 'tool_use', 'id': 't4', 'name': 'finish', 'input': {'summary': 'Added a cache below the API and connected it as step 2.', 'confidence': 'high', 'remaining': ['Check the cache label.']}}],
             ]
             def handle(route):
                 req = route.request
@@ -1565,6 +1565,11 @@ def main():
                 panel.get_by_test_id('agent-ask').fill('Add a cache below the API')
                 panel.get_by_label('API key').fill('sk-ant-e2e-0123456789')
                 panel.get_by_role('checkbox', name='Let Claude look at pictures of the draft').uncheck()
+                # limits and the estimate before running
+                panel.get_by_label('Step limit').select_option('5')
+                panel.get_by_label('Spending limit').select_option('0.25')
+                est = panel.get_by_test_id('agent-estimate').inner_text()
+                assert est.startswith('Estimated cost:') and 'stops at 5 steps or $0.25' in est, est
                 panel.get_by_test_id('agent-run').click()
                 panel.get_by_test_id('agent-reply').wait_for(timeout=10000)
                 assert len(sent) == 3, len(sent)
@@ -1577,6 +1582,10 @@ def main():
                 assert 'Added a shape' in text and 'Added an arrow' in text and 'Checked the page' in text, text
                 assert 'Added “Cache”' in text and 'Added arrow “2. look up”' in text, text
                 assert 'Added a cache below the API' in text
+                assert 'Claude’s confidence: high' in text and 'Check the cache label.' in text and 'limits 5 steps, $0.25' in text, text
+                assert panel.get_by_test_id('agent-checks').inner_text().startswith('Automatic checks: no new problems'), panel.get_by_test_id('agent-checks').inner_text()
+                assert 'You have at most 5 steps' in json.dumps(sent[0]['messages'][0])
+                assert any(t['name'] == 'finish' and t.get('strict') for t in sent[0]['tools'])
                 # the draft is on the canvas, the document is unchanged, and editing is blocked
                 assert len(app.els()) == n0, 'the document must not change before Apply'
                 page.screenshot(path=f'{OUT}/e2e-agent-draft.png')
