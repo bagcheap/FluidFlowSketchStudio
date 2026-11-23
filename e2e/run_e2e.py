@@ -1471,7 +1471,9 @@ def main():
                 body = json.loads(req.post_data or '{}'); sent.append(body)
                 report = {'summary': 'A SPA sign-in using the password grant, which is no longer recommended.', 'verdict': 'needs changes',
                     'findings': [{'severity': 'error', 'category': 'factual', 'items': ['a1'], 'title': 'Password grant is deprecated',
-                                  'explanation': 'The OAuth 2.0 Security BCP says not to use it.', 'suggestion': 'Use authorization code with PKCE.'}],
+                                  'explanation': 'The OAuth 2.0 Security BCP says not to use it.', 'suggestion': 'Use authorization code with PKCE.'},
+                                 {'severity': 'warning', 'category': 'missing', 'items': [], 'title': 'No token refresh', 'explanation': 'Tokens expire.', 'suggestion': 'Add a refresh step.'},
+                                 {'severity': 'suggestion', 'category': 'naming', 'items': ['s2'], 'title': 'Name the server', 'explanation': '', 'suggestion': 'Call it Identity provider.'}],
                     'questions': ['Is there a backend for the frontend?']}
                 route.fulfill(status=200, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
                     'id': 'msg_e2e', 'type': 'message', 'role': 'assistant', 'model': 'claude-opus-5-5', 'stop_reason': 'tool_use', 'stop_sequence': None,
@@ -1500,9 +1502,30 @@ def main():
                 assert 'Password grant is deprecated' in text and 'Suggested: Use authorization code with PKCE.' in text and 'Is there a backend for the frontend?' in text, text
                 assert 'needs changes' in text
                 panel.screenshot(path=f'{OUT}/e2e-ai-review.png')
-                panel.get_by_role('button', name='Password grant is deprecated', exact=False).click(); page.wait_for_timeout(80)
+                panel.locator('.review-msg', has_text='Password grant is deprecated').click(); page.wait_for_timeout(80)
                 assert app.ui()['selection'] == [arrow['id']], app.ui()['selection']
                 assert app.doc()['brief']['about'] == 'How a single-page app signs a user in' and app.doc()['brief']['domain'] == 'OAuth 2.0'
+                # tick two findings and fix them together: one request; the review list comes back after the agent
+                assert panel.get_by_test_id('ai-fix-chosen').is_disabled()
+                panel.get_by_role('checkbox', name='Choose: Password grant is deprecated').check()
+                panel.get_by_role('checkbox', name='Choose: Name the server').check()
+                assert panel.get_by_test_id('ai-fix-chosen').inner_text() == 'Fix 2 with Claude…'
+                panel.get_by_test_id('ai-fix-chosen').click()
+                agent = page.get_by_role('region', name='Edit with Claude')
+                ask = agent.get_by_test_id('agent-ask').input_value()
+                assert ask.startswith('Fix these 2 problems found in a review') and '1. Password grant is deprecated.' in ask and '2. Name the server.' in ask and 'No token refresh' not in ask, ask
+                assert not page.get_by_role('region', name='Review').is_visible()
+                agent.get_by_role('button', name='Close Edit with Claude').click(); page.wait_for_timeout(80)
+                assert panel.is_visible(), 'the review list comes back after Edit with Claude closes'
+                # mark one as dealt with by hand: it shows as fixed, and "Choose all open" leaves it out
+                panel.get_by_role('button', name='Mark as fixed: No token refresh').click(); page.wait_for_timeout(60)
+                assert '1 of 3 fixed' in panel.inner_text()
+                panel.get_by_role('button', name='Choose all open').click()
+                assert panel.get_by_role('checkbox', name='Choose: No token refresh').is_checked() is False
+                assert panel.get_by_test_id('ai-fix-chosen').inner_text() == 'Fix 2 with Claude…'
+                panel.screenshot(path=f'{OUT}/e2e-ai-review-choose.png')
+                panel.get_by_role('button', name='Mark as not fixed: No token refresh').click(); page.wait_for_timeout(60)
+                assert 'fixed' not in panel.locator('.ai-choose').inner_text()
                 # save the review as Markdown notes
                 with page.expect_download() as dl:
                     panel.get_by_role('button', name='Save review notes').click()

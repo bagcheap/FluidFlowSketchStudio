@@ -27,6 +27,8 @@ export interface AiReview {
   docId: string; pageId: string; at: number; model: AiModel; effort: ReviewEffort;
   summary: string; verdict: (typeof VERDICTS)[number]; findings: Finding[]; questions: string[];
   sources: { url: string; title: string }[]; usage: ReviewUsage; dropped: number;
+  /** Findings (by index) marked as dealt with: by applying an Edit with Claude draft made for them, or by hand. */
+  fixed?: number[];
 }
 
 export interface ReviewOptions extends DrawOptions {
@@ -265,7 +267,7 @@ export function reviewToMarkdown(r: AiReview, o: { title: string; page: string; 
   out.push('## Findings', '');
   if (!r.findings.length) out.push('No problems found.', '');
   r.findings.forEach((f, i) => {
-    out.push(`### ${i + 1}. ${mdText(f.title)}`, '', `**${SEV_WORD[f.severity]}** · ${f.category}`, '');
+    out.push(`### ${i + 1}. ${mdText(f.title)}`, '', `**${SEV_WORD[f.severity]}** · ${f.category}${r.fixed?.includes(i) ? ' · fixed' : ''}`, '');
     const names = f.ids.map(o.nameOf).filter((n): n is string => !!n);
     if (names.length) out.push(`**Items:** ${names.map(mdText).join(', ')}`, '');
     if (f.explanation) out.push(mdText(f.explanation), '');

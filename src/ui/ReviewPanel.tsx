@@ -2,7 +2,7 @@
 // selects its items and brings them into view; issues with a one-click remedy show a button for it; any issue can be
 // hidden for the session.
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, EyeOff, FileDown, Info, Lightbulb, Sparkles, X, XCircle } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, EyeOff, FileDown, Info, Lightbulb, Sparkles, Undo2, X, XCircle } from 'lucide-react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import { lintPage, type LintIssue, type LintSeverity } from '../lint/lint';
@@ -101,6 +101,11 @@ function AiSection() {
 }
 
 function AiReviewView({ r }: { r: AiReview }) {
+  // findings ticked for "Fix chosen with Claude" (this panel only; starts empty each time the panel opens)
+  const [chosen, setChosen] = useState<number[]>([]);
+  const fixed = new Set(r.fixed ?? []);
+  const open = r.findings.map((_, i) => i).filter((i) => !fixed.has(i));
+  const pick = (i: number, on: boolean) => setChosen((c) => (on ? [...c, i].sort((a, b) => a - b) : c.filter((x) => x !== i)));
   const model = AI_MODELS.find((m) => m.id === r.model)?.label.replace(/ \(.*\)$/, '') ?? r.model;
   const time = new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return (
@@ -113,14 +118,29 @@ function AiReviewView({ r }: { r: AiReview }) {
         <button className="icon-btn sm" aria-label="Clear Claude’s review" title="Clear" onClick={() => useUI.getState().setAiReview(null)}><X size={13} /></button>
       </div>
       {r.summary && <p className="ai-summary">{r.summary}</p>}
+      {r.findings.length > 1 && <div className="ai-choose">
+        <span>{fixed.size ? `${fixed.size} of ${r.findings.length} fixed` : `${r.findings.length} findings`}</span>
+        {open.length > 0 && <button className="link-btn" onClick={() => setChosen(chosen.length === open.length && open.every((i) => chosen.includes(i)) ? [] : open)}>
+          {chosen.length === open.length && open.every((i) => chosen.includes(i)) ? 'Choose none' : `Choose all ${fixed.size ? 'open' : ''}`.trim()}</button>}
+        <button className="btn small primary" data-testid="ai-fix-chosen" disabled={!chosen.length} title="Open Edit with Claude with the ticked findings as one request"
+          onClick={() => cmd.fixFindings(chosen)}>Fix {chosen.length || ''} with Claude…</button>
+      </div>}
       {r.findings.length > 0 && <ul className="review-list">
         {r.findings.map((f, i) => (
-          <li key={i} className={`review-item ai-finding sev-${f.severity === 'suggestion' ? 'info' : f.severity}`}>
+          <li key={i} className={`review-item ai-finding sev-${f.severity === 'suggestion' ? 'info' : f.severity}${fixed.has(i) ? ' fixed' : ''}`}>
+            {r.findings.length > 1 && <input type="checkbox" className="ai-pick" aria-label={`Choose: ${f.title}`} checked={chosen.includes(i)} onChange={(e) => pick(i, e.target.checked)} />}
             <button className="review-msg" onClick={() => cmd.focusItems(f.ids)} disabled={!f.ids.length} title={f.ids.length ? 'Select and show on the canvas' : 'About something missing from the page'}>
               <span className="review-icon" aria-label={AI_WORD[f.severity]}>{AI_ICON[f.severity]}</span>
               <span><b>{f.title}</b> <span className="ai-cat">{f.category}</span>{f.explanation && <span className="ai-expl">{f.explanation}</span>}{f.suggestion && <span className="ai-sugg">Suggested: {f.suggestion}</span>}</span>
             </button>
-            <div className="review-actions"><button className="btn small" title="Open Edit with Claude with this finding as the request" onClick={() => cmd.openAgent(cmd.fixFindingRequest(f))}>Fix with Claude…</button></div>
+            <div className="review-actions">
+              {fixed.has(i)
+                ? <><span className="ai-fixed"><Check size={13} aria-hidden /> Fixed</span>
+                  <button className="icon-btn sm" aria-label={`Mark as not fixed: ${f.title}`} title="Mark as not fixed" onClick={() => cmd.markFindings([i], false)}><Undo2 size={13} /></button></>
+                : <>
+                  <button className="icon-btn sm" aria-label={`Mark as fixed: ${f.title}`} title="Mark as fixed (dealt with another way)" onClick={() => { cmd.markFindings([i], true); pick(i, false); }}><Check size={13} /></button>
+                  <button className="btn small" title="Open Edit with Claude with this finding as the request" onClick={() => cmd.fixFindings([i])}>Fix with Claude…</button></>}
+            </div>
           </li>
         ))}
       </ul>}

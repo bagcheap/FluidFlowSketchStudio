@@ -446,6 +446,13 @@ code { font-size: 12px; }
 .review-panel .ai-sources a { color: var(--accent); word-break: break-word; }
 .review-panel .ai-meta { margin: 6px 4px 4px; font-size: 11px; color: var(--fg-3); line-height: 1.35; }
 .review-panel footer { flex-wrap: wrap; }
+.review-panel .ai-choose { display: flex; align-items: center; gap: 8px; margin: 4px 4px 2px; color: var(--fg-2); }
+.review-panel .ai-choose .btn { margin-left: auto; }
+.review-panel .ai-pick { flex: none; margin: 7px 0 0 4px; accent-color: var(--accent); }
+.review-panel .ai-finding .review-msg { flex-basis: 180px; }
+.review-panel .ai-finding.fixed .review-msg { opacity: 0.55; }
+.review-panel .ai-finding.fixed .review-msg b { text-decoration: line-through; }
+.review-panel .ai-fixed { display: inline-flex; align-items: center; gap: 3px; color: var(--ok); font-size: 11.5px; }
 .stage .agent-panel { position: absolute; top: 74px; left: 16px; z-index: 42; width: 360px; max-width: calc(100% - 32px); max-height: calc(100% - 150px); display: flex; flex-direction: column; background: var(--panel); color: var(--fg); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--shadow-lg); font-size: 12.5px; overflow: hidden; }
 .agent-panel header { display: flex; align-items: center; gap: 7px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--line); }
 .agent-panel header svg { color: var(--accent); }

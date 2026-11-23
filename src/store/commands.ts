@@ -8,7 +8,7 @@ import { separateBoxes } from '../layout/separate';
 import type { ToolContext, ToolSession } from '../ai/toolkit';
 import { reviewToMarkdown, type AiReview } from '../ai/review';
 import { diffPage } from '../ai/diff';
-import { AI_MODELS } from '../ai/describe';
+import { AI_MODELS, MAX_PROMPT_CHARS } from '../ai/describe';
 import { pageSnapshot } from '../export/staticExport';
 import { useUI } from './uiStore';
 import { cameraView, compartmentLayout, contentBounds, hasCamera, playSchedule } from '../engine/render';
@@ -1367,8 +1367,8 @@ export async function saveAiReview() {
 // ---- Edit with Claude (agent) ----------------------------------------------------------------------------------------
 
 /** Open the agent panel (the Review panel steps aside), optionally with a request to start from. */
-export function openAgent(seed = '') {
-  U().setAgent(true, seed);
+export function openAgent(seed = '', fixing: number[] = []) {
+  U().setAgent(true, seed, fixing, U().review);
   U().setReview(false);
   U().setTool('select');
   U().select([]);
@@ -1376,7 +1376,27 @@ export function openAgent(seed = '') {
 
 /** Close the agent panel; the draft (if any) is dropped and the document shows again. */
 export function closeAgent() {
+  const back = U().agentFromReview;
   U().setAgent(false);
+  if (back) U().setReview(true); // back to the review list, to deal with the rest
+}
+
+/** Mark Claude's review findings (by index) as fixed or not (session only, like the review). */
+export function markFindings(indices: number[], fixed: boolean) {
+  const r = U().aiReview;
+  if (!r) return;
+  const set = new Set(r.fixed ?? []);
+  for (const i of indices) if (i >= 0 && i < r.findings.length) { if (fixed) set.add(i); else set.delete(i); }
+  U().setAiReview({ ...r, fixed: [...set].sort((a, b) => a - b) });
+}
+
+/** Open Edit with Claude to fix the given findings of Claude's review (one or several, as one request). */
+export function fixFindings(indices: number[]) {
+  const r = U().aiReview;
+  if (!r) return;
+  const chosen = indices.filter((i) => i >= 0 && i < r.findings.length);
+  if (!chosen.length) return;
+  openAgent(fixFindingsRequest(chosen.map((i) => r.findings[i])), chosen);
 }
 
 /**
@@ -1396,6 +1416,7 @@ export function applyAgentDraft(s: ToolSession): boolean {
   }
   const d = diffPage(s.original, s.doc);
   U().setDraft(null);
+  if (U().agentFixing.length) markFindings(U().agentFixing, true);
   U().select(d.added.length ? d.added : d.changed.map((c) => c.id));
   U().toast(`Applied ${d.lines.length} change${d.lines.length === 1 ? '' : 's'} (one Undo takes them all back)`, 'success');
   return true;
@@ -1412,9 +1433,23 @@ export function showDraftItem(id: string) {
   fitRect(b, 80, v.zoom);
 }
 
-/** A request for the agent that fixes one of Claude's review findings. */
-export function fixFindingRequest(f: { title: string; explanation: string; suggestion: string; ids: string[] }): string {
+type FindingLike = { title: string; explanation: string; suggestion: string; ids: string[] };
+
+/** One finding as text for the agent's request. */
+function findingText(f: FindingLike): string {
   const doc = D().doc;
   const items = f.ids.map((id) => getElement(doc, id)).filter((e): e is DiagramElement => !!e).map((e) => itemName(doc, e));
-  return [`Fix this problem found in a review: ${f.title}.`, f.explanation, f.suggestion ? `Suggested change: ${f.suggestion}` : '', items.length ? `It concerns: ${items.join(', ')}.` : ''].filter(Boolean).join('\n');
+  return [`${f.title}.`, f.explanation, f.suggestion ? `Suggested change: ${f.suggestion}` : '', items.length ? `It concerns: ${items.join(', ')}.` : ''].filter(Boolean).join('\n');
+}
+
+/** A request for the agent that fixes one of Claude's review findings. */
+export function fixFindingRequest(f: FindingLike): string {
+  return `Fix this problem found in a review: ${findingText(f)}`;
+}
+
+/** A request for the agent that fixes one or several of Claude's review findings together (capped to fit the box). */
+export function fixFindingsRequest(fs: FindingLike[]): string {
+  if (fs.length === 1) return fixFindingRequest(fs[0]);
+  const text = [`Fix these ${fs.length} problems found in a review. Deal with each one; they may affect each other.`, ...fs.map((f, i) => `${i + 1}. ${findingText(f)}`)].join('\n\n');
+  return text.slice(0, MAX_PROMPT_CHARS);
 }
