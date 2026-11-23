@@ -81,3 +81,56 @@ describe('fixing review findings with Claude', () => {
     expect(md).toContain('### 1. No token step\n\n**Warning** · missing\n');
   });
 });
+
+describe('the last review comes back', () => {
+  it('Show last review brings back a closed review with its fixed marks', async () => {
+    const { a } = setup();
+    const { showAiReview, showLastReview, hasLastReview } = await import('../src/store/commands');
+    showAiReview(useUI.getState().aiReview!);
+    markFindings([2], true);
+    await new Promise((r) => setTimeout(r, 0));
+    useUI.getState().setAiReview(null);
+    useUI.getState().setReview(false);
+    expect(hasLastReview()).toBe(true);
+    await showLastReview();
+    const r = useUI.getState().aiReview!;
+    expect(useUI.getState().review).toBe(true);
+    expect(r.findings.map((f) => f.title)).toEqual(['No token step', 'Wrong order', 'Missing cache']);
+    expect(r.fixed).toEqual([2]);
+    expect(r.findings[0].ids).toEqual([a.id]);
+  });
+
+  it('a stored review is checked again: wrong page, hostile fields, items no longer on the page', async () => {
+    const { cleanStoredReview } = await import('../src/ai/review');
+    const onPage = new Set(['keep']);
+    expect(cleanStoredReview({ docId: 'd', pageId: 'other' }, 'd', 'p', onPage)).toBeNull();
+    expect(cleanStoredReview('nope', 'd', 'p', onPage)).toBeNull();
+    const r = cleanStoredReview({
+      docId: 'd', pageId: 'p', at: 5, model: 'evil', effort: 'max', verdict: 'pwned', summary: 'x'.repeat(5000),
+      findings: [{ title: 'T‮', severity: 'fatal', category: 'zzz', ids: ['keep', 'gone', 7], explanation: 1 }, { title: '' }],
+      sources: [{ url: 'javascript:alert(1)', title: 'bad' }, { url: 'https://example.com/a', title: 'ok' }],
+      fixed: [0, 0, 5, -1, 'x'], usage: { input: -3, output: 'lots' }, dropped: 1e9,
+    }, 'd', 'p', onPage)!;
+    expect(r.model).toBe('claude-opus-5-5');
+    expect(r.effort).toBe('medium');
+    expect(r.verdict).toBe('minor issues');
+    expect(r.summary.length).toBe(2000);
+    expect(r.findings).toEqual([{ severity: 'suggestion', category: 'other', title: 'T', explanation: '', suggestion: '', ids: ['keep'] }]);
+    expect(r.sources).toEqual([{ url: 'https://example.com/a', title: 'ok' }]);
+    expect(r.fixed).toEqual([0]);
+    expect(r.usage).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, webSearches: 0 });
+    expect(r.dropped).toBe(1000);
+  });
+
+  it('no saved review: says so', async () => {
+    const { a } = setup();
+    void a;
+    useUI.getState().setAiReview(null);
+    const { showLastReview, hasLastReview } = await import('../src/store/commands');
+    const doc = { ...useDoc.getState().doc, id: 'fresh-doc' };
+    useDoc.getState().load(doc);
+    expect(hasLastReview()).toBe(false);
+    await showLastReview();
+    expect(useUI.getState().aiReview).toBeNull();
+  });
+});

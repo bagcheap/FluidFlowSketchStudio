@@ -6,7 +6,7 @@ import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from
 import { itemName, type LintIssue } from '../lint/lint';
 import { separateBoxes } from '../layout/separate';
 import type { ToolContext, ToolSession } from '../ai/toolkit';
-import { reviewToMarkdown, type AiReview } from '../ai/review';
+import { cleanStoredReview, reviewToMarkdown, type AiReview } from '../ai/review';
 import { diffPage } from '../ai/diff';
 import { AI_MODELS, MAX_PROMPT_CHARS } from '../ai/describe';
 import { pageSnapshot } from '../export/staticExport';
@@ -16,7 +16,7 @@ import { toAspect } from '../engine/camera';
 import { routeArrowsAround } from '../layout/routeArrows';
 import { fileToAsset } from '../engine/images';
 import { downloadBlob, openDocumentFile, pickFile, resetFileHandle, restoreFileFor, safeFileName, saveDocumentFile, saveFileAs } from '../persistence/files';
-import { rememberMermaid } from '../persistence/storage';
+import { hasSavedReview, loadReview, rememberMermaid, saveReview } from '../persistence/storage';
 import { findMatches, replaceAll, replaceOne } from './find';
 import { toMermaid } from '../export/mermaidExport';
 import { allPages, cleanNote, DocumentError, MAX_PAGES, parseDocument, sanitizeBrief, serializeDocument, SHAPE_KINDS } from '../model/schema';
@@ -1344,6 +1344,32 @@ export function setBrief(b: DiagramBrief) {
 export function showAiReview(r: AiReview) {
   U().setAiReview(r);
   U().setReview(true);
+  keepReview(r);
+}
+
+/** Save a review (and its fixed marks) on this computer, so Show last review can bring it back later. */
+function keepReview(r: AiReview) {
+  saveReview(r).catch(() => { /* storage unavailable: the review still shows for this session */ });
+}
+
+/** Whether this page has a review by Claude that Show last review can bring back. */
+export function hasLastReview(): boolean {
+  const d = D().doc, r = U().aiReview;
+  return (!!r && r.docId === d.id && r.pageId === d.activePage) || hasSavedReview(d.id, d.activePage);
+}
+
+/** AI ▸ Review this page ▸ Show last review: bring back Claude's last review of this page, with what was fixed. */
+export async function showLastReview(): Promise<void> {
+  const d = D().doc, cur = U().aiReview;
+  let r = cur && cur.docId === d.id && cur.pageId === d.activePage ? cur : null;
+  if (!r) {
+    const onPage = new Set(d.elements.map((e) => e.id));
+    try { r = cleanStoredReview(await loadReview(d.id, d.activePage), d.id, d.activePage, onPage); } catch { r = null; }
+  }
+  if (!r) { U().toast('There is no review of this page yet. Use AI ▸ Review this page ▸ Run review…', 'info'); return; }
+  if (U().agentOpen) closeAgent();
+  U().setAiReview(r);
+  U().setReview(true);
 }
 
 /** Save Claude's review of this page as Markdown notes, in a file the user chooses. */
@@ -1387,7 +1413,9 @@ export function markFindings(indices: number[], fixed: boolean) {
   if (!r) return;
   const set = new Set(r.fixed ?? []);
   for (const i of indices) if (i >= 0 && i < r.findings.length) { if (fixed) set.add(i); else set.delete(i); }
-  U().setAiReview({ ...r, fixed: [...set].sort((a, b) => a - b) });
+  const next = { ...r, fixed: [...set].sort((a, b) => a - b) };
+  U().setAiReview(next);
+  keepReview(next);
 }
 
 /** Open Edit with Claude to fix the given findings of Claude's review (one or several, as one request). */

@@ -1481,7 +1481,8 @@ def main():
             page.route('https://api.anthropic.com/**', handle)
             try:
                 page.get_by_role('menuitem', name='AI', exact=True).click()
-                page.get_by_role('menuitem', name='Review this page…').click()
+                page.get_by_role('menuitem', name='Review this page', exact=True).hover()
+                page.get_by_role('menuitem', name='Run review…').click()
                 page.get_by_label('What it shows').fill('How a single-page app signs a user in')
                 page.get_by_label('System or domain').fill('OAuth 2.0')
                 page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
@@ -1534,7 +1535,8 @@ def main():
                 assert '### 1. Password grant is deprecated' in md and '**Suggested:** Use authorization code with PKCE.' in md and '- **What the diagram shows:** How a single-page app signs a user in' in md, md
                 # the dialog remembers the brief and the choices; Clear form empties them
                 page.get_by_role('menuitem', name='AI', exact=True).click()
-                page.get_by_role('menuitem', name='Review this page…').click()
+                page.get_by_role('menuitem', name='Review this page', exact=True).hover()
+                page.get_by_role('menuitem', name='Run review…').click()
                 assert page.get_by_label('What it shows').input_value() == 'How a single-page app signs a user in'
                 assert page.get_by_role('radiogroup', name='Effort').get_by_role('radio', name='High').get_attribute('aria-checked') == 'true'
                 page.get_by_role('button', name='Clear form').click(); page.wait_for_timeout(60)
@@ -1542,8 +1544,18 @@ def main():
                 assert page.get_by_role('radiogroup', name='Effort').get_by_role('radio', name='Medium').get_attribute('aria-checked') == 'true'
                 assert 'brief' not in app.doc()
                 page.locator('.modal .modal-x').click(); page.wait_for_timeout(60)  # the ✕ closes it (the brief was already saved as typed)
-                panel.get_by_role('button', name='Clear Claude’s review').click(); page.wait_for_timeout(60)
+                # close Claude's review, then bring it back, with what was fixed, from the panel and from the AI menu
+                panel.get_by_role('button', name='Mark as fixed: No token refresh').click(); page.wait_for_timeout(60)
+                panel.get_by_role('button', name='Close Claude’s review').click(); page.wait_for_timeout(60)
                 assert not page.get_by_role('region', name='Claude’s review').is_visible()
+                page.get_by_test_id('show-last-review').click(); page.wait_for_timeout(150)
+                assert panel.is_visible() and '1 of 3 fixed' in panel.inner_text(), panel.inner_text()
+                page.get_by_role('button', name='Close review').click(); page.wait_for_timeout(60)
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Review this page', exact=True).hover()
+                page.get_by_role('menuitem', name='Show last review').click(); page.wait_for_timeout(150)
+                assert panel.is_visible() and panel.get_by_role('button', name='Mark as not fixed: No token refresh').is_visible()
+                panel.get_by_role('button', name='Close Claude’s review').click(); page.wait_for_timeout(60)
                 page.get_by_role('button', name='Close review').click()
             finally:
                 page.unroute('https://api.anthropic.com/**')

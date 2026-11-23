@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - **Fix several review findings at once:** in Claude's review, tick the findings you want dealt with and press **Fix N with Claude…**: Edit with Claude gets them as one request and works through them together. **Choose all open** ticks every finding not yet fixed.
 
+- **Show last review:** AI ▸ **Review this page** now has **Run review…** and **Show last review**. Claude's last review of each page is kept on this computer, together with which findings are fixed, so you can come back to it later (even after closing the app) and carry on with what's left. The Review panel also offers **Show Claude's last review** when it isn't showing. Closing Claude's review (✕) only hides it.
+
 ### Changed
 - **Back to the review after fixing:** when you open Edit with Claude from a review, closing it (after Apply, Discard or ✕) brings the Review panel back with Claude's findings, so you can deal with the rest without reviewing again. Findings fixed by an applied draft are marked **Fixed** (struck through); you can also mark one as fixed yourself (✓, for something you fixed another way) or undo the mark. Saved review notes say which findings were fixed.
 

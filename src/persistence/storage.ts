@@ -83,3 +83,43 @@ export function lastMermaid(): string | null {
     return typeof t === 'string' && t.trim() && t.length <= MAX_MERMAID_CHARS ? t : null;
   } catch { return null; }
 }
+
+// Claude's last review of each diagram page (AI ▸ Review this page ▸ Show last review), with the findings marked
+// fixed. IndexedDB holds the reviews; a small index in localStorage (key + time, newest first, ≤ MAX_REVIEWS) says at
+// once whether a page has one (for the menu) and which old ones to drop. What is read back is checked again by
+// `cleanStoredReview` before it is shown.
+const REVIEW_INDEX = 'flowsketch:aiReviewIndex';
+const MAX_REVIEWS = 30;
+const reviewKey = (docId: string, pageId: string) => `aiReview:${docId}:${pageId}`;
+const memReviews = new Map<string, unknown>(); // when IndexedDB isn't there (tests, some private windows)
+
+function reviewIndex(): { key: string; at: number }[] {
+  try {
+    const o = JSON.parse(localStorage.getItem(REVIEW_INDEX) ?? '[]') as unknown;
+    return Array.isArray(o) ? o.filter((e): e is { key: string; at: number } => !!e && typeof e.key === 'string' && e.key.startsWith('aiReview:') && e.key.length < 300 && typeof e.at === 'number').slice(0, MAX_REVIEWS) : [];
+  } catch { return []; }
+}
+
+/** Whether this page has a saved review (synchronous, for menus). */
+export function hasSavedReview(docId: string, pageId: string): boolean {
+  const k = reviewKey(docId, pageId);
+  return reviewIndex().some((e) => e.key === k);
+}
+
+export async function saveReview(review: { docId: string; pageId: string; at: number }): Promise<void> {
+  const k = reviewKey(review.docId, review.pageId);
+  const index = [{ key: k, at: Date.now() }, ...reviewIndex().filter((e) => e.key !== k)];
+  const keep = index.slice(0, MAX_REVIEWS), gone = index.slice(MAX_REVIEWS);
+  try { localStorage.setItem(REVIEW_INDEX, JSON.stringify(keep)); } catch { /* storage unavailable */ }
+  if (!store) { memReviews.set(k, structuredClone(review)); gone.forEach((e) => memReviews.delete(e.key)); return; }
+  await set(k, review, store);
+  await Promise.all(gone.map((e) => del(e.key, store)));
+}
+
+/** The saved review of this page, unchecked (the caller runs it through cleanStoredReview). */
+export async function loadReview(docId: string, pageId: string): Promise<unknown> {
+  const k = reviewKey(docId, pageId);
+  if (!hasSavedReview(docId, pageId)) return null;
+  if (!store) return memReviews.get(k) ?? null;
+  return (await get(k, store)) ?? null;
+}

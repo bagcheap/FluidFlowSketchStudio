@@ -47,6 +47,9 @@ function ReviewBody() {
     ? (['error', 'warning', 'info'] as const).filter((s) => count(s)).map((s) => `${count(s)} ${WORD[s].toLowerCase()}${count(s) === 1 ? '' : 's'}`).join(' · ')
     : 'No problems found';
   const size = useRememberedSize('review');
+  const doc = useDoc((s) => s.doc);
+  const aiReview = useUI((s) => s.aiReview);
+  const lastHidden = !(aiReview && aiReview.docId === doc.id && aiReview.pageId === doc.activePage) && cmd.hasLastReview();
   const current = (i: LintIssue) => i.ids.length === selection.length && i.ids.every((id) => selection.includes(id));
   return (
     <section className="review-panel no-canvas" aria-label="Review" ref={size.ref}>
@@ -79,6 +82,7 @@ function ReviewBody() {
       <footer>
         <span>Checks above update as you edit, on your computer.</span>
         {hiddenHere > 0 && <button className="link-btn" onClick={cmd.showHiddenIssues}>Show {hiddenHere} hidden</button>}
+        {lastHidden && <button className="link-btn" data-testid="show-last-review" onClick={() => void cmd.showLastReview()}>Show Claude’s last review</button>}
         <button className="link-btn" onClick={() => useUI.getState().openDialog('aiReview')}>Review with Claude…</button>
       </footer>
     </section>
@@ -107,7 +111,8 @@ function AiReviewView({ r }: { r: AiReview }) {
   const open = r.findings.map((_, i) => i).filter((i) => !fixed.has(i));
   const pick = (i: number, on: boolean) => setChosen((c) => (on ? [...c, i].sort((a, b) => a - b) : c.filter((x) => x !== i)));
   const model = AI_MODELS.find((m) => m.id === r.model)?.label.replace(/ \(.*\)$/, '') ?? r.model;
-  const time = new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const when = new Date(r.at), today = when.toDateString() === new Date().toDateString();
+  const time = today ? when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : when.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
   return (
     <section className="ai-review" aria-label="Claude’s review">
       <div className="ai-review-head">
@@ -115,7 +120,7 @@ function AiReviewView({ r }: { r: AiReview }) {
         <strong>Claude’s review</strong>
         <span className={`ai-verdict ${r.verdict.replace(' ', '-')}`}>{r.verdict}</span>
         <button className="icon-btn sm" aria-label="Save review notes" title="Save as notes (Markdown)…" onClick={() => void cmd.saveAiReview()}><FileDown size={13} /></button>
-        <button className="icon-btn sm" aria-label="Clear Claude’s review" title="Clear" onClick={() => useUI.getState().setAiReview(null)}><X size={13} /></button>
+        <button className="icon-btn sm" aria-label="Close Claude’s review" title="Close (AI ▸ Review this page ▸ Show last review brings it back)" onClick={() => useUI.getState().setAiReview(null)}><X size={13} /></button>
       </div>
       {r.summary && <p className="ai-summary">{r.summary}</p>}
       {r.findings.length > 1 && <div className="ai-choose">

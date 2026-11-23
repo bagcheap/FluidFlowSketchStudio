@@ -167,12 +167,13 @@ What it can do: add shapes (next to a shape you name), connect shapes, remove th
 
 ### 4. Have Claude check a diagram
 
-AI ▸ **Review this page…** (also under AI on the canvas right-click menu, and **Review with Claude…** at the bottom of the Review panel) checks that the page is *right*, not just tidy.
+AI ▸ **Review this page** ▸ **Run review…** (also under AI on the canvas right-click menu, and **Review with Claude…** at the bottom of the Review panel) checks that the page is *right*, not just tidy.
 
 1. Fill in the **brief**: what the diagram shows, the system or domain (for example "Microsoft Entra ID, OAuth 2.0"), who it's for, any assumptions, and what you want checked. The brief is saved with the diagram, so next time it's already there.
 2. Choose **Effort**: Medium (recommended) or High (for large or important diagrams; costs more). Leave **Include a picture of the page** on so Claude can see the layout. **Search the web for current facts** lets Claude look up things that may have changed since it was trained; each search costs extra, and your organisation may need to turn web search on in the Anthropic Console first.
 3. Press **Review**. The findings appear at the top of the Review panel. Each has a severity, what's wrong and a suggested change. Click a finding to select the items it's about. Claude may also ask you questions, and with web search it lists its sources. The download button at the top of Claude's review saves it as **Markdown notes** in a file you choose.
 4. To fix findings, press **Fix with Claude…** on one, or tick several and press **Fix N with Claude…** to have Edit with Claude deal with them in one go. When you close Edit with Claude, the review comes back: findings fixed by an applied draft are marked **Fixed**, so you can carry on with the rest. You can also mark a finding as fixed yourself (✓) if you dealt with it another way.
+5. To come back to a review later, even after closing the app, use AI ▸ **Review this page** ▸ **Show last review** (or **Show Claude's last review** in the Review panel). It shows the review as it was, with what's fixed and what's left. Claude's last review of each page is kept on this computer only.
 
 The dialog remembers what you entered: the brief is saved with the diagram as you type, and your choices are kept for next time. **Clear form** empties the brief and puts the options back to how they started (your key and model stay).
 
