@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.56] - 2026-11-23
 
 ### Added
 - **Edit with Claude** (AI menu, and AI on the canvas right-click menu): say what to change ("add a token cache between the API and the identity provider and renumber the steps") and Claude works through it step by step on a **draft**. The panel lists each step as it happens, the cost so far, Claude's summary and the changes; the canvas shows the draft with additions outlined in green, changes in amber and removed items in red. **Apply** puts it all in as one step (one Undo takes it back), **Send** asks for more changes to the same draft, **Discard** drops it. While a draft is shown you can pan and zoom but not edit, so nothing gets mixed up. Choose Medium or High effort, and whether Claude may look at pictures of the draft to check its work. **Stop** halts it at any time.
