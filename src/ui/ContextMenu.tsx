@@ -83,6 +83,7 @@ function canvasItems(): MenuItem[] {
     { label: 'Select all', shortcut: `${MOD}A`, run: cmd.selectAll, disabled: !doc.elements.length },
     { label: 'Diagram from text…', run: () => ui.openDialog('mermaid') },
     { label: 'Describe a diagram (AI)…', run: () => ui.openDialog('ai') },
+    { label: 'Edit with Claude (AI)…', run: () => cmd.openAgent() },
     { label: 'Change this page (AI)…', run: () => ui.openDialog('aiEdit') },
     { label: 'Review with Claude (AI)…', run: () => ui.openDialog('aiReview') },
     { label: 'Auto-layout diagram', sub: AUTO_LAYOUT_ITEMS, disabled: !doc.elements.length },

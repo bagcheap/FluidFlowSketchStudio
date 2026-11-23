@@ -32,6 +32,9 @@ const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isCon
 export function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // an AI draft is on the canvas: the document can't be edited until it is applied or discarded (typing in the
+      // agent panel's fields is unaffected)
+      if (useUI.getState().draft && !editable(e.target)) { if (!['Escape', 'Tab'].includes(e.key)) e.preventDefault(); return; }
       // ⌘F find (⌥⌘F with replace), ⌘G / ⇧⌘G next / previous match: from anywhere, fields included
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyF') { e.preventDefault(); cmd.openFind(e.altKey); return; }
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyG' && useUI.getState().find) { e.preventDefault(); cmd.findNext(e.shiftKey ? -1 : 1); return; }

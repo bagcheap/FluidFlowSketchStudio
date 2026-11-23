@@ -7,6 +7,7 @@ import { itemName, type LintIssue } from '../lint/lint';
 import { separateBoxes } from '../layout/separate';
 import type { ToolContext, ToolSession } from '../ai/toolkit';
 import { reviewToMarkdown, type AiReview } from '../ai/review';
+import { diffPage } from '../ai/diff';
 import { AI_MODELS } from '../ai/describe';
 import { pageSnapshot } from '../export/staticExport';
 import { useUI } from './uiStore';
@@ -1361,4 +1362,59 @@ export async function saveAiReview() {
   } catch (e) {
     U().toast(`Couldn't save the review notes: ${(e as Error)?.message ?? e}`, 'error');
   }
+}
+
+// ---- Edit with Claude (agent) ----------------------------------------------------------------------------------------
+
+/** Open the agent panel (the Review panel steps aside), optionally with a request to start from. */
+export function openAgent(seed = '') {
+  U().setAgent(true, seed);
+  U().setReview(false);
+  U().setTool('select');
+  U().select([]);
+}
+
+/** Close the agent panel; the draft (if any) is dropped and the document shows again. */
+export function closeAgent() {
+  U().setAgent(false);
+}
+
+/**
+ * Show an agent's draft on the canvas, with what it added, removed and changed outlined. Shown from the moment the agent
+ * starts (even before it changes anything), so the document can't be edited underneath it.
+ */
+export function showDraft(s: ToolSession) {
+  U().setDraft({ doc: s.doc, diff: diffPage(s.original, s.doc) });
+}
+
+/** Put the agent's draft into the document as one undo step. False (with a message) if the document changed meanwhile. */
+export function applyAgentDraft(s: ToolSession): boolean {
+  if (!s.changes) return false;
+  if (!applyToolSession(s)) {
+    U().toast('The diagram changed while Claude was working, so the draft wasn’t applied. Run the request again.', 'error');
+    return false;
+  }
+  const d = diffPage(s.original, s.doc);
+  U().setDraft(null);
+  U().select(d.added.length ? d.added : d.changed.map((c) => c.id));
+  U().toast(`Applied ${d.lines.length} change${d.lines.length === 1 ? '' : 's'} (one Undo takes them all back)`, 'success');
+  return true;
+}
+
+/** Bring an item of the draft (or the document) into view. */
+export function showDraftItem(id: string) {
+  const d = U().draft?.doc ?? D().doc;
+  const b = selectionBounds(d, [id]);
+  if (!b) return;
+  const v = U().view, { top, w, h } = visibleArea(), pad = 60 / v.zoom;
+  const x0 = v.x, y0 = v.y + top / v.zoom;
+  if (b.x >= x0 + pad && b.y >= y0 + pad && b.x + b.w <= x0 + w / v.zoom - pad && b.y + b.h <= y0 + h / v.zoom - pad) return;
+  fitRect(b, 80, v.zoom);
+}
+
+/** A request for the agent that fixes one of Claude's review findings. */
+export function fixFindingRequest(f: { title: string; explanation: string; suggestion: string; ids: string[] }): string {
+  const doc = D().doc;
+  const items = f.ids.map((id) => getElement(doc, id)).filter((e): e is DiagramElement => !!e).map((e) => itemName(doc, e));
+  return [`Fix this problem found in a review: ${f.title}.`, f.explanation, f.suggestion ? `Suggested change: ${f.suggestion}` : '', items.length ? `It concerns: ${items.join(', ')}.` : ''].filter(Boolean).join('\n');
 }

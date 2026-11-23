@@ -118,6 +118,7 @@ function AiReviewView({ r }: { r: AiReview }) {
               <span className="review-icon" aria-label={AI_WORD[f.severity]}>{AI_ICON[f.severity]}</span>
               <span><b>{f.title}</b> <span className="ai-cat">{f.category}</span>{f.explanation && <span className="ai-expl">{f.explanation}</span>}{f.suggestion && <span className="ai-sugg">Suggested: {f.suggestion}</span>}</span>
             </button>
+            <div className="review-actions"><button className="btn small" title="Open Edit with Claude with this finding as the request" onClick={() => cmd.openAgent(cmd.fixFindingRequest(f))}>Fix with Claude…</button></div>
           </li>
         ))}
       </ul>}

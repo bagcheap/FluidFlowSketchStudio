@@ -1,8 +1,9 @@
 // Tool / interaction / selection / viewport / playback / preference state.
 // Preferences (including remembered per-tool styles) persist in localStorage.
 import type { AiReview } from '../ai/review';
+import type { PageDiff } from '../ai/diff';
 import { create } from 'zustand';
-import type { ShapeKind, ToolStyle } from '../model/types';
+import type { FlowDocument, ShapeKind, ToolStyle } from '../model/types';
 import { defaultToolStyle, styleKey, type SeqKind, type ToolId } from '../model/defaults';
 import { sanitizeToolStyle, SHAPE_KINDS } from '../model/schema';
 
@@ -127,6 +128,9 @@ interface UIState {
   find: FindState | null;
   review: boolean; // the Review panel (lint) is open
   aiReview: AiReview | null; // the last review by Claude (this session only; shown for its own page)
+  agentOpen: boolean; // the Edit with Claude (agent) panel
+  agentSeed: string; // text to start its request box with (e.g. a review finding to fix)
+  draft: { doc: FlowDocument; diff: PageDiff } | null; // an AI draft shown on the canvas instead of the document
   reviewHidden: string[]; // lint issues hidden this session (LintIssue.key)
 }
 
@@ -141,6 +145,8 @@ interface UIActions {
   setFind(f: Partial<FindState> | null): void;
   setReview(open: boolean): void;
   setAiReview(r: AiReview | null): void;
+  setAgent(open: boolean, seed?: string): void;
+  setDraft(d: { doc: FlowDocument; diff: PageDiff } | null): void;
   setReviewHidden(keys: string[]): void;
   setTime(t: number): void;
   openDialog(d: DialogId): void;
@@ -192,6 +198,9 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   find: null,
   review: false,
   aiReview: null,
+  agentOpen: false,
+  agentSeed: '',
+  draft: null,
   reviewHidden: [],
   reducedMotionOS: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
 
@@ -242,6 +251,8 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   setPlayOrderMode(on) { set({ playOrderMode: on }); },
   setReview(open) { set({ review: open }); },
   setAiReview(r) { set({ aiReview: r }); },
+  setAgent(open, seed) { set({ agentOpen: open, agentSeed: seed ?? '', ...(open ? {} : { draft: null }) }); },
+  setDraft(d) { set({ draft: d }); },
   setReviewHidden(keys) { set({ reviewHidden: keys.slice(-500) }); },
   setFind(f) { set((s) => ({ find: f === null ? null : { ...(s.find ?? { query: '', replace: '', matchCase: false, allPages: true, showReplace: false, index: -1 }), ...f } })); },
   ask(message, ok = 'Continue') {

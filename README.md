@@ -179,6 +179,18 @@ A review usually costs a few cents with Opus 5.5 at Medium; the panel shows the 
 
 **What is sent for a review:** the brief, this page's labels, shape kinds, colours, positions, arrows and containers, the play order and the automatic checks, plus a picture of the page and the hover notes if you tick them. Open **What will be sent** in the dialog to see the exact text. Other pages and anything else in the file are not sent. Claude's reply comes back in a fixed format and is checked before it's shown; nothing in it is ever run.
 
+### 5. Let Claude make the changes, step by step
+
+Insert ▸ **Edit with Claude (AI)…** (also on the canvas right-click menu, and **Fix with Claude…** on each finding of a review) lets Claude change the page itself, for example *"Add a token cache between the API and the identity provider, connect it, and renumber the steps."*
+
+1. Type what should change, choose **Effort** (Medium for most changes, High for large restructures) and whether Claude may **look at pictures of the draft** to check its work, then press **Run**.
+2. Claude works on a **draft**: the panel lists each step as it happens and the cost so far, and the canvas shows the draft with additions outlined in green, changes in amber and removed items in red. Press **Stop** to halt it.
+3. Read Claude's summary and the list of changes. Then **Apply** (all of it, as one step: one ⌘Z takes it back), type more in **Ask for more changes** and press **Send** to refine the same draft, or **Discard**.
+
+While a draft is shown you can pan and zoom, but editing waits until you apply or discard, so the draft and your diagram never get mixed up. A typical edit costs a few cents to a few tens of cents, depending on the size of the page and the change.
+
+**What is sent:** your request, the brief, this page as for a review, and the results of each step Claude takes (with pictures of the draft if you allow them). Every step Claude asks for is checked before it touches the draft (it must name things on the page, known shapes, real colours), and nothing it sends is ever run.
+
 **Where your prompts and drafts are kept:** in local storage on this computer only, until you press **Start over**. They're never sent anywhere except with a request you make.
 
 **Where the key is kept:** without **Remember**, only in memory until you close the window. With it:

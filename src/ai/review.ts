@@ -22,7 +22,7 @@ export type FindingCategory = (typeof FINDING_CATEGORIES)[number];
 export const VERDICTS = ['looks right', 'minor issues', 'needs changes'] as const;
 
 export interface Finding { severity: FindingSeverity; category: FindingCategory; title: string; explanation: string; suggestion: string; ids: string[] }
-export interface ReviewUsage { input: number; output: number; cacheRead: number; webSearches: number }
+export interface ReviewUsage { input: number; output: number; cacheRead: number; webSearches: number; cacheWrite?: number }
 export interface AiReview {
   docId: string; pageId: string; at: number; model: AiModel; effort: ReviewEffort;
   summary: string; verdict: (typeof VERDICTS)[number]; findings: Finding[]; questions: string[];
@@ -126,7 +126,7 @@ export function reviewText(doc: FlowDocument, brief: DiagramBrief | null, includ
 /** Rough cost in US dollars (list prices per million tokens; web searches are billed separately and not included). */
 export function estimateCost(model: AiModel, u: ReviewUsage): number {
   const p = model === 'claude-opus-5-5' ? [4, 20, 0.2] : model === 'claude-sonnet-5-5' ? [2, 10, 0.1] : u.input > 100_000 ? [0.5, 2.5, 0.05] : [0.1, 0.5, 0.01];
-  return (u.input * p[0] + u.output * p[1] + u.cacheRead * p[2]) / 1e6;
+  return (u.input * p[0] + u.output * p[1] + u.cacheRead * p[2] + (u.cacheWrite ?? 0) * p[0] * 1.25) / 1e6; // cache writes: 1.25 × input
 }
 
 /** Only plain web links, cleaned and capped. */
