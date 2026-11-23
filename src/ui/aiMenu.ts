@@ -10,7 +10,10 @@ export function aiMenuItems(): MenuItem[] {
   const ui = useUI.getState();
   return [
     { label: 'Describe a diagram…', note: 'draw it from a description', run: () => ui.openDialog('ai') },
-    { label: 'Review this page…', note: 'check it’s right', run: () => ui.openDialog('aiReview') },
+    { label: 'Review this page', sub: [
+      { label: 'Run review…', note: 'check it’s right', run: () => ui.openDialog('aiReview') },
+      { label: 'Show last review', note: 'with what’s fixed', disabled: !cmd.hasLastReview(), run: () => void cmd.showLastReview() },
+    ] },
     { label: 'Edit with Claude…', note: 'step by step, with preview', run: () => cmd.openAgent() },
     { label: 'Quick change…', note: 'in one go', run: () => ui.openDialog('aiEdit') },
     { sep: true },

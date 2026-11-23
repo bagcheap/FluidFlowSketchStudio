@@ -11,7 +11,7 @@ import { allPages } from '../model/schema';
 import { isLifeline } from '../editor/hitTest';
 import { lintPage } from '../lint/lint';
 import { playStepLabels, readPlaySteps } from '../store/sequence';
-import { AiError, cleanKey, errorMessage, loadSdk, MAX_PAGE_CHARS, type AiModel, type DrawOptions } from './describe';
+import { AI_MODELS, AiError, cleanKey, errorMessage, loadSdk, MAX_PAGE_CHARS, type AiModel, type DrawOptions } from './describe';
 import { cleanText, describePage, type PageView } from './edits';
 import type { ToolImage } from './toolkit';
 
@@ -27,6 +27,8 @@ export interface AiReview {
   docId: string; pageId: string; at: number; model: AiModel; effort: ReviewEffort;
   summary: string; verdict: (typeof VERDICTS)[number]; findings: Finding[]; questions: string[];
   sources: { url: string; title: string }[]; usage: ReviewUsage; dropped: number;
+  /** Findings (by index) marked as dealt with: by applying an Edit with Claude draft made for them, or by hand. */
+  fixed?: number[];
 }
 
 export interface ReviewOptions extends DrawOptions {
@@ -161,6 +163,48 @@ export function parseReview(raw: unknown, view: PageView): Omit<AiReview, 'docId
   };
 }
 
+/**
+ * A saved review read back from this computer's storage (Show last review): untrusted like any stored data, so every
+ * field is checked and capped as when it first arrived. Item ids are kept only if they are still on the page
+ * (`onPage`); fixed marks only for findings that exist. Null if it isn't a review of this document page.
+ */
+export function cleanStoredReview(raw: unknown, docId: string, pageId: string, onPage: Set<string>): AiReview | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  if (o.docId !== docId || o.pageId !== pageId) return null;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
+  const findings: Finding[] = (Array.isArray(o.findings) ? o.findings : []).slice(0, MAX_FINDINGS).flatMap((f) => {
+    const p = f && typeof f === 'object' ? (f as Record<string, unknown>) : {};
+    const title = cleanText(p.title, 200).trim();
+    if (!title) return [];
+    return [{
+      severity: (['error', 'warning', 'suggestion'] as const).find((s) => s === p.severity) ?? 'suggestion',
+      category: FINDING_CATEGORIES.find((c) => c === p.category) ?? 'other',
+      title, explanation: cleanText(p.explanation, 1500).trim(), suggestion: cleanText(p.suggestion, 1000).trim(),
+      ids: Array.isArray(p.ids) ? [...new Set(p.ids.slice(0, 50).filter((x): x is string => typeof x === 'string' && onPage.has(x)))] : [],
+    }];
+  });
+  const u = o.usage && typeof o.usage === 'object' ? (o.usage as Record<string, unknown>) : {};
+  const fixed = Array.isArray(o.fixed) ? [...new Set(o.fixed.filter((i): i is number => Number.isInteger(i) && i >= 0 && i < findings.length))].sort((a, b) => a - b) : [];
+  return {
+    docId, pageId, at: num(o.at),
+    model: AI_MODELS.find((m) => m.id === o.model)?.id ?? AI_MODELS[0].id,
+    effort: o.effort === 'high' ? 'high' : 'medium',
+    summary: cleanText(o.summary, 2000).trim(),
+    verdict: VERDICTS.find((v) => v === o.verdict) ?? 'minor issues',
+    findings,
+    questions: (Array.isArray(o.questions) ? o.questions : []).slice(0, MAX_QUESTIONS).map((q) => cleanText(q, 500).trim()).filter(Boolean),
+    sources: (Array.isArray(o.sources) ? o.sources : []).slice(0, MAX_SOURCES).flatMap((s) => {
+      const p = s && typeof s === 'object' ? (s as Record<string, unknown>) : {};
+      const url = safeUrl(p.url);
+      return url ? [{ url, title: cleanText(p.title, 300).trim() }] : [];
+    }),
+    usage: { input: num(u.input), output: num(u.output), cacheRead: num(u.cacheRead), cacheWrite: num(u.cacheWrite), webSearches: num(u.webSearches) },
+    dropped: Math.min(1000, Math.floor(num(o.dropped))),
+    ...(fixed.length ? { fixed } : {}),
+  };
+}
+
 type Block = { type: string; [k: string]: unknown };
 
 /**
@@ -265,7 +309,7 @@ export function reviewToMarkdown(r: AiReview, o: { title: string; page: string; 
   out.push('## Findings', '');
   if (!r.findings.length) out.push('No problems found.', '');
   r.findings.forEach((f, i) => {
-    out.push(`### ${i + 1}. ${mdText(f.title)}`, '', `**${SEV_WORD[f.severity]}** · ${f.category}`, '');
+    out.push(`### ${i + 1}. ${mdText(f.title)}`, '', `**${SEV_WORD[f.severity]}** · ${f.category}${r.fixed?.includes(i) ? ' · fixed' : ''}`, '');
     const names = f.ids.map(o.nameOf).filter((n): n is string => !!n);
     if (names.length) out.push(`**Items:** ${names.map(mdText).join(', ')}`, '');
     if (f.explanation) out.push(mdText(f.explanation), '');
