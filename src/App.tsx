@@ -24,6 +24,7 @@ import { Modal } from './ui/dialogs/Modal';
 import { IconLibrariesDialog } from './ui/dialogs/IconLibrariesDialog';
 import { MermaidDialog } from './ui/dialogs/MermaidDialog';
 import { AiDialog, AiEditDialog } from './ui/dialogs/AiDialog';
+import { AiReviewDialog } from './ui/dialogs/AiReviewDialog';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -135,6 +136,7 @@ function Dialogs() {
     case 'mermaid': return <MermaidDialog />;
     case 'ai': return <AiDialog />;
     case 'aiEdit': return <AiEditDialog />;
+    case 'aiReview': return <AiReviewDialog />;
     case 'prefs': return <PrefsDialog />;
     case 'docprops': return <DocPropsDialog />;
     case 'recent': return <RecentDialog />;

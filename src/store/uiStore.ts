@@ -1,5 +1,6 @@
 // Tool / interaction / selection / viewport / playback / preference state.
 // Preferences (including remembered per-tool styles) persist in localStorage.
+import type { AiReview } from '../ai/review';
 import { create } from 'zustand';
 import type { ShapeKind, ToolStyle } from '../model/types';
 import { defaultToolStyle, styleKey, type SeqKind, type ToolId } from '../model/defaults';
@@ -8,7 +9,7 @@ import { sanitizeToolStyle, SHAPE_KINDS } from '../model/schema';
 export type Theme = 'light' | 'dark' | 'system';
 export type DialogId =
   | null | 'gif' | 'image' | 'svg' | 'video' | 'animation' | 'shortcuts' | 'help' | 'templates'
-  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes' | 'whatsnew' | 'iconlibs' | 'mermaid' | 'ai' | 'aiEdit';
+  | 'prefs' | 'docprops' | 'recent' | 'about' | 'shapes' | 'whatsnew' | 'iconlibs' | 'mermaid' | 'ai' | 'aiEdit' | 'aiReview';
 
 export interface Prefs {
   toolStyles: Record<string, ToolStyle>;
@@ -125,6 +126,7 @@ interface UIState {
   /** Find and replace bar (⌘F): null when closed. `index` is the current match (-1: none yet, Enter goes to the first). */
   find: FindState | null;
   review: boolean; // the Review panel (lint) is open
+  aiReview: AiReview | null; // the last review by Claude (this session only; shown for its own page)
   reviewHidden: string[]; // lint issues hidden this session (LintIssue.key)
 }
 
@@ -138,6 +140,7 @@ interface UIActions {
   setPlaying(p: boolean): void;
   setFind(f: Partial<FindState> | null): void;
   setReview(open: boolean): void;
+  setAiReview(r: AiReview | null): void;
   setReviewHidden(keys: string[]): void;
   setTime(t: number): void;
   openDialog(d: DialogId): void;
@@ -188,6 +191,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   playOrderMode: false,
   find: null,
   review: false,
+  aiReview: null,
   reviewHidden: [],
   reducedMotionOS: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
 
@@ -237,6 +241,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   setContextMenu(at) { set({ contextMenu: at, menuOpen: null }); },
   setPlayOrderMode(on) { set({ playOrderMode: on }); },
   setReview(open) { set({ review: open }); },
+  setAiReview(r) { set({ aiReview: r }); },
   setReviewHidden(keys) { set({ reviewHidden: keys.slice(-500) }); },
   setFind(f) { set((s) => ({ find: f === null ? null : { ...(s.find ?? { query: '', replace: '', matchCase: false, allPages: true, showReplace: false, index: -1 }), ...f } })); },
   ask(message, ok = 'Continue') {

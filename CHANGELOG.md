@@ -4,6 +4,11 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.55] - 2026-11-23
+
+### Added
+- **Review with Claude (AI)** (Insert menu, canvas right-click menu, or the Review panel): Claude checks the page against a short **brief** you write (what it shows, the system or domain, the audience, assumptions, what to check) and its knowledge of the subject. It looks for wrong or outdated facts, missing steps or parts, wrong order or direction, naming and inconsistencies. The findings appear in the Review panel with severity, explanation and a suggested change; click one to select its items. Choose Medium or High effort, include a picture of the page and hover notes, and optionally let Claude **search the web** for current facts (with sources listed). The panel shows an estimate of what the review cost. The brief is saved with the diagram as you type, and the dialog remembers your choices; **Clear form** empties it. **What will be sent** shows exactly what goes to Anthropic. **Save review notes** (the download button on Claude's review) saves the review as a Markdown file you choose: verdict, summary, brief, findings with the items they concern, questions and sources.
+
 ## [0.1.54] - 2026-11-22
 
 ### Added

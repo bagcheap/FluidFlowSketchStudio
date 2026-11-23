@@ -1,6 +1,6 @@
 // Validation, sanitisation and migration for .flowsketch files.
 // Every imported value is coerced into a known-safe shape; nothing is executed.
-import type {
+import type { DiagramBrief,
   Asset, ConnectorAnim, DiagramElement, Endpoint, FlowDocument, IconAsset, IconGradient, IconPaint, IconPart, ShapeAnim, ShapeKind, Style, TextStyle, ToolStyle, Page,
 } from './types';
 import { SCHEMA_VERSION } from './types';
@@ -24,6 +24,16 @@ export const MAX_NOTE = 1000;
 export function cleanNote(v: unknown): string {
   if (typeof v !== 'string') return '';
   return v.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000B-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g, '').slice(0, MAX_NOTE);
+}
+/** Longest text in one field of the diagram brief (characters). */
+export const BRIEF_MAX = 2000;
+export const BRIEF_FIELDS = ['about', 'domain', 'audience', 'assumptions', 'focus'] as const;
+/** The diagram brief: plain text fields (cleaned like notes, ≤ BRIEF_MAX each); null when every field is empty. */
+export function sanitizeBrief(v: unknown): DiagramBrief | null {
+  if (!isObj(v)) return null;
+  const clean = (x: unknown) => (typeof x === 'string' ? x.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000B-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g, '').slice(0, BRIEF_MAX) : '');
+  const b = Object.fromEntries(BRIEF_FIELDS.map((k) => [k, clean(v[k])])) as unknown as DiagramBrief;
+  return BRIEF_FIELDS.some((k) => b[k].trim()) ? b : null;
 }
 export const MAX_ASSET_BYTES = 8 * 1024 * 1024;
 
@@ -423,6 +433,10 @@ export function migrate(raw: Obj): Obj {
     // missing = the old fixed 0.35 s, medium, bottom
     version = 18;
   }
+  if (version === 18) {
+    // v18 -> v19: an optional diagram brief (FlowDocument.brief); nothing to convert
+    version = 19;
+  }
   raw.schemaVersion = version;
   return raw;
 }
@@ -485,6 +499,7 @@ export function parseDocument(input: string | unknown): ParseResult {
       gifFps: num(isObj(o.exportPrefs) ? o.exportPrefs.gifFps : undefined, 15, 1, 50),
       padding: num(isObj(o.exportPrefs) ? o.exportPrefs.padding : undefined, 40, 0, 1000),
     },
+    ...(sanitizeBrief(o.brief) ? { brief: sanitizeBrief(o.brief)! } : {}),
     elements: [],
     assets: {},
     icons: {},

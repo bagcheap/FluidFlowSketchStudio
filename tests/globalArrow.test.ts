@@ -77,7 +77,7 @@ describe('Arrow highlight (all arrows)', () => {
     const old = JSON.parse(serializeDocument(newDocument()));
     old.schemaVersion = 16; delete old.animation.connector.highlightWidth;
     const r = parseDocument(JSON.stringify(old)).doc;
-    expect(r.schemaVersion).toBe(18);
+    expect(r.schemaVersion).toBe(19);
     expect(r.animation.connector.highlightWidth).toBe(1.5);
   });
 });

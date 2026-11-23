@@ -15,7 +15,7 @@ import {
 } from '../../ai/describe';
 
 /** The API key: filled in from where it is remembered (Keychain in the desktop app, else this browser). */
-function useApiKey() {
+export function useApiKey() {
   const [key, setKey] = useState('');
   const [remember, setRemember] = useState(false);
   const [remembered, setRemembered] = useState(false);
@@ -56,7 +56,7 @@ function useApiKey() {
 type ApiKey = ReturnType<typeof useApiKey>;
 
 /** The API key and model rows, shared by both AI dialogs. */
-function KeyRows({ api, model, setModel }: { api: ApiKey; model: AiModel; setModel: (m: AiModel) => void }) {
+export function KeyRows({ api, model, setModel }: { api: ApiKey; model: AiModel; setModel: (m: AiModel) => void }) {
   const inKeychain = keyPlace() === 'keychain';
   return <>
     {api.locked && !api.key && <div className="ai-row">
