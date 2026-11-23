@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.57] - 2026-11-23
 
 ### Added
 - **Fix several review findings at once:** in Claude's review, tick the findings you want dealt with and press **Fix N with Claude…**: Edit with Claude gets them as one request and works through them together. **Choose all open** ticks every finding not yet fixed.
