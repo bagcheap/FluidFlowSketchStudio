@@ -79,13 +79,17 @@ export type EditOp =
   | { op: 'move_into'; ids: string[]; container: string | null };
 
 const str = { type: 'string' } as const;
-const nstr = { type: ['string', 'null'] } as const;
+// Nullable values are written as anyOf [..., null]: strict tools and structured outputs reject a type list combined
+// with an enum ("Enum value 'right' does not match declared type ['string','null']").
+const NULL = { type: 'null' } as const;
+const nstr = { anyOf: [{ type: 'string' }, NULL] } as const;
+const nenum = (values: string[]) => ({ anyOf: [{ type: 'string', enum: values }, NULL] });
 const obj = (op: string, props: Record<string, unknown>) => ({
   type: 'object', additionalProperties: false, required: ['op', ...Object.keys(props)],
   properties: { op: { type: 'string', enum: [op] }, ...props },
 });
 const SHAPE_ENUM = { type: 'string', enum: [...SHAPE_KINDS] };
-const PLACE = { type: ['string', 'null'], enum: ['right', 'left', 'above', 'below', null] };
+const PLACE = nenum(['right', 'left', 'above', 'below']);
 const STYLE = { type: 'string', enum: ['solid', 'dashed', 'thick'] };
 const HEADS = { type: 'string', enum: ['end', 'both', 'none'] };
 
@@ -104,7 +108,7 @@ export const EDIT_SCHEMA = {
           obj('set_label', { id: str, label: str }),
           obj('set_shape', { id: str, shape: SHAPE_ENUM }),
           obj('set_color', { ids: { type: 'array', items: str }, fill: nstr, line: nstr }),
-          obj('set_arrow', { id: str, style: { type: ['string', 'null'], enum: ['solid', 'dashed', 'thick', null] }, heads: { type: ['string', 'null'], enum: ['end', 'both', 'none', null] }, reverse: { type: 'boolean' } }),
+          obj('set_arrow', { id: str, style: nenum(['solid', 'dashed', 'thick']), heads: nenum(['end', 'both', 'none']), reverse: { type: 'boolean' } }),
           obj('add_container', { ref: str, title: str, members: { type: 'array', items: str } }),
           obj('move_into', { ids: { type: 'array', items: str }, container: nstr }),
         ],

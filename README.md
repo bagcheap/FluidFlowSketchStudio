@@ -189,6 +189,8 @@ AI ▸ **Edit with Claude…** (also under AI on the canvas right-click menu, an
 
 While a draft is shown you can pan and zoom, but editing waits until you apply or discard, so the draft and your diagram never get mixed up.
 
+This panel and the Review panel can be resized by dragging their bottom-right corner; they keep the size you choose (double-click the title bar for the usual size).
+
 **Keeping the cost in check:** each run has a **step limit** (5, 12 or 25 requests to Claude; 12 by default) and a **spending limit** ($0.25 to $2, or none; $0.50 by default), set under **Limits** and remembered. Before you press Run the panel shows an **estimated cost**: typical, and the most it could cost within your limits (a rough guide from the page size and list prices). While it runs, the header shows the step and the spend so far. The run stops before the next step would go over either limit and keeps the draft so far, so nothing is lost. Claude knows its step budget, is told when two steps are left, and ends by reporting its **confidence** (high, medium or low) and anything left to check. Treat that as Claude's own opinion: the **automatic checks** underneath list any new problems the draft introduced, and the change list and the canvas show exactly what changed. A typical edit costs a few cents to a few tens of cents.
 
 **What is sent:** your request, the brief, this page as for a review, and the results of each step Claude takes (with pictures of the draft if you allow them). Every step Claude asks for is checked before it touches the draft (it must name things on the page, known shapes, real colours), and nothing it sends is ever run.

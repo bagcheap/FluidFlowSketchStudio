@@ -69,6 +69,13 @@ export function cleanKey(v: unknown): string {
 export class AiError extends Error {}
 
 /** A short, plain message for a failed request. */
+/** The plain message inside an API error body ({ error: { message } }), without the status code and raw JSON. */
+export function apiDetail(e: { error?: unknown; message?: string }): string {
+  const body = e.error as { error?: { message?: unknown }; message?: unknown } | undefined;
+  const m = typeof body?.error?.message === 'string' ? body.error.message : typeof body?.message === 'string' ? body.message : e.message ?? '';
+  return String(m).replace(/\s+/g, ' ').trim() || 'the request was not valid.';
+}
+
 export function errorMessage(e: unknown, sdk: typeof Anthropic): string {
   if (e instanceof AiError) return e.message;
   if (e instanceof sdk.APIUserAbortError) return 'Cancelled.';
@@ -76,7 +83,7 @@ export function errorMessage(e: unknown, sdk: typeof Anthropic): string {
   if (e instanceof sdk.PermissionDeniedError) return 'That API key is not allowed to use this model. Try another model or key.';
   if (e instanceof sdk.NotFoundError) return 'That model is not available to this API key. Try another model.';
   if (e instanceof sdk.RateLimitError) return 'Too many requests or out of credit for now. Wait a moment and try again.';
-  if (e instanceof sdk.BadRequestError) return `Anthropic could not take that request: ${e.message}`.slice(0, 300);
+  if (e instanceof sdk.BadRequestError) return `Anthropic could not take that request: ${apiDetail(e)}`.slice(0, 300);
   if (e instanceof sdk.InternalServerError) return 'Anthropic is busy or having trouble. Try again in a moment.';
   if (e instanceof sdk.APIConnectionError) return 'Could not reach Anthropic. Check your internet connection.';
   if (e instanceof sdk.APIError) return `Anthropic returned an error (${e.status ?? '?'}).`;

@@ -1540,6 +1540,7 @@ def main():
             app.key('Escape'); app.key('Escape')
             n0 = len(app.els())
             sent = []
+            fail400 = False
             script = [
                 [{'type': 'text', 'text': 'Adding a cache.'},
                  {'type': 'tool_use', 'id': 't1', 'name': 'add_shape', 'input': {'label': 'Cache', 'shape': 'cylinder', 'near': 's2', 'place': 'below', 'container': None}},
@@ -1552,6 +1553,9 @@ def main():
                 if req.method == 'OPTIONS':
                     return route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'})
                 body = json.loads(req.post_data or '{}'); sent.append(body)
+                if fail400:
+                    return route.fulfill(status=400, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
+                        'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'tools.5.custom: Invalid schema: ' + 'averyveryverylongunbrokenwordwithoutanyspaces' * 4}}))
                 content = script[min(len(sent) - 1, len(script) - 1)]
                 stop = 'tool_use' if any(c['type'] == 'tool_use' for c in content) else 'end_turn'
                 route.fulfill(status=200, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
@@ -1613,6 +1617,26 @@ def main():
                 panel.get_by_test_id('agent-reply').wait_for(timeout=10000)
                 panel.get_by_role('button', name='Discard').click(); page.wait_for_timeout(80)
                 assert panel.get_by_test_id('agent-run').is_visible() and len(app.els()) == n0
+                # an API error reads as a plain sentence and wraps: nothing to scroll sideways
+                fail400 = True
+                panel.get_by_test_id('agent-run').click()
+                err = panel.get_by_role('alert'); err.wait_for(timeout=10000)
+                et = err.inner_text()
+                assert et.startswith('Anthropic could not take that request: tools.5.custom') and '{' not in et, et
+                assert page.evaluate('''() => { const s = document.querySelector('.agent-scroll'); return s.scrollWidth <= s.clientWidth + 1; }'''), 'the panel must not scroll sideways'
+                fail400 = False
+                # the panel resizes from its bottom-right corner, and keeps that size when opened again
+                box = panel.bounding_box()
+                page.mouse.move(box['x'] + box['width'] - 3, box['y'] + box['height'] - 3); page.mouse.down()
+                page.mouse.move(box['x'] + box['width'] + 120, box['y'] + box['height'] + 40, steps=6); page.mouse.up(); page.wait_for_timeout(350)
+                w1 = panel.bounding_box()['width']
+                assert w1 > box['width'] + 80, (box, w1)
+                panel.get_by_role('button', name='Close Edit with Claude').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Edit with Claude…').click()
+                assert abs(panel.bounding_box()['width'] - w1) < 2, (panel.bounding_box(), w1)
+                panel.locator('header').dblclick(position={'x': 60, 'y': 10}); page.wait_for_timeout(80)
+                assert abs(panel.bounding_box()['width'] - box['width']) < 2 and app.js("() => localStorage.getItem('flowsketch:panelSize:agent')") is None
                 panel.get_by_role('button', name='Close Edit with Claude').click()
             finally:
                 page.unroute('https://api.anthropic.com/**')

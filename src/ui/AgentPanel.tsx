@@ -13,6 +13,7 @@ import { MAX_PROMPT_CHARS, savedModel, storeModel, type AiModel } from '../ai/de
 import { DEFAULT_SPEND, DEFAULT_STEPS, firstMessage, runAgent, runEstimate, SPEND_LIMITS, startAgent, STEP_LIMITS, type AgentState } from '../ai/agent';
 import { reviewText, type ReviewEffort } from '../ai/review';
 import { newProblems } from '../ai/diff';
+import { useRememberedSize } from './panelSize';
 
 
 /** What each tool did, in words, for the progress list. */
@@ -106,6 +107,7 @@ function AgentBody() {
       setTick((t) => t + 1);
     }
   };
+  const size = useRememberedSize('agent');
   const discard = () => { abort.current?.abort(); state.current = null; useUI.getState().setDraft(null); setLog([]); setError(''); setTick((t) => t + 1); };
   const apply = () => { if (state.current && cmd.applyAgentDraft(state.current.session)) { state.current = null; cmd.closeAgent(); } };
   const close = async () => {
@@ -115,8 +117,8 @@ function AgentBody() {
   };
 
   return (
-    <section className="agent-panel no-canvas" aria-label="Edit with Claude">
-      <header>
+    <section className="agent-panel no-canvas" aria-label="Edit with Claude" ref={size.ref}>
+      <header title="Drag the bottom-right corner to resize this panel; double-click here for its usual size" onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) size.reset(); }}>
         <Bot size={15} aria-hidden />
         <strong>Edit with Claude</strong>
         <span className="agent-cost" data-testid="agent-cost">{s ? `${busy ? `step ${s.steps + 1} of ${opts.maxSteps} · ` : ''}${money(s.spent).replace('about ', '')}${opts.maxSpend === null ? '' : ` of ${money(opts.maxSpend).replace('about ', '')}`}` : ''}</span>
