@@ -219,8 +219,40 @@ export const DIAGRAM_TOOLS: DiagramTool[] = [
 const BY_NAME = new Map(DIAGRAM_TOOLS.map((t) => [t.name, t]));
 
 /** Tool definitions for the Messages API (strict schemas), optionally only some kinds. */
+/**
+ * Messages API tool definitions. Tools that take input are strict (the input is guaranteed to match its schema); tools
+ * without input are not, because strict adds nothing there and the API allows at most `MAX_STRICT_TOOLS` strict tools
+ * per request (see `strictBudget`).
+ */
 export function toolDefinitions(kinds: ToolKind[] = ['read', 'change', 'check']) {
-  return DIAGRAM_TOOLS.filter((t) => kinds.includes(t.kind)).map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema, strict: true as const }));
+  return DIAGRAM_TOOLS.filter((t) => kinds.includes(t.kind)).map((t) => {
+    const takesInput = Object.keys((t.input_schema as { properties?: object }).properties ?? {}).length > 0;
+    return { name: t.name, description: t.description, input_schema: t.input_schema, ...(takesInput ? { strict: true as const } : {}) };
+  });
+}
+
+/** The API's limits for strict schemas, summed over every strict tool in one request. */
+export const MAX_STRICT_TOOLS = 20, MAX_UNION_PARAMS = 16, MAX_OPTIONAL_PARAMS = 24;
+
+/** How much of the per-request strict-schema budget a tool list uses: strict tools, fields with anyOf / type lists, optional fields. */
+export function strictBudget(tools: { strict?: boolean; input_schema: unknown }[]) {
+  let unions = 0, optional = 0;
+  const walk = (n: unknown) => {
+    if (Array.isArray(n)) { n.forEach(walk); return; }
+    if (!n || typeof n !== 'object') return;
+    const o = n as Record<string, unknown>;
+    if (o.properties && typeof o.properties === 'object') {
+      const req = new Set((o.required as string[]) ?? []);
+      for (const [k, v] of Object.entries(o.properties as Record<string, Record<string, unknown>>)) {
+        if (!req.has(k)) optional++;
+        if (v && (v.anyOf || Array.isArray(v.type))) unions++;
+      }
+    }
+    for (const [k, v] of Object.entries(o)) if (k !== 'enum') walk(v);
+  };
+  const strict = tools.filter((t) => t.strict);
+  strict.forEach((t) => walk(t.input_schema));
+  return { strict: strict.length, unions, optional };
 }
 
 /**

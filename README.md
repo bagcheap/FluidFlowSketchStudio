@@ -126,7 +126,7 @@ GIFs are limited to 256 colours and compress poorly. For long or large animation
 
 ## Describe a diagram with AI (optional)
 
-Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu). You describe a diagram in plain words and Claude drafts it. You can check or edit the draft, ask for changes, and then insert it. This is the only FlowSketch feature that uses the internet. It is off until you use it, and it needs your own Anthropic API key. Everything else keeps working without one.
+AI ▸ **Describe a diagram…** (also under AI on the canvas right-click menu). You describe a diagram in plain words and Claude drafts it. You can check or edit the draft, ask for changes, and then insert it. This is the only FlowSketch feature that uses the internet. It is off until you use it, and it needs your own Anthropic API key. Everything else keeps working without one.
 
 ### 1. Get an Anthropic API key (one time)
 
@@ -138,7 +138,7 @@ Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu).
 
 ### 2. Use it in FlowSketch
 
-1. Open Insert ▸ **Describe a diagram (AI)…**.
+1. Open AI ▸ **Describe a diagram…**.
 2. Paste the key into **API key**. To avoid pasting it again next time, tick **Remember in the macOS Keychain** (desktop app) or **Remember in this browser (encrypted with a passphrase)** (browser; choose a passphrase of at least 8 characters, and type it once per tab to unlock the key). **Forget key** removes it.
 3. Choose a **Model**: Opus (best, the default), Sonnet (faster, cheaper) or Haiku (fastest, cheapest).
 4. Describe the diagram, for example: *"A user signs in through the web app, which checks the auth service, then loads their orders from the API and its database. Number the steps."* Then press **Draw it**. It takes a few seconds to a minute.
@@ -155,7 +155,7 @@ Insert ▸ **Describe a diagram (AI)…** (also on the canvas right-click menu).
 
 ### 3. Change a diagram that's already on the page
 
-Insert ▸ **Change this page (AI)…** (also on the canvas right-click menu) works on what you've already drawn.
+AI ▸ **Quick change…** (also under AI on the canvas right-click menu) works on what you've already drawn, in one go.
 
 1. Type what should change, for example: *"Add a cache between the API and the database, colour all databases green, and number the arrows in the order a request flows."* Then press **Suggest changes**.
 2. Claude's suggestions are listed in plain words, for example "Add cylinder “Cache” below “API”" and "Connect “API” → “Cache”". Untick any you don't want.
@@ -167,7 +167,7 @@ What it can do: add shapes (next to a shape you name), connect shapes, remove th
 
 ### 4. Have Claude check a diagram
 
-Insert ▸ **Review with Claude (AI)…** (also on the canvas right-click menu, and at the bottom of the Review panel) checks that the page is *right*, not just tidy.
+AI ▸ **Review this page…** (also under AI on the canvas right-click menu, and **Review with Claude…** at the bottom of the Review panel) checks that the page is *right*, not just tidy.
 
 1. Fill in the **brief**: what the diagram shows, the system or domain (for example "Microsoft Entra ID, OAuth 2.0"), who it's for, any assumptions, and what you want checked. The brief is saved with the diagram, so next time it's already there.
 2. Choose **Effort**: Medium (recommended) or High (for large or important diagrams; costs more). Leave **Include a picture of the page** on so Claude can see the layout. **Search the web for current facts** lets Claude look up things that may have changed since it was trained; each search costs extra, and your organisation may need to turn web search on in the Anthropic Console first.
@@ -178,6 +178,22 @@ The dialog remembers what you entered: the brief is saved with the diagram as yo
 A review usually costs a few cents with Opus 5.5 at Medium; the panel shows the estimate (web searches are extra). Claude can be wrong, so treat findings as a second opinion.
 
 **What is sent for a review:** the brief, this page's labels, shape kinds, colours, positions, arrows and containers, the play order and the automatic checks, plus a picture of the page and the hover notes if you tick them. Open **What will be sent** in the dialog to see the exact text. Other pages and anything else in the file are not sent. Claude's reply comes back in a fixed format and is checked before it's shown; nothing in it is ever run.
+
+### 5. Let Claude make the changes, step by step
+
+AI ▸ **Edit with Claude…** (also under AI on the canvas right-click menu, and **Fix with Claude…** on each finding of a review) lets Claude change the page itself, for example *"Add a token cache between the API and the identity provider, connect it, and renumber the steps."*
+
+1. Type what should change, choose **Effort** (Medium for most changes, High for large restructures) and whether Claude may **look at pictures of the draft** to check its work, then press **Run**.
+2. Claude works on a **draft**: the panel lists each step as it happens and the cost so far, and the canvas shows the draft with additions outlined in green, changes in amber and removed items in red. Press **Stop** to halt it.
+3. Read Claude's summary and the list of changes. Then **Apply** (all of it, as one step: one ⌘Z takes it back), type more in **Ask for more changes** and press **Send** to refine the same draft, or **Discard**.
+
+While a draft is shown you can pan and zoom, but editing waits until you apply or discard, so the draft and your diagram never get mixed up.
+
+This panel and the Review panel can be resized by dragging their bottom-right corner; they keep the size you choose (double-click the title bar for the usual size).
+
+**Keeping the cost in check:** each run has a **step limit** (5, 12 or 25 requests to Claude; 12 by default) and a **spending limit** ($0.25 to $2, or none; $0.50 by default), set under **Limits** and remembered. Before you press Run the panel shows an **estimated cost**: typical, and the most it could cost within your limits (a rough guide from the page size and list prices). While it runs, the header shows the step and the spend so far. The run stops before the next step would go over either limit and keeps the draft so far, so nothing is lost. Claude knows its step budget, is told when two steps are left, and ends by reporting its **confidence** (high, medium or low) and anything left to check. Treat that as Claude's own opinion: the **automatic checks** underneath list any new problems the draft introduced, and the change list and the canvas show exactly what changed. A typical edit costs a few cents to a few tens of cents.
+
+**What is sent:** your request, the brief, this page as for a review, and the results of each step Claude takes (with pictures of the draft if you allow them). Every step Claude asks for is checked before it touches the draft (it must name things on the page, known shapes, real colours), and nothing it sends is ever run.
 
 **Where your prompts and drafts are kept:** in local storage on this computer only, until you press **Start over**. They're never sent anywhere except with a request you make.
 

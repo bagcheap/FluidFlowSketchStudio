@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { aiMenuItems } from './aiMenu';
 import { Download, Moon, Play, Redo2, Sun, Undo2, Monitor } from 'lucide-react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
@@ -91,9 +92,6 @@ export function TopBar() {
       { label: 'Image…', shortcut: 'I', run: () => void cmd.insertImage() },
       { label: 'Icons…', shortcut: `${SHIFT}I`, run: () => ui.updatePrefs({ showIconPanel: true }) },
       { label: 'Diagram from text (Mermaid)…', run: () => ui.openDialog('mermaid') },
-      { label: 'Describe a diagram (AI)…', run: () => ui.openDialog('ai') },
-      { label: 'Change this page (AI)…', run: () => ui.openDialog('aiEdit') },
-      { label: 'Review with Claude (AI)…', note: 'check it is right', run: () => ui.openDialog('aiReview') },
       { label: 'New page', run: cmd.newPage },
       { label: 'Container around selection', run: cmd.addContainer, disabled: !hasSel },
       { label: 'Group selection', shortcut: `${MOD}G`, run: cmd.groupSelection, disabled: sel.length < 2 },
@@ -178,6 +176,7 @@ export function TopBar() {
       { sep: true },
       { label: 'Theme', sub: (['light', 'dark', 'system'] as const).map((t) => ({ label: t[0].toUpperCase() + t.slice(1), checked: prefs.theme === t, run: () => ui.updatePrefs({ theme: t }) })) },
     ] },
+    { id: 'ai', label: 'AI', items: aiMenuItems() },
     { id: 'export', label: 'Export', items: exportItems() },
     { id: 'help', label: 'Help', items: [
       { label: 'Getting started & feature guide', run: () => ui.openDialog('help') },

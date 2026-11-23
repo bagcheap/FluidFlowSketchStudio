@@ -914,8 +914,8 @@ def main():
             page.route('https://api.anthropic.com/**', handle)
             try:
                 n0 = len(app.els())
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Describe a diagram…').click()
                 assert page.get_by_test_id('ai-draw').is_disabled()  # no key, no description: nothing can be sent
                 page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
                 page.get_by_test_id('ai-prompt').fill('A user signs in to the web app, which checks the auth service')
@@ -945,8 +945,8 @@ def main():
                 assert app.js("() => localStorage.getItem('flowsketch:anthropicKey')") is None
                 # reopening shows the prompts used and the Mermaid that was drawn; tweak a prompt and draw again
                 app.key('Escape')
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Describe a diagram…').click()
                 assert 'Cache' in page.get_by_test_id('ai-draft').input_value()
                 assert page.get_by_test_id('ai-prompt').input_value() == 'Add a cache the web app loads from'
                 assert page.locator('.ai-prompt-text').all_inner_texts() == ['A user signs in to the web app, which checks the auth service', 'Add a cache the web app loads from']
@@ -998,8 +998,8 @@ def main():
                     'content': [{'type': 'text', 'text': json.dumps(reply)}], 'usage': {'input_tokens': 1, 'output_tokens': 1}}))
             page.route('https://api.anthropic.com/**', handle)
             try:
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Change this page (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Quick change…').click()
                 page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
                 page.get_by_test_id('ai-edit-prompt').fill('Add a cache below the API and make the database green')
                 page.get_by_test_id('ai-suggest').click()
@@ -1041,8 +1041,8 @@ def main():
                         'content': [{'type': 'text', 'text': '```mermaid\nflowchart LR\nA-->B\n```'}], 'usage': {'input_tokens': 1, 'output_tokens': 1}}))
                 p7.route('https://api.anthropic.com/**', api)
                 def open_dialog():
-                    p7.get_by_role('menuitem', name='Insert').click()
-                    p7.get_by_role('menuitem', name='Describe a diagram (AI)…').click()
+                    p7.get_by_role('menuitem', name='AI', exact=True).click()
+                    p7.get_by_role('menuitem', name='Describe a diagram…').click()
                 open_dialog()
                 p7.get_by_label('API key').fill('sk-ant-e2e-0123456789')
                 p7.get_by_label('Remember in this browser (encrypted with a passphrase)').check()
@@ -1478,8 +1478,8 @@ def main():
                     'content': [{'type': 'tool_use', 'id': 'toolu_1', 'name': 'report_findings', 'input': report}], 'usage': {'input_tokens': 4000, 'output_tokens': 600}}))
             page.route('https://api.anthropic.com/**', handle)
             try:
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Review with Claude (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Review this page…').click()
                 page.get_by_label('What it shows').fill('How a single-page app signs a user in')
                 page.get_by_label('System or domain').fill('OAuth 2.0')
                 page.get_by_label('API key').fill('sk-ant-e2e-0123456789')
@@ -1510,8 +1510,8 @@ def main():
                 md = open(dl.value.path(), encoding='utf-8').read()
                 assert '### 1. Password grant is deprecated' in md and '**Suggested:** Use authorization code with PKCE.' in md and '- **What the diagram shows:** How a single-page app signs a user in' in md, md
                 # the dialog remembers the brief and the choices; Clear form empties them
-                page.get_by_role('menuitem', name='Insert').click()
-                page.get_by_role('menuitem', name='Review with Claude (AI)…').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Review this page…').click()
                 assert page.get_by_label('What it shows').input_value() == 'How a single-page app signs a user in'
                 assert page.get_by_role('radiogroup', name='Effort').get_by_role('radio', name='High').get_attribute('aria-checked') == 'true'
                 page.get_by_role('button', name='Clear form').click(); page.wait_for_timeout(60)
@@ -1527,6 +1527,127 @@ def main():
                 if page.locator('.modal').count(): app.key('Escape')
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
         taireview()
+
+        @test('Edit with Claude (agent): tool calls build a draft shown on the canvas (editing blocked), Apply = one undo step, Discard keeps the page')
+        def tagent():
+            app.key('Escape')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            page.get_by_role('button', name='Add page').click(); page.wait_for_timeout(100)
+            page.get_by_role('menuitem', name='Insert').click()
+            page.get_by_role('menuitem', name='Diagram from text (Mermaid)…').click()
+            page.get_by_label('Flowchart text').fill('flowchart LR\n  W[Web] -->|1. request| A[API]')
+            page.get_by_test_id('mermaid-insert').click(); page.wait_for_timeout(150)
+            app.key('Escape'); app.key('Escape')
+            n0 = len(app.els())
+            sent = []
+            fail400 = False
+            script = [
+                [{'type': 'text', 'text': 'Adding a cache.'},
+                 {'type': 'tool_use', 'id': 't1', 'name': 'add_shape', 'input': {'label': 'Cache', 'shape': 'cylinder', 'near': 's2', 'place': 'below', 'container': None}},
+                 {'type': 'tool_use', 'id': 't2', 'name': 'connect', 'input': {'from': 's2', 'to': 's3', 'label': '2. look up', 'style': 'dashed', 'heads': 'end'}}],
+                [{'type': 'tool_use', 'id': 't3', 'name': 'lint', 'input': {}}],
+                [{'type': 'tool_use', 'id': 't4', 'name': 'finish', 'input': {'summary': 'Added a cache below the API and connected it as step 2.', 'confidence': 'high', 'remaining': ['Check the cache label.']}}],
+            ]
+            def handle(route):
+                req = route.request
+                if req.method == 'OPTIONS':
+                    return route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'})
+                body = json.loads(req.post_data or '{}'); sent.append(body)
+                if fail400:
+                    return route.fulfill(status=400, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
+                        'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'tools.5.custom: Invalid schema: ' + 'averyveryverylongunbrokenwordwithoutanyspaces' * 4}}))
+                content = script[min(len(sent) - 1, len(script) - 1)]
+                stop = 'tool_use' if any(c['type'] == 'tool_use' for c in content) else 'end_turn'
+                route.fulfill(status=200, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
+                    'id': 'msg_e2e', 'type': 'message', 'role': 'assistant', 'model': 'claude-opus-5-5', 'stop_reason': stop, 'stop_sequence': None,
+                    'content': content, 'usage': {'input_tokens': 3000, 'output_tokens': 300}}))
+            page.route('https://api.anthropic.com/**', handle)
+            try:
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                # one highlighted row: the one under the mouse (the first row loses its highlight)
+                page.get_by_role('menuitem', name='Edit with Claude…').hover(); page.wait_for_timeout(60)
+                lit = page.evaluate('''() => [...document.querySelectorAll('.menu-pop .menu-item')].filter((e) => getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)').map((e) => e.textContent)''')
+                assert len(lit) == 1 and lit[0].startswith('Edit with Claude'), lit
+                page.get_by_role('menuitem', name='Edit with Claude…').click()
+                panel = page.get_by_role('region', name='Edit with Claude')
+                panel.get_by_test_id('agent-ask').fill('Add a cache below the API')
+                panel.get_by_label('API key').fill('sk-ant-e2e-0123456789')
+                panel.get_by_role('checkbox', name='Let Claude look at pictures of the draft').uncheck()
+                # limits and the estimate before running
+                panel.get_by_label('Step limit').select_option('5')
+                panel.get_by_label('Spending limit').select_option('0.25')
+                est = panel.get_by_test_id('agent-estimate').inner_text()
+                assert est.startswith('Estimated cost:') and 'stops at 5 steps or $0.25' in est, est
+                panel.get_by_test_id('agent-run').click()
+                panel.get_by_test_id('agent-reply').wait_for(timeout=10000)
+                assert len(sent) == 3, len(sent)
+                strict = [t['name'] for t in sent[0]['tools'] if t.get('strict')]
+                assert 'add_shape' in strict and 'connect' in strict and len(strict) <= 20, strict  # the API allows at most 20 strict tools
+                assert not any(t['name'] == 'snapshot' for t in sent[0]['tools'])
+                first = sent[0]['messages'][0]['content']
+                assert '## Request\nAdd a cache below the API' in (first if isinstance(first, str) else first[0]['text']), first
+                results = sent[1]['messages'][2]['content']
+                assert [r['tool_use_id'] for r in results] == ['t1', 't2'] and not any(r.get('is_error') for r in results), results
+                text = panel.inner_text()
+                assert 'Added a shape' in text and 'Added an arrow' in text and 'Checked the page' in text, text
+                assert 'Added “Cache”' in text and 'Added arrow “2. look up”' in text, text
+                assert 'Added a cache below the API' in text
+                assert 'Claude’s confidence: high' in text and 'Check the cache label.' in text and 'limits 5 steps, $0.25' in text, text
+                assert panel.get_by_test_id('agent-checks').inner_text().startswith('Automatic checks: no new problems'), panel.get_by_test_id('agent-checks').inner_text()
+                assert 'You have at most 5 steps' in json.dumps(sent[0]['messages'][0])
+                assert any(t['name'] == 'finish' and t.get('strict') for t in sent[0]['tools'])
+                # the draft is on the canvas, the document is unchanged, and editing is blocked
+                assert len(app.els()) == n0, 'the document must not change before Apply'
+                page.screenshot(path=f'{OUT}/e2e-agent-draft.png')
+                web = [e for e in app.els() if e['type'] == 'shape' and e['text'] == 'Web'][0]
+                app.click((web['x'] + web['w'] / 2, web['y'] + web['h'] / 2))
+                assert app.ui()['selection'] == [], 'no editing under a draft'
+                h1 = app.js('() => window.__flowsketch.history()')['past']
+                panel.get_by_test_id('agent-apply').click(); page.wait_for_timeout(150)
+                assert not page.get_by_role('region', name='Edit with Claude').is_visible()
+                els = app.els()
+                assert len(els) == n0 + 2 and any(e['type'] == 'shape' and e['text'] == 'Cache' and e['shape'] == 'cylinder' for e in els)
+                assert app.js('() => window.__flowsketch.history()')['past'] == h1 + 1  # one undo step
+                app.key('Control+z'); page.wait_for_timeout(80)
+                assert len(app.els()) == n0
+                # a second run, then Discard: the page stays as it was
+                sent.clear()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Edit with Claude…').click()
+                panel.get_by_test_id('agent-ask').fill('Add a cache below the API')
+                panel.get_by_test_id('agent-run').click()
+                panel.get_by_test_id('agent-reply').wait_for(timeout=10000)
+                panel.get_by_role('button', name='Discard').click(); page.wait_for_timeout(80)
+                assert panel.get_by_test_id('agent-run').is_visible() and len(app.els()) == n0
+                # an API error reads as a plain sentence and wraps: nothing to scroll sideways
+                fail400 = True
+                panel.get_by_test_id('agent-run').click()
+                err = panel.get_by_role('alert'); err.wait_for(timeout=10000)
+                et = err.inner_text()
+                assert et.startswith('Anthropic could not take that request: tools.5.custom') and '{' not in et, et
+                assert page.evaluate('''() => { const s = document.querySelector('.agent-scroll'); return s.scrollWidth <= s.clientWidth + 1; }'''), 'the panel must not scroll sideways'
+                fail400 = False
+                # the panel resizes from its bottom-right corner, and keeps that size when opened again
+                box = panel.bounding_box()
+                page.mouse.move(box['x'] + box['width'] - 3, box['y'] + box['height'] - 3); page.mouse.down()
+                page.mouse.move(box['x'] + box['width'] + 120, box['y'] + box['height'] + 40, steps=6); page.mouse.up(); page.wait_for_timeout(350)
+                w1 = panel.bounding_box()['width']
+                assert w1 > box['width'] + 80, (box, w1)
+                panel.get_by_role('button', name='Close Edit with Claude').click()
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Edit with Claude…').click()
+                assert abs(panel.bounding_box()['width'] - w1) < 2, (panel.bounding_box(), w1)
+                panel.locator('header').dblclick(position={'x': 60, 'y': 10}); page.wait_for_timeout(80)
+                assert abs(panel.bounding_box()['width'] - box['width']) < 2 and app.js("() => localStorage.getItem('flowsketch:panelSize:agent')") is None
+                panel.get_by_role('button', name='Close Edit with Claude').click()
+            finally:
+                page.unroute('https://api.anthropic.com/**')
+                # never leave the panel (and a draft that blocks editing) open for the next tests
+                if page.get_by_role('region', name='Edit with Claude').count():
+                    page.get_by_role('button', name='Close Edit with Claude').click(); page.wait_for_timeout(80)
+                    if page.get_by_test_id('confirm-ok').count(): page.get_by_test_id('confirm-ok').click()
+            while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+        tagent()
 
         @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
         def tmermaid():

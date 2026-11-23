@@ -28,6 +28,8 @@ import { TextEditor } from './TextEditor';
 import { placeSizeMarks, sizeSnap, spacingSnap, type GapMark } from './spacing';
 import { FindBar } from '../ui/FindBar';
 import { ReviewPanel } from '../ui/ReviewPanel';
+import { AgentPanel } from '../ui/AgentPanel';
+import type { PageDiff } from '../ai/diff';
 import { findMatches } from '../store/find';
 import { updateMembership, withMembers } from '../store/containers';
 
@@ -132,6 +134,7 @@ export function Canvas() {
     let raf = 0;
     let last = performance.now();
     let lastKey = '';
+    let lastDraft: unknown = null;
     const off = onImageLoaded(() => { redraw.current = true; });
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
@@ -150,8 +153,11 @@ export function Canvas() {
       const it = inter.current;
       const susp = u.prefs.suspendWhileDragging && it && (it.k === 'move' || it.k === 'resize' || it.k === 'rotate' || it.k === 'resizeMulti')
         ? new Set(it.k === 'move' || it.k === 'resizeMulti' ? it.ids : [it.id]) : undefined;
-      const cam = liveCameraView(d.doc, u.time);
+      const draft = u.draft;
+      const shown = draft?.doc ?? d.doc; // an AI draft is shown instead of the document while it is reviewed
+      const cam = liveCameraView(shown, u.time);
       const view = cam ?? u.view;
+      if (draft !== lastDraft) { lastDraft = draft; redraw.current = true; }
       const key = `${d.revision}|${u.time.toFixed(4)}|${view.x},${view.y},${view.zoom}|${stage.w}x${stage.h}|${u.editingId}|${susp ? [...susp].join() : ''}`;
       if (key === lastKey && !redraw.current) return;
       lastKey = key; redraw.current = false;
@@ -162,17 +168,18 @@ export function Canvas() {
       if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
       const ctx = c.getContext('2d')!;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = d.doc.canvas.background;
+      ctx.fillStyle = shown.canvas.background;
       ctx.fillRect(0, 0, W, H);
-      if (!u.presentation) drawGrid(ctx, d.doc, view, dpr);
-      const frame = renderDocumentAtTime(d.doc, u.time, {
+      if (!u.presentation) drawGrid(ctx, shown, view, dpr);
+      const frame = renderDocumentAtTime(shown, u.time, {
         flags: { suspended: susp },
         hide: u.editingId ? new Set([u.editingId]) : undefined,
         cull: { x: view.x, y: view.y, w: stage.w / view.zoom, h: stage.h / view.zoom },
       });
       // a step caption stays in the part of the canvas not under the toolbar and Inspector
       const va = visibleArea();
-      drawFrame(ctx, frame, { images: imageMap(d.doc.assets), originX: view.x, originY: view.y, scale: view.zoom * dpr, captionArea: { x: 0, y: va.top * dpr, w: va.w * dpr, h: va.h * dpr } });
+      drawFrame(ctx, frame, { images: imageMap(shown.assets), originX: view.x, originY: view.y, scale: view.zoom * dpr, captionArea: { x: 0, y: va.top * dpr, w: va.w * dpr, h: va.h * dpr } });
+      if (draft) drawDraftMarks(ctx, draft, view, dpr);
     };
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); off(); };
@@ -302,6 +309,7 @@ export function Canvas() {
       inter.current = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: u.view.x, vy: u.view.y };
       return;
     }
+    if (u.draft) return; // an AI draft is shown: look (and pan), don't edit
     if (e.button !== 0) return;
     // "Set play order": a click on an arrow numbers it (Shift: same step as the last one); nothing else happens
     if (u.playOrderMode) {
@@ -518,7 +526,7 @@ export function Canvas() {
     if (isEditable(e.target)) return;
     e.preventDefault();
     const u = useUI.getState();
-    if (u.presentation || (e.target as HTMLElement).closest('.no-canvas')) return;
+    if (u.presentation || u.draft || (e.target as HTMLElement).closest('.no-canvas')) return;
     const d = useDoc.getState().doc;
     const hit = hitTest(d, toWorldPt(e), u.view.zoom);
     if (!hit) u.select([]);
@@ -564,6 +572,7 @@ export function Canvas() {
     const u = useUI.getState();
     const D = useDoc.getState();
     if (!it) {
+      if (u.draft) return; // no hover handles over an AI draft
       if ((e.target as HTMLElement).closest?.('.qc-pop')) return; // over the quick-connect picker
       // hover feedback for connector tools
       if (u.tool === 'arrow' || u.tool === 'line') {
@@ -1281,6 +1290,7 @@ export function Canvas() {
       </svg>
       {!presentation && <FindBar />}
       {!presentation && <ReviewPanel />}
+      {!presentation && <AgentPanel />}
       {playOrderMode && !presentation && (
         <div className="order-bar no-canvas" role="toolbar" aria-label="Set play order">
           <span><b>Play order:</b> click arrows in turn · Shift: same step · again: remove</span>
@@ -1423,4 +1433,26 @@ function isDarkColor(c: string): boolean {
   if (!m) return false;
   const [r, g, b] = [m[1], m[2], m[3]].map((h) => parseInt(h, 16) / 255);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.4;
+}
+
+/** Outlines over an AI draft: green = added, amber = changed, red dashed = removed (where it was). */
+function drawDraftMarks(ctx: CanvasRenderingContext2D, draft: { doc: FlowDocument; diff: PageDiff }, view: { x: number; y: number; zoom: number }, dpr: number) {
+  const k = view.zoom * dpr, pad = 6 / view.zoom;
+  const rect = (b: { x: number; y: number; w: number; h: number }, colour: string, dash: number[]) => {
+    ctx.save();
+    ctx.strokeStyle = colour; ctx.lineWidth = 2 * dpr; ctx.setLineDash(dash.map((x) => x * dpr));
+    ctx.strokeRect((b.x - pad - view.x) * k, (b.y - pad - view.y) * k, (b.w + 2 * pad) * k, (b.h + 2 * pad) * k);
+    ctx.restore();
+  };
+  const bounds = (id: string) => {
+    const e = draft.doc.elements.find((x) => x.id === id);
+    if (!e) return null;
+    if (e.type !== 'connector') return elementBounds(draft.doc, e);
+    const pts = connectorPath(e, makeLookup(draft.doc, null)).pts;
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+  };
+  for (const r of draft.diff.removed) if (r.bounds) rect(r.bounds, '#e03131', [6, 4]);
+  for (const c of draft.diff.changed) { const b = bounds(c.id); if (b) rect(b, '#f08c00', []); }
+  for (const id of draft.diff.added) { const b = bounds(id); if (b) rect(b, '#2f9e44', []); }
 }

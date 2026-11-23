@@ -4,6 +4,22 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.56] - 2026-11-23
+
+### Added
+- **Edit with Claude** (AI menu, and AI on the canvas right-click menu): say what to change ("add a token cache between the API and the identity provider and renumber the steps") and Claude works through it step by step on a **draft**. The panel lists each step as it happens, the cost so far, Claude's summary and the changes; the canvas shows the draft with additions outlined in green, changes in amber and removed items in red. **Apply** puts it all in as one step (one Undo takes it back), **Send** asks for more changes to the same draft, **Discard** drops it. While a draft is shown you can pan and zoom but not edit, so nothing gets mixed up. Choose Medium or High effort, and whether Claude may look at pictures of the draft to check its work. **Stop** halts it at any time.
+- **Cost control for Edit with Claude:** every run has a **step limit** (5, 12 or 25; 12 by default) and a **spending limit** ($0.25, $0.50, $1, $2 or none; $0.50 by default), remembered for next time. Before you press Run, the panel shows an **estimated cost** (typical, and the most it could cost within your limits); while it runs, it shows the step and the spend so far against the limit. The run stops before the next step would go over either limit, keeping the draft so far. Claude knows its step budget and is told when two steps are left, so it wraps up rather than being cut off. At the end it reports its **confidence** (high, medium or low) and anything left to check, next to **automatic checks** that list any new problems the draft introduced.
+- **Fix with Claude…** on each of Claude's review findings opens Edit with Claude with that finding as the request.
+
+### Changed
+- **New AI menu:** everything that uses Claude is now in one place, the **AI** menu: Describe a diagram, Review this page, Edit with Claude, Quick change (the former Change this page) and Forget saved API key. The canvas right-click menu has the same items under **AI**, instead of four separate entries. They are no longer in the Insert menu.
+- **Resizable panels:** the Review panel and the Edit with Claude panel can be made wider or taller by dragging their bottom-right corner, and keep that size next time. Double-click a panel's title bar for its usual size. Long text in them (such as an error message) now always wraps instead of running off the side.
+
+### Fixed
+- Menus showed two highlighted rows while you moved the mouse: the first row stayed highlighted along with the one under the pointer. Now only the row under the pointer (or the one chosen with the arrow keys) is highlighted, in the menu bar and the right-click menu; an item whose submenu is open stays marked.
+- **Edit with Claude** and **Fix with Claude** failed straight away with an "Invalid schema" error from Anthropic: some of the step descriptions sent to Claude (for example where to place a new shape) were written in a form the API doesn't accept. Fixed, with a check that keeps every AI tool description in the accepted form. API errors now read as a plain sentence instead of raw JSON.
+- **Edit with Claude** then failed with "Too many strict tools (22)": Anthropic accepts at most 20 strictly checked tools per request. Tools that take no input are now sent without strict checking (it adds nothing for them), so a request uses 15. A check now keeps every AI request within all of Anthropic's limits for these tools.
+
 ## [0.1.55] - 2026-11-23
 
 ### Added

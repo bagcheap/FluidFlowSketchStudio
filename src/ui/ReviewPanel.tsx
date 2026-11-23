@@ -10,6 +10,7 @@ import * as cmd from '../store/commands';
 import { AI_MODELS } from '../ai/describe';
 import { estimateCost, type AiReview, type FindingSeverity } from '../ai/review';
 import { money } from './dialogs/AiReviewDialog';
+import { useRememberedSize } from './panelSize';
 
 const ICON: Record<LintSeverity, JSX.Element> = {
   error: <XCircle size={15} aria-hidden />,
@@ -45,10 +46,11 @@ function ReviewBody() {
   const summary = shown.length
     ? (['error', 'warning', 'info'] as const).filter((s) => count(s)).map((s) => `${count(s)} ${WORD[s].toLowerCase()}${count(s) === 1 ? '' : 's'}`).join(' · ')
     : 'No problems found';
+  const size = useRememberedSize('review');
   const current = (i: LintIssue) => i.ids.length === selection.length && i.ids.every((id) => selection.includes(id));
   return (
-    <section className="review-panel no-canvas" aria-label="Review">
-      <header>
+    <section className="review-panel no-canvas" aria-label="Review" ref={size.ref}>
+      <header title="Drag the bottom-right corner to resize this panel; double-click here for its usual size" onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) size.reset(); }}>
         <strong>Review</strong>
         <span className="review-sum" aria-live="polite">{summary}</span>
         <button className="icon-btn sm" aria-label="Close review" title="Close" onClick={() => cmd.toggleReview(false)}><X size={14} /></button>
@@ -118,6 +120,7 @@ function AiReviewView({ r }: { r: AiReview }) {
               <span className="review-icon" aria-label={AI_WORD[f.severity]}>{AI_ICON[f.severity]}</span>
               <span><b>{f.title}</b> <span className="ai-cat">{f.category}</span>{f.explanation && <span className="ai-expl">{f.explanation}</span>}{f.suggestion && <span className="ai-sugg">Suggested: {f.suggestion}</span>}</span>
             </button>
+            <div className="review-actions"><button className="btn small" title="Open Edit with Claude with this finding as the request" onClick={() => cmd.openAgent(cmd.fixFindingRequest(f))}>Fix with Claude…</button></div>
           </li>
         ))}
       </ul>}
