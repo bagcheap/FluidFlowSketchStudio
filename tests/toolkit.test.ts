@@ -22,7 +22,7 @@ describe('diagram tool kit', () => {
     const defs = toolDefinitions();
     expect(new Set(defs.map((d) => d.name)).size).toBe(DIAGRAM_TOOLS.length);
     for (const d of defs) {
-      expect(d.strict).toBe(true);
+      expect(Boolean(d.strict)).toBe(Object.keys((d.input_schema as { properties: object }).properties).length > 0); // tools with input are strict
       expect(d.input_schema).toMatchObject({ type: 'object', additionalProperties: false });
       expect((d.input_schema as { required: string[] }).required.sort()).toEqual(Object.keys((d.input_schema as { properties: object }).properties).sort());
     }

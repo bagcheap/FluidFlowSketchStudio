@@ -55,6 +55,11 @@ export const FINISH_TOOL = {
   },
 };
 
+/** Every tool the agent is given: the diagram tools (snapshot only when pictures are allowed) and `finish`. */
+export function agentTools(pictures: boolean) {
+  return [...toolDefinitions(['read', 'change', 'check']).filter((t) => pictures || t.name !== 'snapshot'), FINISH_TOOL];
+}
+
 export type Confidence = 'high' | 'medium' | 'low';
 export type StopReason = 'finished' | 'replied' | 'steps' | 'spend' | 'cancelled';
 
@@ -168,7 +173,7 @@ export async function runAgent(state: AgentState, userText: string, opts: AgentO
   const maxSteps = Math.max(1, Math.min(MAX_TURNS, Math.round(opts.maxSteps ?? DEFAULT_STEPS)));
   const maxSpend = opts.maxSpend === undefined ? DEFAULT_SPEND : opts.maxSpend;
   const client = new Sdk({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 1, timeout: 300_000, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
-  const tools = [...toolDefinitions(['read', 'change', 'check']).filter((t) => opts.pictures || t.name !== 'snapshot'), FINISH_TOOL];
+  const tools = agentTools(opts.pictures);
   state.messages.push({ role: 'user', content: `${userText}\n\n(You have at most ${maxSteps} step${maxSteps === 1 ? '' : 's'} for this. End with finish.)` });
   state.reply = ''; state.confidence = null; state.remaining = []; state.stop = null; state.steps = 0;
   const startUsage = { ...state.usage };

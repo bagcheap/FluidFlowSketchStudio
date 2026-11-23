@@ -47,7 +47,9 @@ describe('AI agent', () => {
     expect(events).toEqual(['add_shape:true', 'connect:true', 'lint:true']);
     expect(calls).toHaveLength(3);
     // strict tools, no snapshot without pictures; cached system prompt; one moving cache breakpoint
-    expect(calls[0].tools.every((t) => t.strict)).toBe(true);
+    expect(calls[0].tools.filter((t) => t.strict).map((t) => t.name)).toContain('add_shape');
+    expect(calls[0].tools.find((t) => t.name === 'finish')?.strict).toBe(true);
+    expect(calls[0].tools.filter((t) => t.strict).length).toBeLessThanOrEqual(20);
     expect(calls[0].tools.some((t) => t.name === 'snapshot')).toBe(false);
     expect((calls[0].system as { cache_control?: unknown }[])[0].cache_control).toEqual({ type: 'ephemeral' });
     const second = calls[1].messages;

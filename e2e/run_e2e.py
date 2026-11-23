@@ -1581,7 +1581,9 @@ def main():
                 panel.get_by_test_id('agent-run').click()
                 panel.get_by_test_id('agent-reply').wait_for(timeout=10000)
                 assert len(sent) == 3, len(sent)
-                assert all(t.get('strict') for t in sent[0]['tools']) and not any(t['name'] == 'snapshot' for t in sent[0]['tools'])
+                strict = [t['name'] for t in sent[0]['tools'] if t.get('strict')]
+                assert 'add_shape' in strict and 'connect' in strict and len(strict) <= 20, strict  # the API allows at most 20 strict tools
+                assert not any(t['name'] == 'snapshot' for t in sent[0]['tools'])
                 first = sent[0]['messages'][0]['content']
                 assert '## Request\nAdd a cache below the API' in (first if isinstance(first, str) else first[0]['text']), first
                 results = sent[1]['messages'][2]['content']

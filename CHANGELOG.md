@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Fixed
 - Menus showed two highlighted rows while you moved the mouse: the first row stayed highlighted along with the one under the pointer. Now only the row under the pointer (or the one chosen with the arrow keys) is highlighted, in the menu bar and the right-click menu; an item whose submenu is open stays marked.
 - **Edit with Claude** and **Fix with Claude** failed straight away with an "Invalid schema" error from Anthropic: some of the step descriptions sent to Claude (for example where to place a new shape) were written in a form the API doesn't accept. Fixed, with a check that keeps every AI tool description in the accepted form. API errors now read as a plain sentence instead of raw JSON.
+- **Edit with Claude** then failed with "Too many strict tools (22)": Anthropic accepts at most 20 strictly checked tools per request. Tools that take no input are now sent without strict checking (it adds nothing for them), so a request uses 15. A check now keeps every AI request within all of Anthropic's limits for these tools.
 
 ## [0.1.55] - 2026-11-23
 
