@@ -51,7 +51,7 @@ export function describePage(doc: FlowDocument, prev?: PageView): PageView {
       items.push({ ...base, arrow: true, from: e.start.elementId ? back.get(e.start.elementId) ?? null : null, to: e.end.elementId ? back.get(e.end.elementId) ?? null : null,
         label: e.text.slice(0, 200), dashed: e.style.strokeStyle !== 'solid', heads: e.startHead !== 'none' && e.endHead !== 'none' ? 'both' : e.endHead !== 'none' ? 'end' : e.startHead !== 'none' ? 'start' : 'none', color: shortColor(e.style.stroke) });
     } else if (e.type === 'container') {
-      items.push({ ...base, container: true, title: e.text.slice(0, 200), x: r(e.x), y: r(e.y), w: r(e.w), h: r(e.h) });
+      items.push({ ...base, container: true, title: e.text.slice(0, 200), x: r(e.x), y: r(e.y), w: r(e.w), h: r(e.h), fill: shortColor(e.style.fill), line: shortColor(e.style.stroke) });
     } else if (e.type === 'freehand') {
       items.push({ ...base, kind: 'drawing', x: r(e.x), y: r(e.y), w: r(e.w), h: r(e.h) });
     } else {
@@ -251,7 +251,10 @@ const SIDE: Record<Placement, Side> = { right: 'e', left: 'w', above: 'n', below
  * Apply checked operations to the document, in order. Locked items are left alone. Returns the new document, the
  * ids of what was added or changed (to select), and how many operations could not be applied.
  */
-export function applyEdits(doc: FlowDocument, view: PageView, ops: EditOp[], tools: EditTools): { doc: FlowDocument; touched: string[]; skipped: number } {
+/** Look of a removed container, by title (lower case): one added again with the same title gets it back. */
+export type RemovedLooks = Map<string, Pick<DiagramElement, 'style' | 'textStyle'>>;
+
+export function applyEdits(doc: FlowDocument, view: PageView, ops: EditOp[], tools: EditTools, removedLooks: RemovedLooks = new Map()): { doc: FlowDocument; touched: string[]; skipped: number } {
   const real = new Map(view.ids); // short id → element id (added items join as they are created)
   let d = doc;
   let skipped = 0;
@@ -294,7 +297,10 @@ export function applyEdits(doc: FlowDocument, view: PageView, ops: EditOp[], too
         const e = get(o.id);
         if (!e || e.locked) { skipped++; break; }
         const ids = new Set([e.id]);
-        if (e.type === 'container') for (const m of collectMembers(d, e)) ids.add(m);
+        if (e.type === 'container') {
+          for (const m of collectMembers(d, e)) ids.add(m);
+          if (e.text.trim()) removedLooks.set(e.text.trim().toLowerCase(), { style: e.style, textStyle: e.textStyle });
+        }
         // arrows attached to anything removed go too
         for (const c of d.elements) if (c.type === 'connector' && ((c.start.elementId && ids.has(c.start.elementId)) || (c.end.elementId && ids.has(c.end.elementId)))) ids.add(c.id);
         d = deleteElements(d, ids);
@@ -340,6 +346,9 @@ export function applyEdits(doc: FlowDocument, view: PageView, ops: EditOp[], too
         const r = members.length ? wrapInContainer(d, members, tools.container, o.title) : null;
         if (!r) { skipped++; break; }
         d = r.doc; real.set(o.ref, r.id); touched.add(r.id);
+        // a container removed and added again (for example to regroup its contents) keeps its colours
+        const look = removedLooks.get(o.title.trim().toLowerCase());
+        if (look) d = { ...d, elements: d.elements.map((x) => (x.id === r.id ? { ...x, style: { ...look.style }, textStyle: { ...look.textStyle } } : x)) };
         break;
       }
       case 'move_into': {

@@ -1767,6 +1767,14 @@ def main():
                 cy = [round(e['y'] + e['h'] / 2) for e in app.els('shape')]
                 assert len(set(cy)) == 1, cy
                 assert app.js('() => window.__flowsketch.history()')['past'] == h1 + 1
+                # Arrange ▸ Spread out: more room between everything, sizes kept, one undo step
+                xs0 = sorted(e['x'] for e in app.els('shape'))
+                page.get_by_role('menuitem', name='Arrange').click()
+                page.get_by_role('menuitem', name='Spread out').click(); page.wait_for_timeout(120)
+                xs1 = sorted(e['x'] for e in app.els('shape'))
+                assert xs1[2] - xs1[0] > (xs0[2] - xs0[0]) * 1.2, (xs0, xs1)
+                assert all(e['w'] == 100 for e in app.els('shape'))
+                assert app.js('() => window.__flowsketch.history()')['past'] == h1 + 2
             finally:
                 page.unroute('https://api.anthropic.com/**')
                 for name in ('Improve the look', 'Edit with Claude'):

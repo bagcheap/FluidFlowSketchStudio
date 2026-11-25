@@ -17,7 +17,7 @@ describe('layout score', () => {
   it('a tidy page scores 100', () => {
     const a = box(0, 0, 'A'), b = box(300, 0, 'B'), c = box(600, 0, 'C');
     const s = layoutScore(doc(a, b, c, arrow(a, b), arrow(b, c)));
-    expect(s).toEqual({ score: 100, crossings: 0, overlaps: 0, throughShapes: 0, labelClashes: 0, misaligned: 0, outside: 0, cramped: 0 });
+    expect(s).toEqual({ score: 100, crossings: 0, overlaps: 0, throughShapes: 0, labelClashes: 0, misaligned: 0, outside: 0, cramped: 0, longLabels: 0 });
     expect(scoreLine(s)).toBe('100/100');
   });
 

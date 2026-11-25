@@ -5,8 +5,8 @@ import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { itemName, type LintIssue } from '../lint/lint';
 import { separateBoxes } from '../layout/separate';
-import { alignBoxes, canMatchSize, distributeBoxes, matchSizes, type AlignKind, type MatchSizeMode } from '../layout/arrange';
-import type { ToolContext, ToolSession } from '../ai/toolkit';
+import { alignBoxes, canMatchSize, distributeBoxes, matchSizes, spreadOut, type AlignKind, type MatchSizeMode } from '../layout/arrange';
+import { CALLOUT_TEXT, type ToolContext, type ToolSession } from '../ai/toolkit';
 import { answeredOf, cleanStoredReview, MAX_ANSWER, reviewToMarkdown, type AiReview } from '../ai/review';
 import { diffPage } from '../ai/diff';
 import { AI_MODELS, MAX_PROMPT_CHARS } from '../ai/describe';
@@ -584,6 +584,18 @@ export function routeArrows() {
   D().commit(() => placeLabels(r.doc, ids).doc); // labels move to clear spots beside their new routes
   const skipped = ids.length - r.routed;
   U().toast(`Routed ${r.routed} arrow${r.routed === 1 ? '' : 's'} around shapes${skipped ? ` (${skipped} left as they were: not between two shapes, locked or no way through)` : ''}. Reset route on an arrow undoes its route.`);
+}
+
+/** Arrange ▸ Spread out: push everything apart by 25 % (crowded pages), re-route the elbow arrows and tidy the labels. One undo step. */
+export function spreadOutPage(factor = 1.25) {
+  const doc = D().doc;
+  if (!doc.elements.some((e) => e.type !== 'connector')) return;
+  let d = spreadOut(doc, factor);
+  const elbows = d.elements.filter((e) => e.type === 'connector' && e.routing === 'elbow' && !e.locked).map((e) => e.id);
+  if (elbows.length) d = routeArrowsAround(d, elbows).doc;
+  d = placeLabels(d, []).doc;
+  D().commit(() => d);
+  U().toast('Spread out: everything has 25 % more room. Undo takes it back.', 'success');
 }
 
 /** Arrange ▸ Tidy arrow labels: move the labels of the selected arrows (or all) beside their arrows, clear of shapes, other labels and lines. */
@@ -1284,6 +1296,12 @@ export function toolContext(): ToolContext {
   return {
     styles: { shape: (k) => u.toolStyle(styleKey('shape', k)), arrow: u.toolStyle('arrow'), container: u.toolStyle('container'), fit: fitShapeToText },
     snapshot: pageSnapshot,
+    // callout text boxes: the text tool's font, small and grey, measured with the real font
+    callout: (() => {
+      const base = u.toolStyle('text').textStyle;
+      const text = { ...CALLOUT_TEXT, fontFamily: base.fontFamily };
+      return { text, measure: (s: string, w: number) => { const l = layoutText(s, text, w - 2 * text.padding); return { w: Math.ceil(Math.min(w, l.width + 2 * text.padding + 2)), h: Math.ceil(l.height + 2 * text.padding) }; } };
+    })(),
   };
 }
 

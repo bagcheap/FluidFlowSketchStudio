@@ -19,7 +19,10 @@ import { applyThemeToDoc, THEMES } from '../store/themes';
 import { alignBoxes, distributeBoxes, matchSizes, moveBoxes, movableBoxes } from '../layout/arrange';
 import { layoutScore } from '../lint/score';
 import { placeLabels } from '../layout/labels';
-import { applyEdits, cleanText, describePage, EDIT_SCHEMA, parseEdits, type EditTools, type PageView } from './edits';
+import { applyEdits, cleanText, describePage, EDIT_SCHEMA, parseEdits, type EditTools, type PageView, type RemovedLooks } from './edits';
+import { labelToCallout } from '../layout/labels';
+import { spreadOut, SPREAD_MAX } from '../layout/arrange';
+import type { TextStyle } from '../model/types';
 
 export type ToolKind = 'read' | 'change' | 'check';
 export interface ToolImage { mediaType: 'image/png'; data: string } // base64
@@ -28,6 +31,8 @@ export interface ToolContext {
   styles: EditTools; // the tools' default styles for new items
   /** A PNG of the page (the editor provides it; absent in tests and where pictures can't be made). */
   snapshot?: (doc: FlowDocument) => Promise<ToolImage | null>;
+  /** Style and measuring for callout text boxes (the editor measures with the real font; tests use an estimate). */
+  callout?: { text: TextStyle; measure: (s: string, w: number) => { w: number; h: number } };
 }
 export interface ToolSession {
   doc: FlowDocument; // the draft
@@ -37,6 +42,7 @@ export interface ToolSession {
   calls: number;
   changes: number; // change-tool calls that changed something
   log: { tool: string; ok: boolean; summary: string }[];
+  removedLooks: RemovedLooks; // containers removed in this session, by title: re-adding one keeps its colours
 }
 export interface DiagramTool {
   name: string;
@@ -56,6 +62,16 @@ function layoutChange(s: ToolSession, raw: unknown, min: number, change: (ids: s
   return ok({ done: true, items: ids.length });
 }
 
+/** Callout text: small, left-aligned, grey (the editor may pass its own). */
+export const CALLOUT_TEXT: TextStyle = { fontFamily: 'hand', fontSize: 13, bold: false, italic: false, color: '#495057', align: 'left', vAlign: 'top', padding: 4, lineHeight: 1.25 };
+/** A rough text size without a canvas (tests): ~0.55 em per character, wrapped at w. */
+export function estimateText(s: string, w: number): { w: number; h: number } {
+  const per = CALLOUT_TEXT.fontSize * 0.55, perLine = Math.max(8, Math.floor((w - 8) / per));
+  const lines = s.split('\n').reduce((n, p) => n + Math.max(1, Math.ceil(p.length / perLine)), 0);
+  const longest = Math.min(w, Math.max(...s.split('\n').map((p) => p.length)) * per + 8);
+  return { w: Math.ceil(longest), h: Math.ceil(lines * CALLOUT_TEXT.fontSize * CALLOUT_TEXT.lineHeight + 8) };
+}
+
 /** The largest single move (px). */
 export const MAX_MOVE = 5000;
 
@@ -64,7 +80,7 @@ export const MAX_TOOL_CALLS = 80;
 export const MAX_RESULT_CHARS = 60_000;
 
 export function startSession(doc: FlowDocument, ctx: ToolContext): ToolSession {
-  return { doc, original: doc, view: describePage(doc), ctx, calls: 0, changes: 0, log: [] };
+  return { doc, original: doc, view: describePage(doc), ctx, calls: 0, changes: 0, log: [], removedLooks: new Map() };
 }
 
 // ---- helpers --------------------------------------------------------------------------------------------------------
@@ -94,7 +110,7 @@ function edit(s: ToolSession, op: Record<string, unknown>): ToolResult {
   const parsed = parseEdits({ ops: [op] }, known(s));
   if (!parsed.ops.length) return fail('That change is not valid: check the ids (they must be on the page) and the values.');
   const before = new Set(s.doc.elements.map((e) => e.id));
-  const r = applyEdits(s.doc, s.view, parsed.ops, s.ctx.styles);
+  const r = applyEdits(s.doc, s.view, parsed.ops, s.ctx.styles, s.removedLooks);
   if (r.skipped) return fail('That change could not be made (an item is locked or gone).');
   commitDraft(s, r.doc);
   const added = r.doc.elements.filter((e) => !before.has(e.id)).map((e) => e.id);
@@ -248,6 +264,26 @@ export const DIAGRAM_TOOLS: DiagramTool[] = [
       if (!r.moved) return ok({ done: true, moved: 0 });
       commitDraft(s, r.doc);
       return ok({ done: true, moved: r.moved });
+    } },
+  { name: 'spread_out', kind: 'change', input_schema: obj({ factor: { type: 'number' } }),
+    description: `Push everything on the page apart by a factor (1.2 = 20 % more room … ${SPREAD_MAX}), around the middle, for crowded pages. Sizes stay the same; containers grow round their contents and keep their colours; groups move together. Elbow arrows are redrawn: call route_arrows (all) afterwards, then place_labels.`,
+    run: (s, i) => {
+      const f = Number(i.factor);
+      if (!Number.isFinite(f) || f <= 1 || f > SPREAD_MAX) return fail(`factor must be a number above 1 and at most ${SPREAD_MAX}.`);
+      commitDraft(s, spreadOut(s.doc, f));
+      return ok({ done: true });
+    } },
+  { name: 'label_to_callout', kind: 'change', input_schema: obj({ id: { type: 'string' }, short_label: { type: 'string' } }),
+    description: 'Shorten a long arrow label: the arrow keeps short_label (its step number is kept at the front automatically, so the play order doesn’t change; give it 2–5 essential words) and the whole original label moves to a callout text box placed in free space near the arrow, starting with the same step number. Returns the callout’s id.',
+    run: (s, i) => {
+      const id = realOf(s, i.id);
+      if (!id) return fail('Unknown arrow id.');
+      const short = cleanText(i.short_label, 120);
+      const co = s.ctx.callout ?? { text: { ...CALLOUT_TEXT }, measure: estimateText };
+      const r = labelToCallout(s.doc, id, short, co.text, co.measure);
+      if (!r) return fail('That isn’t an unlocked arrow with a label.');
+      commitDraft(s, r.doc);
+      return ok({ done: true, callout: shortOf(s, r.calloutId), label: (r.doc.elements.find((e) => e.id === id)?.text ?? '') });
     } },
   { name: 'layout_score', kind: 'check', input_schema: NONE,
     description: 'How tidy the page looks, 0–100 (higher is better), worked out by the editor: counts of arrow crossings, overlapping shapes, arrows through shapes, labels in the way, items outside their container, near-miss alignments and cramped pairs. Use it before and after layout changes; keep a change only if the score went up.',
