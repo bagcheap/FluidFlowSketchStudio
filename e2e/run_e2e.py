@@ -1617,7 +1617,7 @@ def main():
                 panel.get_by_test_id('agent-reply').wait_for(timeout=10000)
                 assert len(sent) == 3, len(sent)
                 strict = [t['name'] for t in sent[0]['tools'] if t.get('strict')]
-                assert 'add_shape' in strict and 'connect' in strict and len(strict) <= 20, strict  # the API allows at most 20 strict tools
+                assert strict == ['finish'], strict  # only finish: many strict tools compile to a grammar the API rejects
                 assert not any(t['name'] == 'snapshot' for t in sent[0]['tools'])
                 first = sent[0]['messages'][0]['content']
                 assert '## Request\nAdd a cache below the API' in (first if isinstance(first, str) else first[0]['text']), first
@@ -1725,7 +1725,7 @@ def main():
                 assert 'This run is about the LOOK of the page' in sent[0]['system'][0]['text']
                 names = [t['name'] for t in sent[0]['tools']]
                 assert all(n in names for n in ('align', 'distribute', 'match_size', 'move', 'layout_score')), names
-                assert sum(1 for t in sent[0]['tools'] if t.get('strict')) <= 20
+                assert [t['name'] for t in sent[0]['tools'] if t.get('strict')] == ['finish']
                 assert '## Layout score now' in json.dumps(sent[0]['messages'][0])
                 res = sent[1]['messages'][2]['content'][0]
                 assert res['tool_use_id'] == 't1' and json.loads(res['content'][0]['text'])['score'] > 0, res

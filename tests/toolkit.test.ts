@@ -18,11 +18,11 @@ function sample() {
 const json = (r: { content: string }) => JSON.parse(r.content);
 
 describe('diagram tool kit', () => {
-  it('offers strict tool definitions with unique names, by kind', () => {
+  it('offers tool definitions with unique names, by kind', () => {
     const defs = toolDefinitions();
     expect(new Set(defs.map((d) => d.name)).size).toBe(DIAGRAM_TOOLS.length);
     for (const d of defs) {
-      expect(Boolean(d.strict)).toBe(Object.keys((d.input_schema as { properties: object }).properties).length > 0); // tools with input are strict
+      expect((d as { strict?: boolean }).strict).toBeUndefined(); // checked by FlowSketch instead (see toolDefinitions)
       expect(d.input_schema).toMatchObject({ type: 'object', additionalProperties: false });
       expect((d.input_schema as { required: string[] }).required.sort()).toEqual(Object.keys((d.input_schema as { properties: object }).properties).sort());
     }

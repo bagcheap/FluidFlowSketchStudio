@@ -12,6 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **Before / after:** while a draft is shown, **Show before** switches the canvas to your diagram as it was, and back.
 - Edit with Claude can now also line shapes up, even out gaps, match sizes and move shapes.
 
+### Fixed
+- **Edit with Claude** and **Improve the look** could fail at once with "The compiled grammar is too large": the diagram tools are no longer sent in Anthropic's strictly checked form (FlowSketch already checks every change Claude asks for before it touches the draft).
+
 ## [0.1.57] - 2026-11-23
 
 ### Added

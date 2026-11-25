@@ -265,8 +265,10 @@ const BY_NAME = new Map(DIAGRAM_TOOLS.map((t) => [t.name, t]));
  */
 export function toolDefinitions(kinds: ToolKind[] = ['read', 'change', 'check']) {
   return DIAGRAM_TOOLS.filter((t) => kinds.includes(t.kind)).map((t) => {
-    const takesInput = Object.keys((t.input_schema as { properties?: object }).properties ?? {}).length > 0;
-    return { name: t.name, description: t.description, input_schema: t.input_schema, ...(takesInput ? { strict: true as const } : {}) };
+    // Not strict: the API compiles every strict schema in a request into one grammar, and ~20 diagram tools (two with
+    // the full shape list) made it "too large". Every input is checked here anyway (parseEdits / runTool) and a bad
+    // one comes back to Claude as an error, so strict adds little. Only `finish` (agent.ts) stays strict.
+    return { name: t.name, description: t.description, input_schema: t.input_schema };
   });
 }
 
