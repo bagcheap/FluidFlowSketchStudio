@@ -7,7 +7,7 @@ import { itemName, type LintIssue } from '../lint/lint';
 import { separateBoxes } from '../layout/separate';
 import { alignBoxes, canMatchSize, distributeBoxes, matchSizes, type AlignKind, type MatchSizeMode } from '../layout/arrange';
 import type { ToolContext, ToolSession } from '../ai/toolkit';
-import { cleanStoredReview, reviewToMarkdown, type AiReview } from '../ai/review';
+import { answeredOf, cleanStoredReview, MAX_ANSWER, reviewToMarkdown, type AiReview } from '../ai/review';
 import { diffPage } from '../ai/diff';
 import { AI_MODELS, MAX_PROMPT_CHARS } from '../ai/describe';
 import { pageSnapshot } from '../export/staticExport';
@@ -1305,8 +1305,11 @@ export function setBrief(b: DiagramBrief) {
   D().commit((d) => { const { brief: _old, ...rest } = d; void _old; return next ? { ...rest, brief: next } : rest; }, 'brief');
 }
 
+let answerTimer = 0; // saves answers a moment after typing stops
+
 /** Show a finished review by Claude in the Review panel. */
 export function showAiReview(r: AiReview) {
+  window.clearTimeout(answerTimer); // answers typed for the old review were sent with this one
   U().setAiReview(r);
   U().setReview(true);
   keepReview(r);
@@ -1323,14 +1326,28 @@ export function hasLastReview(): boolean {
   return (!!r && r.docId === d.id && r.pageId === d.activePage) || hasSavedReview(d.id, d.activePage);
 }
 
+/** Claude's last review of this page: the one shown this session, else the saved one (checked again), else null. */
+export async function lastReviewForPage(): Promise<AiReview | null> {
+  const d = D().doc, cur = U().aiReview;
+  if (cur && cur.docId === d.id && cur.pageId === d.activePage) return cur;
+  try { return cleanStoredReview(await loadReview(d.id, d.activePage), d.id, d.activePage, new Set(d.elements.map((e) => e.id))); } catch { return null; }
+}
+
+/** Your answer to one of Claude's questions: kept with the review (saved a moment after typing stops). */
+export function answerQuestion(i: number, text: string) {
+  const r = U().aiReview;
+  if (!r || i < 0 || i >= r.questions.length) return;
+  const answers = r.questions.map((_, k) => (k === i ? text.slice(0, MAX_ANSWER) : r.answers?.[k] ?? ''));
+  const next = { ...r, answers };
+  U().setAiReview(next);
+  window.clearTimeout(answerTimer);
+  // save what is current then (never an older review over a newer one: a new review may have arrived meanwhile)
+  answerTimer = window.setTimeout(() => { const cur = U().aiReview; if (cur && cur.docId === next.docId && cur.pageId === next.pageId && cur.at === next.at) keepReview(cur); }, 400);
+}
+
 /** AI ▸ Review this page ▸ Show last review: bring back Claude's last review of this page, with what was fixed. */
 export async function showLastReview(): Promise<void> {
-  const d = D().doc, cur = U().aiReview;
-  let r = cur && cur.docId === d.id && cur.pageId === d.activePage ? cur : null;
-  if (!r) {
-    const onPage = new Set(d.elements.map((e) => e.id));
-    try { r = cleanStoredReview(await loadReview(d.id, d.activePage), d.id, d.activePage, onPage); } catch { r = null; }
-  }
+  const r = await lastReviewForPage();
   if (!r) { U().toast('There is no review of this page yet. Use AI ▸ Review this page ▸ Run review…', 'info'); return; }
   if (U().agentOpen) closeAgent();
   U().setAiReview(r);
@@ -1456,7 +1473,10 @@ export function fixFindingRequest(f: FindingLike): string {
 
 /** A request for the agent that fixes one or several of Claude's review findings together (capped to fit the box). */
 export function fixFindingsRequest(fs: FindingLike[]): string {
-  if (fs.length === 1) return fixFindingRequest(fs[0]);
-  const text = [`Fix these ${fs.length} problems found in a review. Deal with each one; they may affect each other.`, ...fs.map((f, i) => `${i + 1}. ${findingText(f)}`)].join('\n\n');
-  return text.slice(0, MAX_PROMPT_CHARS);
+  const base = fs.length === 1 ? fixFindingRequest(fs[0])
+    : [`Fix these ${fs.length} problems found in a review. Deal with each one; they may affect each other.`, ...fs.map((f, i) => `${i + 1}. ${findingText(f)}`)].join('\n\n');
+  // the author's answers to the review's questions say what they intend: Claude should follow them
+  const qa = answeredOf(U().aiReview);
+  const extra = qa.length ? `\n\nThe author answered the review's questions:\n${qa.map((x) => `- Q: ${x.q}\n  A: ${x.a}`).join('\n')}` : '';
+  return (base + extra).slice(0, MAX_PROMPT_CHARS);
 }

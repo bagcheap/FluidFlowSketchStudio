@@ -1544,6 +1544,30 @@ def main():
                 assert page.get_by_role('radiogroup', name='Effort').get_by_role('radio', name='Medium').get_attribute('aria-checked') == 'true'
                 assert 'brief' not in app.doc()
                 page.locator('.modal .modal-x').click(); page.wait_for_timeout(60)  # the ✕ closes it (the brief was already saved as typed)
+                # the panel moves by its title bar, and comes back to the same place when opened again
+                rp = page.get_by_role('region', name='Review', exact=True)
+                b0 = rp.bounding_box()
+                page.mouse.move(b0['x'] + 40, b0['y'] + 16); page.mouse.down(); page.mouse.move(b0['x'] + 340, b0['y'] + 96, steps=6); page.mouse.up(); page.wait_for_timeout(60)
+                b1 = rp.bounding_box()
+                assert abs(b1['x'] - b0['x'] - 300) < 3 and abs(b1['y'] - b0['y'] - 80) < 3, (b0, b1)
+                page.get_by_role('button', name='Close review').click(); page.wait_for_timeout(60)
+                page.get_by_role('menuitem', name='View').click(); page.get_by_role('menuitemcheckbox', name='Review diagram').click(); page.wait_for_timeout(80)
+                b2 = rp.bounding_box()
+                assert abs(b2['x'] - b1['x']) < 2 and abs(b2['y'] - b1['y']) < 2, (b1, b2)
+                rp.locator('header').dblclick(position={'x': 30, 'y': 12}); page.wait_for_timeout(60)
+                assert abs(rp.bounding_box()['x'] - b0['x']) < 2, 'double-click puts it back'
+                # Claude's review and the automatic checks are told apart
+                assert rp.get_by_role('region', name='Automatic checks').is_visible() and 'no AI' in rp.get_by_role('region', name='Automatic checks').inner_text()
+                assert 'It doesn’t change as you edit' in panel.inner_text()
+                # answer Claude's question: kept with the review and sent with the next one
+                panel.get_by_label('Your answer: Is there a backend for the frontend?').fill('Yes, a BFF holds the tokens.')
+                panel.get_by_test_id('review-with-answers').click()
+                assert 'Your answers to 1 question from the last review go with this one' in page.get_by_test_id('ai-review-answers').inner_text()
+                n = len(sent)
+                page.get_by_test_id('ai-review').click()
+                page.wait_for_function('() => !document.querySelector(".modal")', timeout=10000)
+                assert len(sent) == n + 1
+                assert 'Q: Is there a backend for the frontend?\nA: Yes, a BFF holds the tokens.' in sent[-1]['messages'][0]['content'][0]['text']
                 # close Claude's review, then bring it back, with what was fixed, from the panel and from the AI menu
                 panel.get_by_role('button', name='Mark as fixed: No token refresh').click(); page.wait_for_timeout(60)
                 panel.get_by_role('button', name='Close Claude’s review').click(); page.wait_for_timeout(60)

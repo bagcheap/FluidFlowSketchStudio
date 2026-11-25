@@ -2,13 +2,13 @@
 // selects its items and brings them into view; issues with a one-click remedy show a button for it; any issue can be
 // hidden for the session.
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Check, CheckCircle2, EyeOff, FileDown, Info, Lightbulb, Sparkles, Undo2, X, XCircle } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, EyeOff, FileDown, Info, Lightbulb, ListChecks, RefreshCw, Sparkles, Undo2, X, XCircle } from 'lucide-react';
 import { useDoc } from '../store/docStore';
 import { useUI } from '../store/uiStore';
 import { lintPage, type LintIssue, type LintSeverity } from '../lint/lint';
 import * as cmd from '../store/commands';
 import { AI_MODELS } from '../ai/describe';
-import { estimateCost, type AiReview, type FindingSeverity } from '../ai/review';
+import { answeredOf, estimateCost, MAX_ANSWER, type AiReview, type FindingSeverity } from '../ai/review';
 import { money } from './dialogs/AiReviewDialog';
 import { useRememberedSize } from './panelSize';
 
@@ -49,17 +49,25 @@ function ReviewBody() {
   const size = useRememberedSize('review');
   const doc = useDoc((s) => s.doc);
   const aiReview = useUI((s) => s.aiReview);
-  const lastHidden = !(aiReview && aiReview.docId === doc.id && aiReview.pageId === doc.activePage) && cmd.hasLastReview();
+  const aiShown = !!aiReview && aiReview.docId === doc.id && aiReview.pageId === doc.activePage;
+  const lastHidden = !aiShown && cmd.hasLastReview();
   const current = (i: LintIssue) => i.ids.length === selection.length && i.ids.every((id) => selection.includes(id));
   return (
     <section className="review-panel no-canvas" aria-label="Review" ref={size.ref}>
-      <header title="Drag the bottom-right corner to resize this panel; double-click here for its usual size" onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) size.reset(); }}>
+      <header className="panel-bar" title="Drag here to move this panel, or its bottom-right corner to resize it; double-click here to put it back" onPointerDown={size.startMove} onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) size.reset(); }}>
         <strong>Review</strong>
-        <span className="review-sum" aria-live="polite">{summary}</span>
+        <span className="review-sum">{aiShown ? 'Claude’s review and automatic checks' : 'Automatic checks'}</span>
         <button className="icon-btn sm" aria-label="Close review" title="Close" onClick={() => cmd.toggleReview(false)}><X size={14} /></button>
       </header>
       <div className="review-scroll">
       <AiSection />
+      <section className="lint-section" aria-label="Automatic checks">
+      <div className="lint-head">
+        <ListChecks size={14} aria-hidden />
+        <strong>Automatic checks</strong>
+        <span className="review-sum" aria-live="polite" data-testid="lint-summary">{summary}</span>
+      </div>
+      <p className="note lint-note">Worked out on your computer, no AI. They update by themselves as you edit.</p>
       {shown.length ? (
         <ul className="review-list">
           {shown.map((i) => (
@@ -78,12 +86,12 @@ function ReviewBody() {
       ) : (
         <p className="review-empty"><CheckCircle2 size={16} aria-hidden /> Nothing to fix on this page.</p>
       )}
+      </section>
       </div>
       <footer>
-        <span>Checks above update as you edit, on your computer.</span>
-        {hiddenHere > 0 && <button className="link-btn" onClick={cmd.showHiddenIssues}>Show {hiddenHere} hidden</button>}
+        {hiddenHere > 0 && <button className="link-btn" onClick={cmd.showHiddenIssues}>Show {hiddenHere} hidden check{hiddenHere === 1 ? '' : 's'}</button>}
         {lastHidden && <button className="link-btn" data-testid="show-last-review" onClick={() => void cmd.showLastReview()}>Show Claude’s last review</button>}
-        <button className="link-btn" onClick={() => useUI.getState().openDialog('aiReview')}>Review with Claude…</button>
+        {!aiShown && <button className="link-btn" title="Claude checks the page against your brief and what it knows (needs your API key; costs a few cents)" onClick={() => useUI.getState().openDialog('aiReview')}>Ask Claude to review this page…</button>}
       </footer>
     </section>
   );
@@ -119,9 +127,11 @@ function AiReviewView({ r }: { r: AiReview }) {
         <Sparkles size={14} aria-hidden />
         <strong>Claude’s review</strong>
         <span className={`ai-verdict ${r.verdict.replace(' ', '-')}`}>{r.verdict}</span>
+        <button className="icon-btn sm" aria-label="Review again" title="Review again: check the page as it is now (your answers below go with it)" onClick={() => useUI.getState().openDialog('aiReview')}><RefreshCw size={13} /></button>
         <button className="icon-btn sm" aria-label="Save review notes" title="Save as notes (Markdown)…" onClick={() => void cmd.saveAiReview()}><FileDown size={13} /></button>
         <button className="icon-btn sm" aria-label="Close Claude’s review" title="Close (AI ▸ Review this page ▸ Show last review brings it back)" onClick={() => useUI.getState().setAiReview(null)}><X size={13} /></button>
       </div>
+      <p className="note ai-when">Made {today ? 'today at ' : ''}{time}. It doesn’t change as you edit: <button className="link-btn" onClick={() => useUI.getState().openDialog('aiReview')}>review again</button> to check the page as it is now.</p>
       {r.summary && <p className="ai-summary">{r.summary}</p>}
       {r.findings.length > 1 && <div className="ai-choose">
         <span>{fixed.size ? `${fixed.size} of ${r.findings.length} fixed` : `${r.findings.length} findings`}</span>
@@ -149,9 +159,16 @@ function AiReviewView({ r }: { r: AiReview }) {
           </li>
         ))}
       </ul>}
-      {r.questions.length > 0 && <div className="ai-questions"><b>Questions for you</b><ul>{r.questions.map((q, i) => <li key={i}>{q}</li>)}</ul></div>}
+      {r.questions.length > 0 && <div className="ai-questions"><b>Questions for you</b>
+        <p className="note">Answer here. Your answers are kept with this review and go with the next review and with Fix with Claude, so Claude takes them into account.</p>
+        <ol>{r.questions.map((q, i) => <li key={i}>
+          <span>{q}</span>
+          <textarea className="ai-answer" rows={2} maxLength={MAX_ANSWER} aria-label={`Your answer: ${q}`} placeholder="Your answer…" value={r.answers?.[i] ?? ''} onChange={(e) => cmd.answerQuestion(i, e.target.value)} />
+        </li>)}</ol>
+        {answeredOf(r).length > 0 && <button className="btn small" data-testid="review-with-answers" onClick={() => useUI.getState().openDialog('aiReview')}><RefreshCw size={12} /> Review again with my answers…</button>}
+      </div>}
       {r.sources.length > 0 && <div className="ai-sources"><b>Sources</b><ul>{r.sources.map((s) => <li key={s.url}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.title || new URL(s.url).host}</a></li>)}</ul></div>}
-      <p className="ai-meta">{model} · {r.effort === 'high' ? 'High' : 'Medium'} effort · {time} · {money(estimateCost(r.model, r.usage))}{r.usage.webSearches ? ` + ${r.usage.webSearches} web search${r.usage.webSearches === 1 ? '' : 'es'}` : ''}{r.dropped ? ` · ${r.dropped} unusable finding${r.dropped === 1 ? '' : 's'} left out` : ''}. Based on the page as it was then; checks may be wrong, so judge them yourself.</p>
+      <p className="ai-meta">{model} · {r.effort === 'high' ? 'High' : 'Medium'} effort · {time} · {money(estimateCost(r.model, r.usage))}{r.usage.webSearches ? ` + ${r.usage.webSearches} web search${r.usage.webSearches === 1 ? '' : 'es'}` : ''}{r.dropped ? ` · ${r.dropped} unusable finding${r.dropped === 1 ? '' : 's'} left out` : ''}. Claude can be wrong, so judge its findings yourself.</p>
     </section>
   );
 }

@@ -126,7 +126,7 @@ function AgentBody() {
 
   return (
     <section className="agent-panel no-canvas" aria-label={look ? 'Improve the look' : 'Edit with Claude'} ref={size.ref}>
-      <header title="Drag the bottom-right corner to resize this panel; double-click here for its usual size" onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) size.reset(); }}>
+      <header className="panel-bar" title="Drag here to move this panel, or its bottom-right corner to resize it; double-click here to put it back" onPointerDown={size.startMove} onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) size.reset(); }}>
         <Bot size={15} aria-hidden />
         <strong>{look ? 'Improve the look' : 'Edit with Claude'}</strong>
         <span className="agent-cost" data-testid="agent-cost">{s ? `${busy ? `step ${s.steps + 1} of ${opts.maxSteps} · ` : ''}${money(s.spent).replace('about ', '')}${opts.maxSpend === null ? '' : ` of ${money(opts.maxSpend).replace('about ', '')}`}` : ''}</span>

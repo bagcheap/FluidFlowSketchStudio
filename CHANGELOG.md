@@ -14,10 +14,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - **Tidy arrow labels** (Arrange menu and the canvas right-click menu): moves the labels of the selected arrows (or all) along and beside their arrows to spots where they don't cover shapes, other labels or other arrows, instead of sitting on top of lines. Route arrows around shapes now does this for the arrows it routes, and Claude can use it when improving the look.
 
+- **Answer Claude's questions:** each question in Claude's review now has an answer box. Your answers are kept with the review (also after closing the app), saved in the review notes, sent with the next review (**Review again with my answers…**) and with **Fix with Claude**, so Claude takes what you meant into account.
+- **Move the Review and Edit with Claude panels** by dragging their title bar; they stay where you put them. Double-click the title bar to put a panel back in its usual place and size.
+
 ### Changed
 - **Fewer crossing arrows:** Route arrows around shapes (and Claude's routing) now picks the sides arrows attach to so they cross each other as little as possible, avoids crossing the arrows it isn't moving, and swaps the order of arrows that share a side when that removes a crossing. Several arrows between the same two shapes run side by side.
 - **Straight short arrows:** an arrow between two shapes that face each other across a small gap is routed straight across instead of with a little step.
 - The layout score also counts an arrow label lying across another arrow.
+
+- **Clearer Review panel:** Claude's review and the automatic checks are now two titled sections. Claude's review says when it was made and that it doesn't change as you edit, with a **Review again** button. The automatic checks say they are worked out on your computer without AI and update as you edit, with their count (for example "2 notes") beside their title. The footer link to ask Claude for a review only shows when no review of Claude's is open.
 
 ### Fixed
 - **Edit with Claude** and **Improve the look** could fail at once with "The compiled grammar is too large": the diagram tools are no longer sent in Anthropic's strictly checked form (FlowSketch already checks every change Claude asks for before it touches the draft).

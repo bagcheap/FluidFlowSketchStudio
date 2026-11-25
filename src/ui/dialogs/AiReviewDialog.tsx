@@ -1,7 +1,7 @@
 // Review with Claude (AI): the diagram brief, what to include, then Claude checks the page against the brief and its
 // knowledge of the domain. Findings appear in the Review panel. Opt-in: nothing is sent until Review is pressed, and
 // only with the user's own key. "What will be sent" shows the exact text.
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUI } from '../../store/uiStore';
 import { useDoc } from '../../store/docStore';
 import * as cmd from '../../store/commands';
@@ -9,7 +9,7 @@ import { Modal } from './Modal';
 import { Segmented } from '../controls';
 import { KeyRows, useApiKey } from './AiDialog';
 import { savedModel, storeModel, type AiModel } from '../../ai/describe';
-import { DEFAULT_CHOICES, estimateCost, loadChoices, reviewText, reviewWithClaude, saveChoices, type ReviewChoices } from '../../ai/review';
+import { answeredOf, DEFAULT_CHOICES, estimateCost, loadChoices, reviewText, reviewWithClaude, saveChoices, type Answered, type ReviewChoices } from '../../ai/review';
 import { pageSnapshot } from '../../export/staticExport';
 import { BRIEF_MAX } from '../../model/schema';
 import type { DiagramBrief } from '../../model/types';
@@ -35,12 +35,15 @@ export function AiReviewDialog() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const abort = useRef<AbortController | null>(null);
+  // your answers to the last review's questions go with this one
+  const [earlier, setEarlier] = useState<Answered[]>([]);
+  useEffect(() => { void cmd.lastReviewForPage().then((r) => setEarlier(answeredOf(r))); }, []);
   const choose = (c: Partial<ReviewChoices>) => setChoices((o) => { const n = { ...o, ...c }; saveChoices(n); return n; });
   // the brief is saved with the diagram as you type (one undo step for a run of typing), so closing never loses it
   const edit = (k: keyof DiagramBrief, v: string) => { const b = { ...brief, [k]: v }; setBrief(b); cmd.setBrief(b); };
   const clearForm = () => { setBrief(EMPTY); cmd.setBrief(EMPTY); setChoices(DEFAULT_CHOICES); saveChoices(DEFAULT_CHOICES); setError(''); };
   const close = () => { abort.current?.abort(); useUI.getState().openDialog(null); };
-  const preview = reviewText(doc, brief, choices.includeNotes).text;
+  const preview = reviewText(doc, brief, choices.includeNotes, earlier).text;
   const empty = !doc.elements.length;
 
   const review = async () => {
@@ -53,7 +56,7 @@ export function AiReviewDialog() {
     abort.current = new AbortController();
     try {
       const image = choices.includeImage ? await pageSnapshot(d) : null;
-      const r = await reviewWithClaude(d, d.brief ?? null, { apiKey: api.key, model, effort: choices.effort, webSearch: choices.webSearch, includeNotes: choices.includeNotes, image, signal: abort.current.signal });
+      const r = await reviewWithClaude(d, d.brief ?? null, { apiKey: api.key, model, effort: choices.effort, webSearch: choices.webSearch, includeNotes: choices.includeNotes, image, earlier, signal: abort.current.signal });
       cmd.showAiReview({ ...r, docId: d.id, pageId: d.activePage, at: Date.now() });
       const n = r.findings.length;
       useUI.getState().toast(`Claude's review: ${n ? `${n} finding${n === 1 ? '' : 's'}` : 'no problems found'} (${money(estimateCost(model, r.usage))}${r.usage.webSearches ? ` + ${r.usage.webSearches} web search${r.usage.webSearches === 1 ? '' : 'es'}` : ''})`, 'success');
@@ -98,6 +101,7 @@ export function AiReviewDialog() {
         <summary>What will be sent</summary>
         <pre data-testid="ai-review-preview">{preview}{choices.includeImage ? '\n\n(+ a picture of this page)' : ''}</pre>
       </details>
+      {earlier.length > 0 && <p className="note" data-testid="ai-review-answers">Your answers to {earlier.length} question{earlier.length === 1 ? '' : 's'} from the last review go with this one, so Claude takes them into account.</p>}
       {empty && <p className="note">This page is empty: there is nothing to review.</p>}
       {error && <p className="ai-error" role="alert">{error}</p>}
     </Modal>
