@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.58] - 2026-11-25
 
 ### Added
 - **Improve the look (AI):** AI ▸ **Improve the look…** asks Claude to tidy the layout of the page without changing what it says: line up rows and columns, even out the spacing, give similar shapes the same size, move apart shapes that overlap or crowd each other, and route arrows around shapes. The request is filled in for you and can be changed (for example "give all databases the same colour").
