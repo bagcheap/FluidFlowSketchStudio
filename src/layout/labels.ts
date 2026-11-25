@@ -2,7 +2,9 @@
 // where it covers the least: other shapes, other labels and other arrows' lines first, then its own line. Labels sit
 // beside the line (not on top of it) when there is room, like a well-drawn diagram. Static geometry. The result is
 // ordinary labelPos / labelOffset, so a label can still be dragged by hand afterwards.
-import type { BoxElement, ConnectorElement, FlowDocument, Point } from '../model/types';
+import type { BoxElement, ConnectorElement, FlowDocument, Point, TextStyle } from '../model/types';
+import { defaultToolStyle, makeText } from '../model/defaults';
+import { updateMembership } from '../store/containers';
 import { connectorPath, pointAt, type ConnectorPath } from '../engine/connectors';
 import { connectorLabelSize, elementBounds, makeLookup } from '../engine/render';
 import { isLifeline } from '../editor/hitTest';
@@ -41,7 +43,8 @@ export function placeLabels(doc: FlowDocument, ids: string[] = []): { doc: FlowD
   const lookup = makeLookup(doc, null);
   const arrows = doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && !e.bar).slice(0, MAX_ARROWS);
   const paths = new Map(arrows.map((c) => [c.id, connectorPath(c, lookup)]));
-  const boxes = doc.elements.filter((e): e is BoxElement => e.type === 'shape' || e.type === 'icon' || e.type === 'image').map((b) => ({ id: b.id, r: elementBounds(doc, b) }));
+  // shapes, icons, pictures and text boxes (callouts, titles): a label shouldn't cover any of them
+  const boxes = doc.elements.filter((e): e is BoxElement => e.type === 'shape' || e.type === 'icon' || e.type === 'image' || e.type === 'text').map((b) => ({ id: b.id, r: elementBounds(doc, b) }));
   const todo = arrows.filter((c) => placeable(c) && (!want.size || want.has(c.id)));
   if (!todo.length) return { doc, moved: 0 };
   // labels that stay put count as obstacles; the ones being placed are added as they are placed
@@ -75,4 +78,71 @@ export function placeLabels(doc: FlowDocument, ids: string[] = []): { doc: FlowD
   }
   if (!changes.size) return { doc, moved: 0 };
   return { doc: { ...doc, elements: doc.elements.map((e) => (e.type === 'connector' && changes.has(e.id) ? { ...e, ...changes.get(e.id)! } : e)) }, moved: changes.size };
+}
+
+// ---- callouts -------------------------------------------------------------------------------------------------------
+
+/** Callouts are at most this wide (px) and placed at most this far from their arrow's label. */
+const CALLOUT_W = 240, CALLOUT_REACH = 520;
+
+/**
+ * Where to put a box of size w×h near `near`: the free spot closest to it, clear of shapes, labels, text, other
+ * arrows' lines and container borders (inside a container is fine).
+ */
+export function placeNote(doc: FlowDocument, w: number, h: number, near: Point, skip: Set<string> = new Set()): Rect {
+  const lookup = makeLookup(doc, null);
+  const solid = doc.elements.filter((e) => !skip.has(e.id) && (e.type === 'shape' || e.type === 'icon' || e.type === 'image' || e.type === 'text')).map((e) => elementBounds(doc, e));
+  const frames = doc.elements.filter((e) => !skip.has(e.id) && e.type === 'container').map((e) => elementBounds(doc, e));
+  const arrows = doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && !e.bar).slice(0, MAX_ARROWS);
+  const lines = arrows.filter((c) => !lifeline(c)).map((c) => connectorPath(c, lookup).pts);
+  const labels = arrows.filter((c) => !skip.has(c.id) && c.text.trim()).map((c) => boxAt(connectorPath(c, lookup), connectorLabelSize(c), c.labelPos, c.labelOffset));
+  const cost = (r: Rect) => {
+    const g = grow(r, 8);
+    let k = 0;
+    for (const s of solid) k += overlap(g, s) * W_BOX;
+    for (const l of labels) k += overlap(g, l) * W_LABEL;
+    for (const f of frames) { const o = overlap(g, f); if (o > 0 && o < g.w * g.h - 1) k += 1500; } // across a container border
+    for (const pts of lines) if (lineHits(pts, g)) k += W_LINE;
+    return k + Math.hypot(r.x + r.w / 2 - near.x, r.y + r.h / 2 - near.y) * 3;
+  };
+  let best: Rect = { x: near.x - w / 2, y: near.y - h / 2, w, h }, bestK = cost(best);
+  for (let rad = 40; rad <= CALLOUT_REACH; rad += 40) {
+    for (let a = 0; a < 16; a++) {
+      const t = (a / 16) * Math.PI * 2;
+      const r = { x: near.x + Math.cos(t) * rad - w / 2, y: near.y + Math.sin(t) * rad - h / 2, w, h };
+      const k = cost(r);
+      if (k < bestK) { best = r; bestK = k; }
+    }
+  }
+  return { x: Math.round(best.x), y: Math.round(best.y), w, h };
+}
+
+/** The leading step number of a label ("17", "4a", "8a.1"), or ''. */
+export function stepPrefix(label: string): string {
+  const m = /^\s*(\d{1,3}[a-z]?(?:\.\d{1,3}[a-z]?){0,5})(?=$|[\s.):\-])/i.exec(label);
+  return m ? m[1] : '';
+}
+
+/**
+ * Move most of a long arrow label into a callout text box near the arrow: the arrow keeps `short` (always starting
+ * with its step number, so the play order and step numbering are unchanged) and the whole label goes into the
+ * callout, which starts with the same number so the two are easy to match. The full label is also kept as the
+ * arrow's hover note (unless it already has one). Returns null for an arrow without a label or a locked one.
+ */
+export function labelToCallout(doc: FlowDocument, arrowId: string, short: string, text: TextStyle, measure: (s: string, w: number) => { w: number; h: number }): { doc: FlowDocument; calloutId: string } | null {
+  const c = doc.elements.find((e): e is ConnectorElement => e.id === arrowId && e.type === 'connector');
+  if (!c || c.locked || !c.text.trim()) return null;
+  const full = c.text.trim(), num = stepPrefix(full);
+  let s = short.replace(/\s+/g, ' ').trim();
+  if (num && stepPrefix(s) !== num) s = `${num}. ${s.replace(/^[\s.):\-]+/, '')}`.trim();
+  if (!s || s === `${num}.`) s = num ? `${num}. ${full.slice(full.indexOf(num) + num.length).replace(/^[\s.):\-]+/, '').split(' ').slice(0, 3).join(' ')}` : full.split(' ').slice(0, 4).join(' ');
+  const shortened: ConnectorElement = { ...c, text: s, ...(c.note ? {} : { note: full.slice(0, 1000) }) };
+  let d: FlowDocument = { ...doc, elements: doc.elements.map((e) => (e.id === c.id ? shortened : e)) };
+  d = placeLabels(d, [c.id]).doc;
+  const size = measure(full, CALLOUT_W);
+  const lb = (() => { const cc = d.elements.find((e) => e.id === c.id) as ConnectorElement; return boxAt(connectorPath(cc, makeLookup(d, null)), connectorLabelSize(cc), cc.labelPos, cc.labelOffset); })();
+  const at = placeNote(d, size.w, size.h, { x: lb.x + lb.w / 2, y: lb.y + lb.h / 2 });
+  const callout = { ...makeText(at.x, at.y, full, { ...defaultToolStyle('text'), textStyle: text }), w: size.w, h: size.h, textStyle: { ...text } };
+  d = { ...d, elements: [...d.elements, callout] };
+  return { doc: updateMembership(d, [callout.id]), calloutId: callout.id };
 }

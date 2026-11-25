@@ -4,6 +4,15 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.59] - 2026-11-25
+
+### Added
+- **Spread out** (Arrange menu and the canvas right-click menu): gives a crowded page 25 % more room between everything. Shapes keep their sizes, grouped items move together, containers grow round their contents and keep their colours, and the arrows and their labels are tidied afterwards. One undo step.
+- **Improve the look handles busy diagrams:** Claude can now spread a crowded page out (the diagram may get bigger) and shorten long arrow labels. An arrow keeps its step number and a few essential words ("17. Entra OBO token exchange"), and the full text moves to a small numbered **callout** text box placed in free space near the arrow (it is also kept as the arrow's hover note). Labels and callouts are placed clear of shapes, other labels and lines. The layout score now counts long arrow labels, and shapes closer than 30 px as cramped.
+
+### Fixed
+- **Containers keep their colours when Claude edits the page.** Claude now sees each container's colours, is told never to remove and re-create a container to move or resize it, and a container it does remove and add back with the same title gets its colours back.
+
 ## [0.1.58] - 2026-11-25
 
 ### Added

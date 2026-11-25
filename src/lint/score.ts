@@ -11,11 +11,13 @@ import { segmentHitsRect } from './lint';
 type Rect = { x: number; y: number; w: number; h: number };
 
 /** Points taken off for each problem. */
-export const PENALTY = { crossing: 3, overlap: 8, throughShape: 5, labelClash: 3, misaligned: 1, outside: 4, cramped: 1 } as const;
+export const PENALTY = { crossing: 3, overlap: 8, throughShape: 5, labelClash: 3, misaligned: 1, outside: 4, cramped: 1, longLabel: 1 } as const;
+/** An arrow label longer than this (characters) is hard to place and covers the diagram: shorten it (a callout can hold the rest). */
+export const LONG_LABEL = 48;
 /** Centres this close (px) but not lined up look like a mistake; closer than 1 px counts as lined up. */
 const MISALIGN = 10;
-/** Boxes closer than this (px) side by side look cramped. */
-const CRAMPED = 12;
+/** Boxes closer than this (px) look cramped: there is no room for arrows and their labels between them. */
+const CRAMPED = 30;
 const INSET = 6;
 const MAX_ITEMS = 400;
 
@@ -27,7 +29,8 @@ export interface LayoutScore {
   labelClashes: number; // arrow labels over shapes, other labels or other arrows' lines
   misaligned: number; // pairs of shapes almost, but not quite, lined up
   outside: number; // container members sticking out of their container
-  cramped: number; // pairs of shapes almost touching
+  cramped: number; // pairs of shapes closer than 30 px
+  longLabels: number; // arrow labels longer than LONG_LABEL characters
 }
 
 const ov = (a: Rect, b: Rect, pad = 0) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
@@ -39,7 +42,7 @@ export function layoutScore(doc: FlowDocument): LayoutScore {
   const bounds = new Map<string, Rect>(boxes.map((b) => [b.id, elementBounds(doc, b)]));
   const lookup = makeLookup(doc, null);
   const paths = new Map<string, ConnectorPath>(arrows.map((c) => [c.id, connectorPath(c, lookup)]));
-  const r: Omit<LayoutScore, 'score'> = { crossings: 0, overlaps: 0, throughShapes: 0, labelClashes: 0, misaligned: 0, outside: 0, cramped: 0 };
+  const r: Omit<LayoutScore, 'score'> = { crossings: 0, overlaps: 0, throughShapes: 0, labelClashes: 0, misaligned: 0, outside: 0, cramped: 0, longLabels: 0 };
 
   for (let i = 0; i < arrows.length; i++)
     for (let j = i + 1; j < arrows.length; j++) r.crossings += crossings(paths.get(arrows[i].id)!, paths.get(arrows[j].id)!).length;
@@ -66,6 +69,7 @@ export function layoutScore(doc: FlowDocument): LayoutScore {
       if ([...ends].some((id) => id && bounds.has(id) && within(bounds.get(id)!, box))) continue;
       for (let i = 0; i + 1 < pts.length; i++) if (segmentHitsRect(pts[i], pts[i + 1], s)) { r.throughShapes++; break; }
     }
+    if (c.text.trim().length > LONG_LABEL) r.longLabels++;
     const lb = connectorLabelBox(doc, c);
     if (!lb) continue;
     const overLine = arrows.some((o) => o.id !== c.id && paths.get(o.id)!.pts.some((p, i, pts) => i > 0 && segmentHitsRect(pts[i - 1], p, lb)));
@@ -79,7 +83,7 @@ export function layoutScore(doc: FlowDocument): LayoutScore {
   }
 
   const lost = r.crossings * PENALTY.crossing + r.overlaps * PENALTY.overlap + r.throughShapes * PENALTY.throughShape + r.labelClashes * PENALTY.labelClash
-    + r.misaligned * PENALTY.misaligned + r.outside * PENALTY.outside + r.cramped * PENALTY.cramped;
+    + r.misaligned * PENALTY.misaligned + r.outside * PENALTY.outside + r.cramped * PENALTY.cramped + r.longLabels * PENALTY.longLabel;
   return { score: Math.max(0, Math.round(100 - lost)), ...r };
 }
 
@@ -89,7 +93,7 @@ export function scoreLine(s: LayoutScore): string {
     [s.overlaps, 'overlapping shape pair', 'overlapping shape pairs'], [s.throughShapes, 'arrow through a shape', 'arrows through shapes'],
     [s.crossings, 'arrow crossing', 'arrow crossings'], [s.labelClashes, 'label in the way', 'labels in the way'],
     [s.outside, 'item outside its container', 'items outside their containers'], [s.misaligned, 'near-miss alignment', 'near-miss alignments'],
-    [s.cramped, 'cramped pair', 'cramped pairs'],
+    [s.cramped, 'cramped pair', 'cramped pairs'], [s.longLabels, 'long arrow label', 'long arrow labels'],
   ];
   const left = parts.filter(([n]) => n > 0).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
   return `${s.score}/100${left.length ? `: ${left.join(', ')}` : ''}`;
