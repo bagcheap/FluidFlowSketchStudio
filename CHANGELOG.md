@@ -4,7 +4,7 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
-## [Unreleased]
+## [0.1.59] - 2026-11-25
 
 ### Added
 - **Spread out** (Arrange menu and the canvas right-click menu): gives a crowded page 25 % more room between everything. Shapes keep their sizes, grouped items move together, containers grow round their contents and keep their colours, and the arrows and their labels are tidied afterwards. One undo step.
