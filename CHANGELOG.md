@@ -4,6 +4,29 @@ All notable changes to FlowSketch Studio, newest first. The same list appears in
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/). Each version has up to three groups: **Added** for new features, **Changed** for changes to existing behaviour, and **Fixed** for bug fixes.
 
+## [0.1.58] - 2026-11-25
+
+### Added
+- **Improve the look (AI):** AI ▸ **Improve the look…** asks Claude to tidy the layout of the page without changing what it says: line up rows and columns, even out the spacing, give similar shapes the same size, move apart shapes that overlap or crowd each other, and route arrows around shapes. The request is filled in for you and can be changed (for example "give all databases the same colour").
+- **Layout score:** FlowSketch works out a tidiness score from 0 to 100 (arrow crossings, overlapping shapes, arrows through shapes, labels in the way, items outside their container, shapes nearly but not quite lined up, shapes crowding each other). The panel shows it before you run and as **before → after** once Claude is done. Claude checks it after each group of changes and keeps only those that help, so the result is judged by the editor's own numbers, not only by Claude's opinion.
+- **Before / after:** while a draft is shown, **Show before** switches the canvas to your diagram as it was, and back.
+- Edit with Claude can now also line shapes up, even out gaps, match sizes and move shapes.
+
+- **Tidy arrow labels** (Arrange menu and the canvas right-click menu): moves the labels of the selected arrows (or all) along and beside their arrows to spots where they don't cover shapes, other labels or other arrows, instead of sitting on top of lines. Route arrows around shapes now does this for the arrows it routes, and Claude can use it when improving the look.
+
+- **Answer Claude's questions:** each question in Claude's review now has an answer box. Your answers are kept with the review (also after closing the app), saved in the review notes, sent with the next review (**Review again with my answers…**) and with **Fix with Claude**, so Claude takes what you meant into account.
+- **Move the Review and Edit with Claude panels** by dragging their title bar; they stay where you put them. Double-click the title bar to put a panel back in its usual place and size.
+
+### Changed
+- **Fewer crossing arrows:** Route arrows around shapes (and Claude's routing) now picks the sides arrows attach to so they cross each other as little as possible, avoids crossing the arrows it isn't moving, and swaps the order of arrows that share a side when that removes a crossing. Several arrows between the same two shapes run side by side.
+- **Straight short arrows:** an arrow between two shapes that face each other across a small gap is routed straight across instead of with a little step.
+- The layout score also counts an arrow label lying across another arrow.
+
+- **Clearer Review panel:** Claude's review and the automatic checks are now two titled sections. Claude's review says when it was made and that it doesn't change as you edit, with a **Review again** button. The automatic checks say they are worked out on your computer without AI and update as you edit, with their count (for example "2 notes") beside their title. The footer link to ask Claude for a review only shows when no review of Claude's is open.
+
+### Fixed
+- **Edit with Claude** and **Improve the look** could fail at once with "The compiled grammar is too large": the diagram tools are no longer sent in Anthropic's strictly checked form (FlowSketch already checks every change Claude asks for before it touches the draft).
+
 ## [0.1.57] - 2026-11-23
 
 ### Added

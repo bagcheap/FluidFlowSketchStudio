@@ -444,6 +444,15 @@ code { font-size: 12px; }
 .review-panel .ai-questions, .review-panel .ai-sources { margin: 6px 4px; }
 .review-panel .ai-questions ul, .review-panel .ai-sources ul { margin: 4px 0; padding-left: 18px; }
 .review-panel .ai-sources a { color: var(--accent); word-break: break-word; }
+.review-panel .lint-head { display: flex; align-items: center; gap: 6px; padding: 8px 12px 0; }
+.review-panel .lint-head svg { color: var(--fg-2); }
+.review-panel .lint-head .review-sum { margin-left: auto; }
+.review-panel .lint-note { margin: 2px 12px 4px; font-size: 11.5px; }
+.review-panel .ai-when { margin: 4px 4px 0; font-size: 11.5px; }
+.review-panel .ai-questions ol { margin: 4px 0; padding-left: 20px; }
+.review-panel .ai-questions li { margin-bottom: 8px; }
+.review-panel .ai-answer { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; border: 1px solid var(--line-2); border-radius: 7px; background: var(--panel); color: var(--fg); font: inherit; font-size: 12.5px; padding: 5px 7px; resize: vertical; }
+.review-panel .ai-answer:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .review-panel .ai-meta { margin: 6px 4px 4px; font-size: 11px; color: var(--fg-3); line-height: 1.35; }
 .review-panel footer { flex-wrap: wrap; }
 .review-panel .ai-choose { display: flex; align-items: center; gap: 8px; margin: 4px 4px 2px; color: var(--fg-2); }
@@ -479,6 +488,10 @@ code { font-size: 12px; }
 .agent-panel .agent-checks ul { margin: 4px 0 0; padding-left: 18px; }
 .agent-panel .agent-limits select { height: 28px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel); color: var(--fg); font: inherit; }
 .agent-panel .agent-estimate { margin: 4px 0 8px; }
+.agent-panel .agent-score { margin: 6px 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+.agent-panel .agent-score b.up { color: var(--ok); }
+.agent-panel .agent-score b.down { color: var(--danger); }
+.agent-panel .agent-score .btn { margin-left: auto; }
 .agent-panel .mk { display: inline-block; padding: 0 6px; border-radius: 4px; border: 2px solid; font-size: 11px; }
 .agent-panel .mk.add { border-color: #2f9e44; }
 .agent-panel .mk.chg { border-color: #f08c00; }
@@ -488,6 +501,9 @@ code { font-size: 12px; }
 /* Floating panels resize from the bottom-right corner (size remembered: ui/panelSize.ts) */
 .stage .review-panel, .stage .agent-panel { resize: both; min-width: 280px; min-height: 120px; }
 .review-panel header, .agent-panel header { flex: none; }
+.panel-bar { cursor: move; touch-action: none; user-select: none; }
+.panel-bar button { cursor: pointer; }
+.review-panel.moving, .agent-panel.moving { opacity: 0.92; box-shadow: 0 18px 48px rgba(0,0,0,0.22); }
 .review-panel footer, .agent-panel footer { flex: none; padding-right: 22px; }
 .agent-panel pre, .review-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .link-btn { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; white-space: nowrap; }

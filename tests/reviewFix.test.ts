@@ -134,3 +134,44 @@ describe('the last review comes back', () => {
     expect(useUI.getState().aiReview).toBeNull();
   });
 });
+
+describe('answering Claude’s questions', () => {
+  it('answers are kept with the review, come back with it, and go with fixes', async () => {
+    setup();
+    const { answerQuestion, showAiReview, showLastReview, fixFindingsRequest: req } = await import('../src/store/commands');
+    showAiReview({ ...useUI.getState().aiReview!, questions: ['Is OBO done in the agent on purpose?', 'Where is the agent deployed?'] });
+    answerQuestion(0, 'Yes: the gateway can’t reach Entra.');
+    expect(useUI.getState().aiReview!.answers).toEqual(['Yes: the gateway can’t reach Entra.', '']);
+    expect(req([finding('Wrong order')])).toContain("The author answered the review's questions:\n- Q: Is OBO done in the agent on purpose?\n  A: Yes: the gateway can’t reach Entra.");
+    await new Promise((r) => setTimeout(r, 450)); // saved a moment after typing stops
+    useUI.getState().setAiReview(null);
+    await showLastReview();
+    expect(useUI.getState().aiReview!.answers).toEqual(['Yes: the gateway can’t reach Entra.', '']);
+    const md = reviewToMarkdown(useUI.getState().aiReview!, { title: 'T', page: 'P', brief: null, nameOf: () => null, modelLabel: 'M', when: 'now' });
+    expect(md).toContain('- Is OBO done in the agent on purpose?\n  - **Answer:** Yes: the gateway can’t reach Entra.');
+  });
+
+  it('the next review sends the answered questions; stored answers stay in step with their questions', async () => {
+    const { reviewText, cleanStoredReview, answeredOf } = await import('../src/ai/review');
+    const { doc } = setup();
+    const text = reviewText(doc, null, false, [{ q: 'Where is it deployed?', a: 'Cloud Run' }]).text;
+    expect(text).toContain('## Your questions from the last review, answered by the author\nQ: Where is it deployed?\nA: Cloud Run');
+    expect(reviewText(doc, null, false).text).not.toContain('answered by the author');
+    const r = cleanStoredReview({ docId: doc.id, pageId: doc.activePage, questions: ['', 'Second?', 'Third?'], answers: ['dropped with its empty question', 'two', 42] }, doc.id, doc.activePage, new Set())!;
+    expect(r.questions).toEqual(['Second?', 'Third?']);
+    expect(r.answers).toEqual(['two', '']);
+    expect(answeredOf(r)).toEqual([{ q: 'Second?', a: 'two' }]);
+  });
+});
+
+describe('panel place', () => {
+  it('a remembered place is type-checked and clamped', async () => {
+    const { loadPanelPos } = await import('../src/ui/panelSize');
+    localStorage.setItem('flowsketch:panelPos:t', JSON.stringify({ x: 120.4, y: -30 }));
+    expect(loadPanelPos('t')).toEqual({ x: 120, y: 0 });
+    localStorage.setItem('flowsketch:panelPos:t', '{"x":"1"}');
+    expect(loadPanelPos('t')).toBeNull();
+    localStorage.setItem('flowsketch:panelPos:t', 'nonsense');
+    expect(loadPanelPos('t')).toBeNull();
+  });
+});

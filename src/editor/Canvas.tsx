@@ -154,7 +154,7 @@ export function Canvas() {
       const susp = u.prefs.suspendWhileDragging && it && (it.k === 'move' || it.k === 'resize' || it.k === 'rotate' || it.k === 'resizeMulti')
         ? new Set(it.k === 'move' || it.k === 'resizeMulti' ? it.ids : [it.id]) : undefined;
       const draft = u.draft;
-      const shown = draft?.doc ?? d.doc; // an AI draft is shown instead of the document while it is reviewed
+      const shown = draft && !draft.original ? draft.doc : d.doc; // an AI draft is shown instead of the document while it is reviewed
       const cam = liveCameraView(shown, u.time);
       const view = cam ?? u.view;
       if (draft !== lastDraft) { lastDraft = draft; redraw.current = true; }
@@ -179,7 +179,7 @@ export function Canvas() {
       // a step caption stays in the part of the canvas not under the toolbar and Inspector
       const va = visibleArea();
       drawFrame(ctx, frame, { images: imageMap(shown.assets), originX: view.x, originY: view.y, scale: view.zoom * dpr, captionArea: { x: 0, y: va.top * dpr, w: va.w * dpr, h: va.h * dpr } });
-      if (draft) drawDraftMarks(ctx, draft, view, dpr);
+      if (draft && !draft.original) drawDraftMarks(ctx, draft, view, dpr);
     };
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); off(); };

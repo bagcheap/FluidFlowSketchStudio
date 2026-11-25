@@ -86,6 +86,7 @@ function canvasItems(): MenuItem[] {
     { label: 'AI', sub: aiMenuItems() },
     { label: 'Auto-layout diagram', sub: AUTO_LAYOUT_ITEMS, disabled: !doc.elements.length },
     { label: 'Route arrows around shapes', run: cmd.routeArrows, disabled: !doc.elements.some((e) => e.type === 'connector') },
+    { label: 'Tidy arrow labels', run: cmd.tidyLabels, disabled: !doc.elements.some((e) => e.type === 'connector' && !!e.text.trim()) },
     { sep: true },
     { label: 'Grid', sub: (['dots', 'lines', 'none'] as const).map((g) => ({ label: g === 'none' ? 'Plain' : g === 'dots' ? 'Dot grid' : 'Line grid', checked: doc.canvas.grid === g, run: () => setGrid(g) })) },
     { label: 'Line jumps', checked: !!doc.canvas.lineJumps, run: cmd.toggleLineJumps },

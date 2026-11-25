@@ -109,6 +109,7 @@ export function TopBar() {
       { label: 'Match size', sub: matchSizeItems(prefs.matchSizeKeepsProportions), disabled: sel.length < 2 },
       { label: sel.length >= 2 ? 'Auto-layout selection' : 'Auto-layout diagram', sub: AUTO_LAYOUT_ITEMS },
       { label: 'Route arrows around shapes', note: sel.length ? 'selected arrows' : 'all arrows', run: cmd.routeArrows },
+      { label: 'Tidy arrow labels', note: sel.length ? 'selected arrows' : 'all arrows', run: cmd.tidyLabels },
       { sep: true },
       { label: 'Bring to front', shortcut: `${MOD}${SHIFT}]`, run: () => cmd.reorder('front'), disabled: !hasSel },
       { label: 'Bring forward', shortcut: `${MOD}]`, run: () => cmd.reorder('forward'), disabled: !hasSel },

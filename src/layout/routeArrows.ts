@@ -6,7 +6,8 @@ import { connectorPath, GAP, LEAD, localOutline, toWorld } from '../engine/conne
 import { makeLookup } from '../engine/render';
 import { STILL } from '../engine/animation';
 import { rayPolygon } from '../engine/shapes';
-import { markUsed, routeOrtho, type Rect, type RouteEnd } from './orthoRoute';
+import { countCrossings, markUsed, routeOrtho, segsOf, type Rect, type RouteEnd, type Seg } from './orthoRoute';
+import { isLifeline } from '../editor/hitTest';
 
 type Side = 0 | 1 | 2 | 3; // top, right, bottom, left
 const OUT: Point[] = [{ x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }];
@@ -55,6 +56,42 @@ function anchorPoint(el: BoxElement, anchor: Point): { anchor: Point; end: Route
 
 interface Plan { c: ConnectorElement; a: BoxElement; b: BoxElement; sa: Side; sb: Side; pts: Point[] }
 
+/** The two shapes an arrow joins, in a fixed order (arrows between the same pair sort together). */
+const pairKey = (p: Plan) => [p.a.id, p.b.id].sort().join('|');
+/**
+ * Two shapes facing each other across a gap, with overlapping edges and nothing in between: a straight arrow across
+ * the middle of the overlap reads best (the router's straight runs out of each shape wouldn't fit a short gap and
+ * would give it a step). Returns the anchors and the straight route, or null.
+ */
+function straightShot(plan: Plan, obstacles: Rect[], segs: Seg[], fixA?: number, fixB?: number): { A: { anchor: Point }; B: { anchor: Point }; pts: Point[] } | null {
+  const { a, b, sa, sb } = plan;
+  if ((sa + 2) % 4 !== sb || a.type !== 'shape' || b.type !== 'shape') return null; // outlines other than shapes' vary
+  const ra = bounds(a), rb = bounds(b), horiz = sa === 1 || sa === 3;
+  const lo = horiz ? Math.max(ra.y0, rb.y0) : Math.max(ra.x0, rb.x0), hi = horiz ? Math.min(ra.y1, rb.y1) : Math.min(ra.x1, rb.x1);
+  if (hi - lo < 16) return null; // not enough of the edges face each other
+  // where along the edges: the middle of the overlap, or where a shared end already sits (both fixed: they must agree)
+  const at = (r: Rect, t: number) => (horiz ? r.y0 + t * (r.y1 - r.y0) : r.x0 + t * (r.x1 - r.x0));
+  const want = [fixA !== undefined ? at(ra, fixA) : null, fixB !== undefined ? at(rb, fixB) : null].filter((v): v is number => v !== null);
+  if (want.length === 2 && Math.abs(want[0] - want[1]) > 0.5) return null;
+  const c = want.length ? want[0] : (lo + hi) / 2;
+  if (c < lo + 8 || c > hi - 8) return null; // too near a corner of one of them
+  const ta = horiz ? (c - ra.y0) / (ra.y1 - ra.y0) : (c - ra.x0) / (ra.x1 - ra.x0), tb = horiz ? (c - rb.y0) / (rb.y1 - rb.y0) : (c - rb.x0) / (rb.x1 - rb.x0);
+  const A = sidePoint(a, sa, ta), B = sidePoint(b, sb, tb);
+  if (Math.abs(horiz ? A.end.p.y - B.end.p.y : A.end.p.x - B.end.p.x) > 0.5) return null; // a slanted outline moved a point
+  const d = horiz ? (B.end.p.x - A.end.p.x) * A.end.dir.x : (B.end.p.y - A.end.p.y) * A.end.dir.y;
+  if (d <= 0) return null; // they don't face each other
+  const pts = [A.end.p, B.end.p];
+  const between = (r: Rect) => r !== null && !(r.x1 < Math.min(pts[0].x, pts[1].x) || r.x0 > Math.max(pts[0].x, pts[1].x) || r.y1 < Math.min(pts[0].y, pts[1].y) || r.y0 > Math.max(pts[0].y, pts[1].y));
+  if (obstacles.some((r) => r !== ra && r !== rb && !sameRect(r, ra) && !sameRect(r, rb) && between(r))) return null;
+  if (countCrossings(segsOf(pts), segs) > 0) return null;
+  return { A, B, pts };
+}
+const sameRect = (p: Rect, q: Rect) => Math.abs(p.x0 - q.x0) < 0.01 && Math.abs(p.y0 - q.y0) < 0.01 && Math.abs(p.x1 - q.x1) < 0.01 && Math.abs(p.y1 - q.y1) < 0.01;
+
+/** Most side-order swaps tried to remove crossings (each re-routes the arrows). */
+const MAX_SWAPS = 30;
+const lifeline = (e: ConnectorElement): boolean => isLifeline(e);
+
 /**
  * Route the given arrows (ids) around every shape on the page. Only arrows attached at both ends to two different,
  * unrotated shapes/icons/pictures are routed; locked ones and activation bars are left alone. They become elbow
@@ -76,9 +113,15 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[], opts: { keep
   const withStub = (r: RouteEnd, stub: number): RouteEnd => ({ ...r, stub });
   const want = new Set(ids);
   const conns = doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && want.has(e.id) && !e.locked && !e.bar);
+  // arrows that aren't being routed stay where they are: new routes try not to cross them (lifelines don't count)
+  const lookup = makeLookup(doc, null);
+  const fixed: Seg[] = doc.elements.filter((e): e is ConnectorElement => e.type === 'connector' && !e.bar && !lifeline(e) && !conns.some((c) => c.id === e.id))
+    .slice(0, 400).flatMap((c) => segsOf(connectorPath(c, lookup).control));
   const plans: Plan[] = [];
   const used = new Map<string, number>();
-  // pass 1: the best pair of sides for each arrow, from the middle of each side
+  const placed: Seg[] = [...fixed];
+  // pass 1: the best pair of sides for each arrow, from the middle of each side (crossing other arrows costs a lot,
+  // so an arrow picks the sides that keep it clear of the ones already placed)
   for (const c of conns) {
     const a = c.start.elementId ? byId.get(c.start.elementId) : undefined, b = c.end.elementId ? byId.get(c.end.elementId) : undefined;
     if (!a || !b || a === b || !isObstacle(a) || !isObstacle(b) || a.rotation % 360 || b.rotation % 360) continue;
@@ -86,12 +129,13 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[], opts: { keep
     const ka = kept(c, 'start'), kb = kept(c, 'end');
     const sidesA: Side[] = ka ? [anchorPoint(a, ka).side] : [0, 1, 2, 3], sidesB: Side[] = kb ? [anchorPoint(b, kb).side] : [0, 1, 2, 3];
     for (const sa of sidesA) for (const sb of sidesB) {
-      const r = routeOrtho(withStub(ka ? anchorPoint(a, ka).end : sidePoint(a, sa, 0.5).end, stubOf(c, c.startHead)), withStub(kb ? anchorPoint(b, kb).end : sidePoint(b, sb, 0.5).end, stubOf(c, c.endHead)), obstacles, used, borders);
+      const r = routeOrtho(withStub(ka ? anchorPoint(a, ka).end : sidePoint(a, sa, 0.5).end, stubOf(c, c.startHead)), withStub(kb ? anchorPoint(b, kb).end : sidePoint(b, sb, 0.5).end, stubOf(c, c.endHead)), obstacles, used, borders, placed);
       if (r && r.cost < bestCost) { bestCost = r.cost; best = { c, a, b, sa, sb, pts: r.pts }; }
     }
-    if (best) { plans.push(best); markUsed(used, best.pts, obstacles); }
+    if (best) { plans.push(best); markUsed(used, best.pts, obstacles); placed.push(...segsOf(best.pts)); }
   }
-  // spread arrows that share a side of a shape along it, in the order of where their other ends are
+  // spread arrows that share a side of a shape along it, in the order of where their other ends are; arrows between
+  // the same two shapes keep the same order at both ends (by id), so they run side by side instead of crossing
   const slots = new Map<string, { plan: Plan; end: 'a' | 'b'; along: number }[]>();
   for (const plan of plans) {
     for (const end of ['a', 'b'] as const) {
@@ -103,24 +147,60 @@ export function routeArrowsAround(doc: FlowDocument, ids: string[], opts: { keep
     }
   }
   const tOf = new Map<string, number>(); // `${connector}:${end}` → position along the side
+  const groups = [...slots.values()].filter((l) => l.length > 1);
+  const shared = new Set(groups.flatMap((l) => l.map((s) => `${s.plan.c.id}:${s.end}`))); // ends sharing a side
   for (const list of slots.values()) {
-    list.sort((p, q) => p.along - q.along);
+    list.sort((p, q) => p.along - q.along || pairKey(p.plan).localeCompare(pairKey(q.plan)) || (p.plan.c.id < q.plan.c.id ? -1 : 1));
     list.forEach((s, i) => tOf.set(`${s.plan.c.id}:${s.end}`, (i + 1) / (list.length + 1)));
   }
-  // pass 2: route again from the spread points
-  const used2 = new Map<string, number>();
+  // pass 2: route again from the spread points, each route keeping clear of the ones before it
+  const routeAll = () => {
+    const used2 = new Map<string, number>();
+    const segs: Seg[] = [...fixed];
+    const out = new Map<string, { A: { anchor: Point }; B: { anchor: Point }; pts: Point[] }>();
+    for (const plan of plans) {
+      const ka = kept(plan.c, 'start'), kb = kept(plan.c, 'end');
+      // a short straight arrow between facing shapes; an end that shares its side keeps its spread place
+      const fixA = shared.has(`${plan.c.id}:a`) ? tOf.get(`${plan.c.id}:a`) : undefined, fixB = shared.has(`${plan.c.id}:b`) ? tOf.get(`${plan.c.id}:b`) : undefined;
+      const direct = !ka && !kb ? straightShot(plan, obstacles, segs, fixA, fixB) : null;
+      if (direct) { segs.push(...segsOf(direct.pts)); out.set(plan.c.id, direct); continue; }
+      const A = ka ? anchorPoint(plan.a, ka) : sidePoint(plan.a, plan.sa, tOf.get(`${plan.c.id}:a`) ?? 0.5);
+      const B = kb ? anchorPoint(plan.b, kb) : sidePoint(plan.b, plan.sb, tOf.get(`${plan.c.id}:b`) ?? 0.5);
+      const r = routeOrtho(withStub(A.end, stubOf(plan.c, plan.c.startHead)), withStub(B.end, stubOf(plan.c, plan.c.endHead)), obstacles, used2, borders, segs);
+      if (!r) continue;
+      markUsed(used2, r.pts, obstacles);
+      segs.push(...segsOf(r.pts));
+      out.set(plan.c.id, { A, B, pts: r.pts });
+    }
+    return out;
+  };
+  const crossTotal = (rs: ReturnType<typeof routeAll>) => {
+    const list = [...rs.values()].map((r) => segsOf(r.pts));
+    let n = 0;
+    for (let i = 0; i < list.length; i++) { n += countCrossings(list[i], fixed); for (let j = i + 1; j < list.length; j++) n += countCrossings(list[i], list[j]); }
+    return n;
+  };
+  let routes = routeAll(), crossed = crossTotal(routes);
+  // still crossing: try swapping neighbours on a shared side (the order there decides whether they cross); keep a
+  // swap only when it leaves fewer crossings and no fewer routes
+  for (let sweep = 0, tries = 0; sweep < 2 && crossed > 0 && tries < MAX_SWAPS; sweep++) {
+    for (const list of groups) for (let i = 0; i + 1 < list.length && crossed > 0 && tries < MAX_SWAPS; i++, tries++) {
+      const p = `${list[i].plan.c.id}:${list[i].end}`, q = `${list[i + 1].plan.c.id}:${list[i + 1].end}`;
+      const tp = tOf.get(p)!, tq = tOf.get(q)!;
+      tOf.set(p, tq); tOf.set(q, tp);
+      const r2 = routeAll(), c2 = crossTotal(r2);
+      if (c2 < crossed && r2.size >= routes.size) { routes = r2; crossed = c2; [list[i], list[i + 1]] = [list[i + 1], list[i]]; }
+      else { tOf.set(p, tp); tOf.set(q, tq); }
+    }
+  }
   const done = new Map<string, Partial<ConnectorElement>>();
   for (const plan of plans) {
-    const ka = kept(plan.c, 'start'), kb = kept(plan.c, 'end');
-    const A = ka ? anchorPoint(plan.a, ka) : sidePoint(plan.a, plan.sa, tOf.get(`${plan.c.id}:a`) ?? 0.5);
-    const B = kb ? anchorPoint(plan.b, kb) : sidePoint(plan.b, plan.sb, tOf.get(`${plan.c.id}:b`) ?? 0.5);
-    const r = routeOrtho(withStub(A.end, stubOf(plan.c, plan.c.startHead)), withStub(B.end, stubOf(plan.c, plan.c.endHead)), obstacles, used2, borders);
+    const r = routes.get(plan.c.id);
     if (!r) continue;
-    markUsed(used2, r.pts, obstacles);
     done.set(plan.c.id, {
       routing: 'elbow',
-      start: { ...plan.c.start, anchor: A.anchor },
-      end: { ...plan.c.end, anchor: B.anchor },
+      start: { ...plan.c.start, anchor: r.A.anchor },
+      end: { ...plan.c.end, anchor: r.B.anchor },
       bends: r.pts.slice(1, -1),
     });
   }

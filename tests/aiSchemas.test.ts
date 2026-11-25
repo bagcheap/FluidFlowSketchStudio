@@ -45,11 +45,8 @@ describe('AI schemas', () => {
     within(strictBudget([FINDINGS_TOOL]));
     within(strictBudget([{ strict: true, input_schema: EDIT_SCHEMA }])); // Quick change: structured output
     // tools that take input are strict; tools without input are not (nothing to enforce, and they'd use up the limit)
-    for (const t of toolDefinitions()) {
-      const takesInput = Object.keys((t.input_schema as { properties: object }).properties).length > 0;
-      expect(Boolean((t as { strict?: boolean }).strict)).toBe(takesInput);
-    }
-    expect(strictBudget(agentTools(true))).toEqual({ strict: 15, unions: 8, optional: 0 });
+    for (const t of toolDefinitions()) expect((t as { strict?: boolean }).strict).toBeUndefined();
+    expect(strictBudget(agentTools(true))).toEqual({ strict: 1, unions: 0, optional: 0 }); // only finish: a large strict set compiles to a grammar the API rejects
   });
 
   it('nullable choices still allow null', () => {
