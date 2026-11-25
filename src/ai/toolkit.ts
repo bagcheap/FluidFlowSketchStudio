@@ -16,6 +16,8 @@ import { isLifeline } from '../editor/hitTest';
 import { lintPage } from '../lint/lint';
 import { applyPlaySteps, fitLoopToPlay, labelStep, labelSteps, numberedSteps, playStepLabels, readPlaySteps, renumberSteps } from '../store/sequence';
 import { applyThemeToDoc, THEMES } from '../store/themes';
+import { alignBoxes, distributeBoxes, matchSizes, moveBoxes, movableBoxes } from '../layout/arrange';
+import { layoutScore } from '../lint/score';
 import { applyEdits, cleanText, describePage, EDIT_SCHEMA, parseEdits, type EditTools, type PageView } from './edits';
 
 export type ToolKind = 'read' | 'change' | 'check';
@@ -42,6 +44,19 @@ export interface DiagramTool {
   input_schema: Record<string, unknown>;
   run: (s: ToolSession, input: Record<string, unknown>) => ToolResult | Promise<ToolResult>;
 }
+
+/** Run a layout change on the movable boxes among the given short ids (at least `min` of them). */
+function layoutChange(s: ToolSession, raw: unknown, min: number, change: (ids: string[]) => FlowDocument): ToolResult {
+  const ids = movableBoxes(s.doc, (Array.isArray(raw) ? raw : []).slice(0, 200).map((x) => realOf(s, x)).filter((x): x is string => !!x)).map((e) => e.id);
+  if (ids.length < min) return fail(`Name at least ${min} unlocked shape${min === 1 ? '' : 's'} on the page.`);
+  const next = change(ids);
+  if (next === s.doc) return ok({ done: true, changed: false });
+  commitDraft(s, next);
+  return ok({ done: true, items: ids.length });
+}
+
+/** The largest single move (px). */
+export const MAX_MOVE = 5000;
 
 /** Limits for one session. */
 export const MAX_TOOL_CALLS = 80;
@@ -203,6 +218,30 @@ export const DIAGRAM_TOOLS: DiagramTool[] = [
   { name: 'apply_theme', kind: 'change', input_schema: obj({ theme: { type: 'string', enum: THEMES.map((t) => t.id) } }),
     description: `Recolour the whole document with a theme: ${THEMES.map((t) => `${t.id} (${t.name})`).join(', ')}.`,
     run: (s, i) => { const t = THEMES.find((x) => x.id === i.theme); if (!t) return fail('Unknown theme.'); commitDraft(s, applyThemeToDoc(s.doc, t)); return ok({ done: true }); } },
+
+  { name: 'align', kind: 'change', input_schema: obj({ ids: { type: 'array', items: { type: 'string' } }, edge: { type: 'string', enum: ['left', 'hcenter', 'right', 'top', 'vcenter', 'bottom'] } }),
+    description: 'Line up two or more shapes by an edge or their centres (hcenter = same vertical centre line, i.e. a column; vcenter = same horizontal centre line, i.e. a row). Containers bring their contents.',
+    run: (s, i) => layoutChange(s, i.ids, 2, (ids) => alignBoxes(s.doc, ids, i.edge as never)) },
+  { name: 'distribute', kind: 'change', input_schema: obj({ ids: { type: 'array', items: { type: 'string' } }, axis: { type: 'string', enum: ['across', 'down'] } }),
+    description: 'Even out the gaps between three or more shapes, across (left to right) or down (top to bottom); the first and last stay put.',
+    run: (s, i) => layoutChange(s, i.ids, 3, (ids) => distributeBoxes(s.doc, ids, i.axis === 'down' ? 'v' : 'h')) },
+  { name: 'match_size', kind: 'change', input_schema: obj({ reference: { type: 'string' }, ids: { type: 'array', items: { type: 'string' } }, mode: { type: 'string', enum: ['width', 'height', 'both'] } }),
+    description: 'Give shapes the width, height or both of a reference shape (each keeps its centre).',
+    run: (s, i) => {
+      const ref = realOf(s, i.reference);
+      if (!ref) return fail('Unknown reference id.');
+      return layoutChange(s, i.ids, 1, (ids) => matchSizes(s.doc, ref, ids, i.mode === 'width' || i.mode === 'height' ? i.mode : 'both'));
+    } },
+  { name: 'move', kind: 'change', input_schema: obj({ ids: { type: 'array', items: { type: 'string' } }, dx: { type: 'number' }, dy: { type: 'number' } }),
+    description: 'Move shapes, containers (with their contents) or text by dx, dy pixels (x grows to the right, y downwards). Attached arrows follow.',
+    run: (s, i) => {
+      const dx = Number(i.dx), dy = Number(i.dy);
+      if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > MAX_MOVE || Math.abs(dy) > MAX_MOVE) return fail(`dx and dy must be numbers within ±${MAX_MOVE}.`);
+      return layoutChange(s, i.ids, 1, (ids) => moveBoxes(s.doc, ids.map((id) => [id, Math.round(dx), Math.round(dy)] as const)));
+    } },
+  { name: 'layout_score', kind: 'check', input_schema: NONE,
+    description: 'How tidy the page looks, 0–100 (higher is better), worked out by the editor: counts of arrow crossings, overlapping shapes, arrows through shapes, labels in the way, items outside their container, near-miss alignments and cramped pairs. Use it before and after layout changes; keep a change only if the score went up.',
+    run: (s) => ok(layoutScore(s.doc)) },
 
   // check
   { name: 'lint', kind: 'check', input_schema: NONE,

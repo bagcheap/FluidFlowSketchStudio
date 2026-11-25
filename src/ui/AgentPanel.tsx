@@ -13,6 +13,7 @@ import { MAX_PROMPT_CHARS, savedModel, storeModel, type AiModel } from '../ai/de
 import { DEFAULT_SPEND, DEFAULT_STEPS, firstMessage, runAgent, runEstimate, SPEND_LIMITS, startAgent, STEP_LIMITS, type AgentState } from '../ai/agent';
 import { reviewText, type ReviewEffort } from '../ai/review';
 import { newProblems } from '../ai/diff';
+import { layoutScore, scoreLine } from '../lint/score';
 import { useRememberedSize } from './panelSize';
 
 
@@ -23,6 +24,7 @@ const DID: Record<string, string> = {
   set_color: 'Changed colours', set_arrow: 'Changed an arrow', add_container: 'Added a container', move_into: 'Moved items into a container',
   renumber_steps: 'Renumbered the steps', play_in_label_order: 'Set the play order', auto_layout: 'Laid out the page again', route_arrows: 'Routed arrows',
   apply_theme: 'Applied a theme', lint: 'Checked the page', snapshot: 'Looked at a picture of the draft',
+  align: 'Lined shapes up', distribute: 'Evened out gaps', match_size: 'Matched sizes', move: 'Moved shapes', layout_score: 'Scored the layout',
 };
 const OPTS = 'flowsketch:aiAgentOptions';
 interface AgentChoices { effort: ReviewEffort; pictures: boolean; maxSteps: number; maxSpend: number | null }
@@ -51,6 +53,8 @@ export function AgentPanel() {
 function AgentBody() {
   const api = useApiKey();
   const seed = useUI((s) => s.agentSeed);
+  const mode = useUI((s) => s.agentMode);
+  const look = mode === 'look';
   const draft = useUI((s) => s.draft);
   const [model, setModel] = useState<AiModel>(savedModel);
   const [opts, setOpts] = useState(loadOpts);
@@ -74,6 +78,10 @@ function AgentBody() {
   // the estimate shown before Run (rough: from the page size, effort and options, at list prices with caching)
   const est = !s && count ? runEstimate(model, opts.effort, opts.pictures, `${ask}\n${reviewText(doc, brief, false).text}`, opts.maxSteps, opts.maxSpend) : null;
   const problems = s && !busy && s.session.changes ? newProblems(s.session.original, s.session.doc) : [];
+  // the layout score, worked out here (not by Claude): before the run, and before → after once the draft changed
+  const scoreNow = look && !s && count ? scoreLine(layoutScore(doc)) : '';
+  const scores = s && !busy && s.session.changes ? [layoutScore(s.session.original), layoutScore(s.session.doc)] as const : null;
+  const original = !!draft?.original;
   const limits = `${opts.maxSteps} steps${opts.maxSpend === null ? '' : `, ${money(opts.maxSpend).replace('about ', '')}`}`;
 
   const run = async (text: string, fresh: boolean) => {
@@ -82,7 +90,7 @@ function AgentBody() {
     storeModel(model);
     const doc = useDoc.getState().doc;
     if (fresh || !state.current) {
-      state.current = startAgent(doc, cmd.toolContext(), model);
+      state.current = startAgent(doc, cmd.toolContext(), model, mode);
       setLog([]);
       text = firstMessage(state.current, text, doc.brief ?? null, useUI.getState().selection);
     }
@@ -117,16 +125,19 @@ function AgentBody() {
   };
 
   return (
-    <section className="agent-panel no-canvas" aria-label="Edit with Claude" ref={size.ref}>
+    <section className="agent-panel no-canvas" aria-label={look ? 'Improve the look' : 'Edit with Claude'} ref={size.ref}>
       <header title="Drag the bottom-right corner to resize this panel; double-click here for its usual size" onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) size.reset(); }}>
         <Bot size={15} aria-hidden />
-        <strong>Edit with Claude</strong>
+        <strong>{look ? 'Improve the look' : 'Edit with Claude'}</strong>
         <span className="agent-cost" data-testid="agent-cost">{s ? `${busy ? `step ${s.steps + 1} of ${opts.maxSteps} · ` : ''}${money(s.spent).replace('about ', '')}${opts.maxSpend === null ? '' : ` of ${money(opts.maxSpend).replace('about ', '')}`}` : ''}</span>
-        <button className="icon-btn sm" aria-label="Close Edit with Claude" title="Close" onClick={() => void close()}><X size={14} /></button>
+        <button className="icon-btn sm" aria-label={look ? 'Close Improve the look' : 'Close Edit with Claude'} title="Close" onClick={() => void close()}><X size={14} /></button>
       </header>
       <div className="agent-scroll">
         {!s && <>
-          <p className="note">Say what to change on this page. Claude works on a <b>draft</b> step by step, and you see it on the canvas before anything changes. Uses your own <b>Anthropic API key</b>; this page, its brief and the draft’s progress (and pictures, if ticked) are sent to Anthropic when you press Run.</p>
+          {look
+            ? <p className="note">Claude tidies the <b>layout</b> of this page (positions, sizes, alignment, spacing, arrow routes) without changing its content, checking each change against a <b>layout score</b> worked out by FlowSketch. Edit the request below if you want something different. Uses your own <b>Anthropic API key</b>; this page and the draft’s progress (and pictures, if ticked) are sent to Anthropic when you press Run.</p>
+            : <p className="note">Say what to change on this page. Claude works on a <b>draft</b> step by step, and you see it on the canvas before anything changes. Uses your own <b>Anthropic API key</b>; this page, its brief and the draft’s progress (and pictures, if ticked) are sent to Anthropic when you press Run.</p>}
+          {scoreNow && <p className="agent-score" data-testid="agent-score-now">Layout score now: <b>{scoreNow}</b></p>}
           <textarea className="agent-ask" aria-label="What should change" data-testid="agent-ask" maxLength={MAX_PROMPT_CHARS} rows={4} value={ask} onChange={(e) => setAsk(e.target.value)}
             placeholder="e.g. Add a token cache between the API and the identity provider, connect it, and renumber the steps."
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void run(ask, true); } }} />
@@ -164,6 +175,12 @@ function AgentBody() {
             {!s.confidence && s.stop && STOPPED[s.stop] && <p className="note">{STOPPED[s.stop]}</p>}
             {s.remaining.length > 0 && <><b>Left to check</b><ul>{s.remaining.map((r, i) => <li key={i}>{r}</li>)}</ul></>}
             <p className="note">{s.steps} step{s.steps === 1 ? '' : 's'} · {money(s.spent)} · limits {limits}</p>
+          </div>}
+          {scores && <div className="agent-score" data-testid="agent-score">
+            Layout score: <b>{scores[0].score}</b> → <b className={scores[1].score > scores[0].score ? 'up' : scores[1].score < scores[0].score ? 'down' : ''}>{scores[1].score}</b>
+            <span className="note"> (worked out by FlowSketch: {scoreLine(scores[1]).replace(/^\d+\/100:? ?/, '') || 'nothing costs points'})</span>
+            <button className="btn small" aria-pressed={original} data-testid="agent-before-after" title="Switch the canvas between your diagram as it was and Claude’s draft"
+              onClick={() => cmd.showOriginal(!original)}>{original ? 'Showing before: show after' : 'Show before'}</button>
           </div>}
           {!busy && s.session.changes > 0 && <div className={`agent-checks ${problems.length ? 'bad' : 'ok'}`} data-testid="agent-checks">
             {problems.length ? <><b>New problems in the draft</b> (automatic checks)<ul>{problems.map((p, i) => <li key={i}>{p}</li>)}</ul></> : <b>Automatic checks: no new problems</b>}

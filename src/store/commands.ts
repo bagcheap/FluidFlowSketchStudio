@@ -5,6 +5,7 @@ import { cycleFill, DEFAULT_ANIMATION, makeIcon, makeShape, newDocument, newSeed
 import { deleteElements, getElement, mapElements, selectionBounds, useDoc } from './docStore';
 import { itemName, type LintIssue } from '../lint/lint';
 import { separateBoxes } from '../layout/separate';
+import { alignBoxes, canMatchSize, distributeBoxes, matchSizes, type AlignKind, type MatchSizeMode } from '../layout/arrange';
 import type { ToolContext, ToolSession } from '../ai/toolkit';
 import { cleanStoredReview, reviewToMarkdown, type AiReview } from '../ai/review';
 import { diffPage } from '../ai/diff';
@@ -351,47 +352,14 @@ export function reorder(kind: 'front' | 'back' | 'forward' | 'backward') {
 
 const boxesSel = () => D().doc.elements.filter((e): e is BoxElement => selected().has(e.id) && e.type !== 'connector' && !e.locked);
 
-export function align(kind: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom') {
+export function align(kind: AlignKind) {
   const els = boxesSel();
   if (els.length < 2) return;
-  const x0 = Math.min(...els.map((e) => e.x)), x1 = Math.max(...els.map((e) => e.x + e.w));
-  const y0 = Math.min(...els.map((e) => e.y)), y1 = Math.max(...els.map((e) => e.y + e.h));
-  const target = (b: BoxElement) => {
-    switch (kind) {
-      case 'left': return { x: x0, y: b.y };
-      case 'right': return { x: x1 - b.w, y: b.y };
-      case 'hcenter': return { x: (x0 + x1) / 2 - b.w / 2, y: b.y };
-      case 'top': return { x: b.x, y: y0 };
-      case 'bottom': return { x: b.x, y: y1 - b.h };
-      case 'vcenter': return { x: b.x, y: (y0 + y1) / 2 - b.h / 2 };
-    }
-  };
-  D().commit((d) => moveBoxes(d, els.map((b) => { const t = target(b); return [b.id, t.x - b.x, t.y - b.y] as const; })));
+  D().commit((d) => alignBoxes(d, els.map((e) => e.id), kind));
 }
 
-export type MatchSizeMode = 'width' | 'height' | 'both';
-
-/** Elements Match size resizes: shapes, icons, pictures and pen drawings (not text, arrows, containers or locked items). */
-const canMatchSize = (e: DiagramElement): e is BoxElement =>
-  !e.locked && (e.type === 'shape' || e.type === 'icon' || e.type === 'image' || e.type === 'freehand');
-
-/**
- * Resize `ids` to the size of `refId`, each keeping its centre. Width or height changes only that side, unless
- * `keepProportions` (the other side then scales with it); both sets width and height exactly.
- */
-export function matchSizes(doc: FlowDocument, refId: string, ids: string[], mode: MatchSizeMode, keepProportions = false): FlowDocument {
-  const ref = getElement(doc, refId);
-  if (!ref || ref.type === 'connector') return doc;
-  const targets = new Set(ids.filter((id) => id !== refId));
-  const out = mapElements(doc, [...targets], (e) => {
-    if (!canMatchSize(e) || e.w <= 0 || e.h <= 0) return e;
-    const k = mode === 'width' ? ref.w / e.w : ref.h / e.h;
-    const w = mode === 'both' || mode === 'width' ? ref.w : keepProportions ? e.w * k : e.w;
-    const h = mode === 'both' || mode === 'height' ? ref.h : keepProportions ? e.h * k : e.h;
-    return { ...e, x: e.x + e.w / 2 - w / 2, y: e.y + e.h / 2 - h / 2, w, h };
-  });
-  return updateMembership(out, [...targets]); // containers grow to fit bigger members
-}
+export type { MatchSizeMode } from '../layout/arrange';
+export { matchSizes } from '../layout/arrange';
 
 /** Match size: the selection takes the size of the first selected shape (the reference). One undo step. */
 export function matchSize(mode: MatchSizeMode) {
@@ -627,24 +595,10 @@ export function autoLayout(dir: LayoutDir) {
   D().commit(() => next);
 }
 
-/** Move boxes by their own offsets; a container brings its contents. Then re-check container membership. */
-function moveBoxes(doc: FlowDocument, moves: (readonly [string, number, number])[]): FlowDocument {
-  let out = doc;
-  for (const [id, dx, dy] of moves) out = moveElements(out, new Set(withMembers(out, [id])), dx, dy);
-  return updateMembership(out, moves.map((m) => m[0]));
-}
-
 export function distribute(axis: 'h' | 'v') {
-  const els = boxesSel().sort((a, b) => (axis === 'h' ? a.x - b.x : a.y - b.y));
+  const els = boxesSel();
   if (els.length < 3) return;
-  const total = els.reduce((s, e) => s + (axis === 'h' ? e.w : e.h), 0);
-  const first = els[0], last = els[els.length - 1];
-  const span = axis === 'h' ? last.x + last.w - first.x : last.y + last.h - first.y;
-  const gap = (span - total) / (els.length - 1);
-  let cur = axis === 'h' ? first.x : first.y;
-  const pos = new Map<string, number>();
-  for (const e of els) { pos.set(e.id, cur); cur += (axis === 'h' ? e.w : e.h) + gap; }
-  D().commit((d) => moveBoxes(d, els.map((e) => [e.id, axis === 'h' ? pos.get(e.id)! - e.x : 0, axis === 'v' ? pos.get(e.id)! - e.y : 0] as const)));
+  D().commit((d) => distributeBoxes(d, els.map((e) => e.id), axis));
 }
 
 export function flip(axis: 'h' | 'v') {
@@ -1393,8 +1347,8 @@ export async function saveAiReview() {
 // ---- Edit with Claude (agent) ----------------------------------------------------------------------------------------
 
 /** Open the agent panel (the Review panel steps aside), optionally with a request to start from. */
-export function openAgent(seed = '', fixing: number[] = []) {
-  U().setAgent(true, seed, fixing, U().review);
+export function openAgent(seed = '', fixing: number[] = [], mode: 'edit' | 'look' = 'edit') {
+  U().setAgent(true, seed, fixing, U().review, mode);
   U().setReview(false);
   U().setTool('select');
   U().select([]);
@@ -1433,6 +1387,20 @@ export function fixFindings(indices: number[]) {
  */
 export function showDraft(s: ToolSession) {
   U().setDraft({ doc: s.doc, diff: diffPage(s.original, s.doc) });
+}
+
+/** Before/after: show the document as it was (true) or Claude's draft (false) on the canvas. */
+export function showOriginal(on: boolean) {
+  const d = U().draft;
+  if (d && !!d.original !== on) U().setDraft({ ...d, original: on });
+}
+
+/** The request Improve the look starts with (the user can change it before Run). */
+export const LOOK_REQUEST = 'Tidy up the layout: line up rows and columns, even out the spacing, give similar shapes the same size, move shapes that overlap or crowd each other apart, and route arrows around shapes. Keep the content, colours and play order as they are.';
+
+/** AI ▸ Improve the look…: Edit with Claude in layout mode, judged by the layout score. */
+export function improveLook() {
+  openAgent(LOOK_REQUEST, [], 'look');
 }
 
 /** Put the agent's draft into the document as one undo step. False (with a message) if the document changed meanwhile. */

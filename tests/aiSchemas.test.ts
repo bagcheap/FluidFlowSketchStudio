@@ -49,7 +49,7 @@ describe('AI schemas', () => {
       const takesInput = Object.keys((t.input_schema as { properties: object }).properties).length > 0;
       expect(Boolean((t as { strict?: boolean }).strict)).toBe(takesInput);
     }
-    expect(strictBudget(agentTools(true))).toEqual({ strict: 15, unions: 8, optional: 0 });
+    expect(strictBudget(agentTools(true))).toEqual({ strict: 19, unions: 8, optional: 0 });
   });
 
   it('nullable choices still allow null', () => {

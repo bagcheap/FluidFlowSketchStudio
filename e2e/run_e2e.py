@@ -1684,6 +1684,75 @@ def main():
             while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
         tagent()
 
+        @test('Improve the look (AI, faked): layout tools, score before and after, before/after switch, Apply = one undo step')
+        def tlook():
+            app.key('Escape')
+            h0 = app.js('() => window.__flowsketch.history()')['past']
+            page.get_by_role('button', name='Add page').click(); page.wait_for_timeout(100)
+            v = app.ui()['view']
+            app.tool('r'); app.drag((300, 300), (400, 360)); app.drag((460, 308), (560, 368)); app.drag((620, 296), (720, 356)); app.key('Escape')
+            app.key('Escape')
+            assert len(app.els('shape')) == 3, app.els('shape')
+            ys0 = [e['y'] for e in app.els('shape')]
+            sent = []
+            script = [
+                [{'type': 'tool_use', 'id': 't1', 'name': 'layout_score', 'input': {}}],
+                [{'type': 'tool_use', 'id': 't2', 'name': 'align', 'input': {'ids': ['s1', 's2', 's3'], 'edge': 'vcenter'}},
+                 {'type': 'tool_use', 'id': 't3', 'name': 'layout_score', 'input': {}}],
+                [{'type': 'tool_use', 'id': 't4', 'name': 'finish', 'input': {'summary': 'Lined the three shapes up in a row. Score 97 to 100.', 'confidence': 'high', 'remaining': []}}],
+            ]
+            def handle(route):
+                req = route.request
+                if req.method == 'OPTIONS':
+                    return route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'})
+                body = json.loads(req.post_data or '{}'); sent.append(body)
+                content = script[min(len(sent) - 1, len(script) - 1)]
+                route.fulfill(status=200, headers={'content-type': 'application/json', 'access-control-allow-origin': '*'}, body=json.dumps({
+                    'id': 'msg_e2e', 'type': 'message', 'role': 'assistant', 'model': 'claude-opus-5-5', 'stop_reason': 'tool_use', 'stop_sequence': None,
+                    'content': content, 'usage': {'input_tokens': 3000, 'output_tokens': 300}}))
+            page.route('https://api.anthropic.com/**', handle)
+            try:
+                page.get_by_role('menuitem', name='AI', exact=True).click()
+                page.get_by_role('menuitem', name='Improve the look…').click()
+                panel = page.get_by_role('region', name='Improve the look')
+                assert panel.get_by_test_id('agent-ask').input_value().startswith('Tidy up the layout')
+                now = panel.get_by_test_id('agent-score-now').inner_text()
+                assert 'near-miss alignment' in now and '/100' in now, now
+                panel.get_by_label('API key').fill('sk-ant-e2e-0123456789')
+                panel.get_by_test_id('agent-run').click()
+                panel.get_by_test_id('agent-reply').wait_for(timeout=10000)
+                assert len(sent) == 3, len(sent)
+                assert 'This run is about the LOOK of the page' in sent[0]['system'][0]['text']
+                names = [t['name'] for t in sent[0]['tools']]
+                assert all(n in names for n in ('align', 'distribute', 'match_size', 'move', 'layout_score')), names
+                assert sum(1 for t in sent[0]['tools'] if t.get('strict')) <= 20
+                assert '## Layout score now' in json.dumps(sent[0]['messages'][0])
+                res = sent[1]['messages'][2]['content'][0]
+                assert res['tool_use_id'] == 't1' and json.loads(res['content'][0]['text'])['score'] > 0, res
+                sc = ' '.join(panel.get_by_test_id('agent-score').inner_text().split())
+                assert sc.startswith('Layout score:') and '→ 100' in sc, sc
+                assert [e['y'] for e in app.els('shape')] == ys0, 'the document must not change before Apply'
+                ba = panel.get_by_test_id('agent-before-after')
+                ba.click(); page.wait_for_timeout(80)
+                assert ba.get_attribute('aria-pressed') == 'true' and app.ui()['draftOriginal'] is True
+                ba.click(); page.wait_for_timeout(80)
+                assert ba.get_attribute('aria-pressed') == 'false'
+                page.screenshot(path=f'{OUT}/e2e-look-draft.png')
+                h1 = app.js('() => window.__flowsketch.history()')['past']
+                panel.get_by_test_id('agent-apply').click(); page.wait_for_timeout(150)
+                cy = [round(e['y'] + e['h'] / 2) for e in app.els('shape')]
+                assert len(set(cy)) == 1, cy
+                assert app.js('() => window.__flowsketch.history()')['past'] == h1 + 1
+            finally:
+                page.unroute('https://api.anthropic.com/**')
+                for name in ('Improve the look', 'Edit with Claude'):
+                    if page.get_by_role('region', name=name).count():
+                        page.get_by_role('button', name=f'Close {name}').click(); page.wait_for_timeout(80)
+                        if page.get_by_test_id('confirm-ok').count(): page.get_by_test_id('confirm-ok').click()
+                while app.js('() => window.__flowsketch.history()')['past'] > h0: app.key('Control+z')
+                app.js('(v) => window.__flowsketch.setView(v)', v)
+        tlook()
+
         @test('Diagram from text: Mermaid dialog inserts shapes, arrows and a container; Auto-layout arranges along arrows')
         def tmermaid():
             app.key('Escape')

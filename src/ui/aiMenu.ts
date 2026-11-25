@@ -16,6 +16,7 @@ export function aiMenuItems(): MenuItem[] {
     ] },
     { label: 'Edit with Claude…', note: 'step by step, with preview', run: () => cmd.openAgent() },
     { label: 'Quick change…', note: 'in one go', run: () => ui.openDialog('aiEdit') },
+    { label: 'Improve the look…', note: 'layout, scored', run: () => cmd.improveLook() },
     { sep: true },
     { label: 'Forget saved API key', run: () => void forgetKey().then(() => ui.toast('The saved API key was removed from this computer', 'success')) },
   ];

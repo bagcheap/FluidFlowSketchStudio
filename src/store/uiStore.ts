@@ -132,7 +132,8 @@ interface UIState {
   agentSeed: string; // text to start its request box with (e.g. a review finding to fix)
   agentFixing: number[]; // indices of Claude's review findings the agent was opened to fix (marked fixed on Apply)
   agentFromReview: boolean; // the Review panel was open when the agent opened: it comes back when the agent closes
-  draft: { doc: FlowDocument; diff: PageDiff } | null; // an AI draft shown on the canvas instead of the document
+  agentMode: 'edit' | 'look'; // Edit with Claude, or Improve the look (layout only, judged by the layout score)
+  draft: { doc: FlowDocument; diff: PageDiff; original?: boolean } | null; // an AI draft shown on the canvas instead of the document (original: show the document instead, for before/after)
   reviewHidden: string[]; // lint issues hidden this session (LintIssue.key)
 }
 
@@ -147,8 +148,8 @@ interface UIActions {
   setFind(f: Partial<FindState> | null): void;
   setReview(open: boolean): void;
   setAiReview(r: AiReview | null): void;
-  setAgent(open: boolean, seed?: string, fixing?: number[], fromReview?: boolean): void;
-  setDraft(d: { doc: FlowDocument; diff: PageDiff } | null): void;
+  setAgent(open: boolean, seed?: string, fixing?: number[], fromReview?: boolean, mode?: 'edit' | 'look'): void;
+  setDraft(d: { doc: FlowDocument; diff: PageDiff; original?: boolean } | null): void;
   setReviewHidden(keys: string[]): void;
   setTime(t: number): void;
   openDialog(d: DialogId): void;
@@ -204,6 +205,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   agentSeed: '',
   agentFixing: [],
   agentFromReview: false,
+  agentMode: 'edit',
   draft: null,
   reviewHidden: [],
   reducedMotionOS: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -255,7 +257,7 @@ export const useUI = create<UIState & UIActions>((set, get) => ({
   setPlayOrderMode(on) { set({ playOrderMode: on }); },
   setReview(open) { set({ review: open }); },
   setAiReview(r) { set({ aiReview: r }); },
-  setAgent(open, seed, fixing, fromReview) { set({ agentOpen: open, agentSeed: seed ?? '', agentFixing: open ? fixing ?? [] : [], agentFromReview: open ? !!fromReview : false, ...(open ? {} : { draft: null }) }); },
+  setAgent(open, seed, fixing, fromReview, mode) { set({ agentOpen: open, agentSeed: seed ?? '', agentFixing: open ? fixing ?? [] : [], agentFromReview: open ? !!fromReview : false, agentMode: open ? mode ?? 'edit' : 'edit', ...(open ? {} : { draft: null }) }); },
   setDraft(d) { set({ draft: d }); },
   setReviewHidden(keys) { set({ reviewHidden: keys.slice(-500) }); },
   setFind(f) { set((s) => ({ find: f === null ? null : { ...(s.find ?? { query: '', replace: '', matchCase: false, allPages: true, showReplace: false, index: -1 }), ...f } })); },
