@@ -15,6 +15,7 @@ import { useUI } from './uiStore';
 import { cameraView, compartmentLayout, contentBounds, hasCamera, playSchedule } from '../engine/render';
 import { toAspect } from '../engine/camera';
 import { routeArrowsAround } from '../layout/routeArrows';
+import { placeLabels } from '../layout/labels';
 import { fileToAsset } from '../engine/images';
 import { downloadBlob, openDocumentFile, pickFile, resetFileHandle, restoreFileFor, safeFileName, saveDocumentFile, saveFileAs } from '../persistence/files';
 import { hasSavedReview, loadReview, rememberMermaid, saveReview } from '../persistence/storage';
@@ -580,9 +581,19 @@ export function routeArrows() {
   const ids = sel.length ? sel : doc.elements.filter((e) => e.type === 'connector').map((e) => e.id);
   const r = routeArrowsAround(doc, ids);
   if (!r.routed) { U().toast('No arrows between two shapes to route', 'error'); return; }
-  D().commit(() => r.doc);
+  D().commit(() => placeLabels(r.doc, ids).doc); // labels move to clear spots beside their new routes
   const skipped = ids.length - r.routed;
   U().toast(`Routed ${r.routed} arrow${r.routed === 1 ? '' : 's'} around shapes${skipped ? ` (${skipped} left as they were: not between two shapes, locked or no way through)` : ''}. Reset route on an arrow undoes its route.`);
+}
+
+/** Arrange ▸ Tidy arrow labels: move the labels of the selected arrows (or all) beside their arrows, clear of shapes, other labels and lines. */
+export function tidyLabels() {
+  const doc = D().doc;
+  const sel = U().selection.filter((id) => getElement(doc, id)?.type === 'connector');
+  const r = placeLabels(doc, sel);
+  if (!r.moved) { U().toast('The arrow labels are already clear'); return; }
+  D().commit(() => r.doc);
+  U().toast(`Moved ${r.moved} arrow label${r.moved === 1 ? '' : 's'} to clearer spots`, 'success');
 }
 
 /** Auto-layout the selection (2+ items), or the whole diagram, in one direction. One undo step. */

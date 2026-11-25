@@ -12,6 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **Before / after:** while a draft is shown, **Show before** switches the canvas to your diagram as it was, and back.
 - Edit with Claude can now also line shapes up, even out gaps, match sizes and move shapes.
 
+- **Tidy arrow labels** (Arrange menu and the canvas right-click menu): moves the labels of the selected arrows (or all) along and beside their arrows to spots where they don't cover shapes, other labels or other arrows, instead of sitting on top of lines. Route arrows around shapes now does this for the arrows it routes, and Claude can use it when improving the look.
+
+### Changed
+- **Fewer crossing arrows:** Route arrows around shapes (and Claude's routing) now picks the sides arrows attach to so they cross each other as little as possible, avoids crossing the arrows it isn't moving, and swaps the order of arrows that share a side when that removes a crossing. Several arrows between the same two shapes run side by side.
+- **Straight short arrows:** an arrow between two shapes that face each other across a small gap is routed straight across instead of with a little step.
+- The layout score also counts an arrow label lying across another arrow.
+
 ### Fixed
 - **Edit with Claude** and **Improve the look** could fail at once with "The compiled grammar is too large": the diagram tools are no longer sent in Anthropic's strictly checked form (FlowSketch already checks every change Claude asks for before it touches the draft).
 

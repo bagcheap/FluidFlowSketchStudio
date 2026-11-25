@@ -18,6 +18,7 @@ import { applyPlaySteps, fitLoopToPlay, labelStep, labelSteps, numberedSteps, pl
 import { applyThemeToDoc, THEMES } from '../store/themes';
 import { alignBoxes, distributeBoxes, matchSizes, moveBoxes, movableBoxes } from '../layout/arrange';
 import { layoutScore } from '../lint/score';
+import { placeLabels } from '../layout/labels';
 import { applyEdits, cleanText, describePage, EDIT_SCHEMA, parseEdits, type EditTools, type PageView } from './edits';
 
 export type ToolKind = 'read' | 'change' | 'check';
@@ -206,13 +207,13 @@ export const DIAGRAM_TOOLS: DiagramTool[] = [
     description: 'Arrange the whole page along its arrows, in layers in the given direction (containers keep their contents together).',
     run: (s, i) => { const dir = DIRS[String(i.direction)]; if (!dir) return fail('Unknown direction.'); commitDraft(s, autoLayout(s.doc, dir)); return ok({ done: true }); } },
   { name: 'route_arrows', kind: 'change', input_schema: obj({ ids: { type: 'array', items: { type: 'string' } } }),
-    description: 'Route arrows around shapes with right-angled paths (ids of arrows; an empty list = every arrow on the page).',
+    description: 'Route arrows around shapes with right-angled paths, choosing the sides they attach to so they cross other arrows as little as possible, and move their labels beside them (ids of arrows; an empty list = every arrow on the page).',
     run: (s, i) => {
       const want = Array.isArray(i.ids) ? i.ids.map((x) => realOf(s, x)).filter((x): x is string => !!x) : [];
       const ids = want.length ? want : s.doc.elements.filter((e) => e.type === 'connector').map((e) => e.id);
       const r = routeArrowsAround(s.doc, ids);
       if (!r.routed) return fail('No arrows between two shapes could be routed.');
-      commitDraft(s, r.doc);
+      commitDraft(s, placeLabels(r.doc, ids).doc); // their labels move to clear spots beside the new routes
       return ok({ done: true, routed: r.routed });
     } },
   { name: 'apply_theme', kind: 'change', input_schema: obj({ theme: { type: 'string', enum: THEMES.map((t) => t.id) } }),
@@ -238,6 +239,15 @@ export const DIAGRAM_TOOLS: DiagramTool[] = [
       const dx = Number(i.dx), dy = Number(i.dy);
       if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > MAX_MOVE || Math.abs(dy) > MAX_MOVE) return fail(`dx and dy must be numbers within ±${MAX_MOVE}.`);
       return layoutChange(s, i.ids, 1, (ids) => moveBoxes(s.doc, ids.map((id) => [id, Math.round(dx), Math.round(dy)] as const)));
+    } },
+  { name: 'place_labels', kind: 'change', input_schema: obj({ ids: { type: 'array', items: { type: 'string' } } }),
+    description: 'Move arrow labels along and beside their arrows to spots where they don’t cover shapes, other labels or other arrows (ids of arrows; an empty list = every labelled arrow).',
+    run: (s, i) => {
+      const ids = Array.isArray(i.ids) ? i.ids.map((x) => realOf(s, x)).filter((x): x is string => !!x) : [];
+      const r = placeLabels(s.doc, ids);
+      if (!r.moved) return ok({ done: true, moved: 0 });
+      commitDraft(s, r.doc);
+      return ok({ done: true, moved: r.moved });
     } },
   { name: 'layout_score', kind: 'check', input_schema: NONE,
     description: 'How tidy the page looks, 0–100 (higher is better), worked out by the editor: counts of arrow crossings, overlapping shapes, arrows through shapes, labels in the way, items outside their container, near-miss alignments and cramped pairs. Use it before and after layout changes; keep a change only if the score went up.',

@@ -24,7 +24,7 @@ export interface LayoutScore {
   crossings: number; // arrow crossings
   overlaps: number; // shapes on top of each other
   throughShapes: number; // arrows passing through a shape
-  labelClashes: number; // arrow labels over shapes or other labels
+  labelClashes: number; // arrow labels over shapes, other labels or other arrows' lines
   misaligned: number; // pairs of shapes almost, but not quite, lined up
   outside: number; // container members sticking out of their container
   cramped: number; // pairs of shapes almost touching
@@ -68,7 +68,8 @@ export function layoutScore(doc: FlowDocument): LayoutScore {
     }
     const lb = connectorLabelBox(doc, c);
     if (!lb) continue;
-    if (boxes.some((b) => !ends.has(b.id) && ov(lb, bounds.get(b.id)!)) || labels.some((o) => ov(lb, o))) r.labelClashes++;
+    const overLine = arrows.some((o) => o.id !== c.id && paths.get(o.id)!.pts.some((p, i, pts) => i > 0 && segmentHitsRect(pts[i - 1], p, lb)));
+    if (overLine || boxes.some((b) => !ends.has(b.id) && ov(lb, bounds.get(b.id)!)) || labels.some((o) => ov(lb, o))) r.labelClashes++;
     labels.push(lb);
   }
 

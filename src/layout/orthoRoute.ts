@@ -12,6 +12,30 @@ export const ROUTE_MARGIN = 14; // routes keep this far from shapes
 const BEND = 40; // a turn costs as much as this many px of length
 const SHARE = 0.6; // running along a segment another route already uses costs this much extra per px
 const BORDER = 3; // running along a container's border (where the arrow is hard to see) costs this much extra per px
+export const CROSS = 160; // crossing another arrow costs as much as this many px of detour
+
+/** An axis-aligned piece of another arrow's route (for counting crossings). */
+export interface Seg { a: Point; b: Point }
+
+/** Does a–b (axis-aligned) properly cross s (axis-aligned, the other way)? Touching ends don't count. */
+export function segsCross(a: Point, b: Point, s: Seg): boolean {
+  const h1 = Math.abs(a.y - b.y) < 0.01, h2 = Math.abs(s.a.y - s.b.y) < 0.01;
+  const v1 = Math.abs(a.x - b.x) < 0.01, v2 = Math.abs(s.a.x - s.b.x) < 0.01;
+  const E = 0.5;
+  if (h1 && v2) return s.a.x > Math.min(a.x, b.x) + E && s.a.x < Math.max(a.x, b.x) - E && a.y > Math.min(s.a.y, s.b.y) + E && a.y < Math.max(s.a.y, s.b.y) - E;
+  if (v1 && h2) return a.x > Math.min(s.a.x, s.b.x) + E && a.x < Math.max(s.a.x, s.b.x) - E && s.a.y > Math.min(a.y, b.y) + E && s.a.y < Math.max(a.y, b.y) - E;
+  return false;
+}
+
+/** The axis-aligned pieces of a route. */
+export const segsOf = (pts: Point[]): Seg[] => pts.slice(1).map((b, i) => ({ a: pts[i], b })).filter((s) => Math.abs(s.a.x - s.b.x) < 0.01 || Math.abs(s.a.y - s.b.y) < 0.01);
+
+/** How many times two sets of route pieces cross. */
+export function countCrossings(p: Seg[], q: Seg[]): number {
+  let n = 0;
+  for (const s of p) for (const t of q) if (segsCross(s.a, s.b, t)) n++;
+  return n;
+}
 const BORDER_NEAR = 8; // "along" = parallel and this close
 const BORDER_CLEAR = 16; // extra grid lines this far either side of each container border give a way round
 
@@ -64,10 +88,10 @@ class Heap {
 /**
  * The cheapest right-angled route from s to e that doesn't pass through any obstacle (each grown by ROUTE_MARGIN):
  * straight out of s for a short stub, then along the lines of a sparse grid made from the obstacles' edges, then
- * straight into e. Cost = length + BEND per turn + SHARE per px along segments in `used`. Returns the route's points
+ * straight into e. Cost = length + BEND per turn + SHARE per px along segments in `used` + CROSS per crossing of `cross`. Returns the route's points
  * from s.p to e.p (corners only) and its cost, or null when there is no way through.
  */
-export function routeOrtho(s: RouteEnd, e: RouteEnd, obstacles: Rect[], used?: Map<string, number>, borders: Rect[] = []): { pts: Point[]; cost: number } | null {
+export function routeOrtho(s: RouteEnd, e: RouteEnd, obstacles: Rect[], used?: Map<string, number>, borders: Rect[] = [], cross: Seg[] = []): { pts: Point[]; cost: number } | null {
   const M = ROUTE_MARGIN, minStub = M + 6;
   const rs = obstacles.map((r) => ({ x0: r.x0 - M, y0: r.y0 - M, x1: r.x1 + M, y1: r.y1 + M }));
   // straight out of each end until clear of every shape's margin (a point on a diamond's slanted side starts well
@@ -115,6 +139,7 @@ export function routeOrtho(s: RouteEnd, e: RouteEnd, obstacles: Rect[], used?: M
     const a = pt(n), b = pt(m), mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     return rs.some((r) => strictlyInside(mid, r)) ? -1 : m;
   };
+  const crossCost = (a: Point, b: Point) => { if (!cross.length) return 0; let n = 0; for (const t of cross) if (segsCross(a, b, t)) n++; return n * CROSS; };
   const arrive = (dirIndex({ x: -e.dir.x, y: -e.dir.y })); // the last stretch runs into e
   const h = (n: number) => { const p = pt(n); return Math.abs(p.x - E.x) + Math.abs(p.y - E.y); };
   const best = new Float64Array(nx * ny * 4).fill(Infinity);
@@ -139,7 +164,7 @@ export function routeOrtho(s: RouteEnd, e: RouteEnd, obstacles: Rect[], used?: M
       const m = step(n, d2);
       if (m < 0) continue;
       const a = pt(n), b = pt(m), len = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
-      const g2 = g + len + (d2 === d ? 0 : BEND) + (used?.get(key(a, b)) ?? 0) * SHARE * len + (borders.length ? alongBorder(a, b) * BORDER : 0);
+      const g2 = g + len + (d2 === d ? 0 : BEND) + (used?.get(key(a, b)) ?? 0) * SHARE * len + (borders.length ? alongBorder(a, b) * BORDER : 0) + crossCost(a, b);
       const s2 = m * 4 + d2;
       if (g2 < best[s2] - 1e-9) { best[s2] = g2; from[s2] = st; heap.push(g2 + h(m), s2); }
     }

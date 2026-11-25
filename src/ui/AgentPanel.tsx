@@ -24,7 +24,7 @@ const DID: Record<string, string> = {
   set_color: 'Changed colours', set_arrow: 'Changed an arrow', add_container: 'Added a container', move_into: 'Moved items into a container',
   renumber_steps: 'Renumbered the steps', play_in_label_order: 'Set the play order', auto_layout: 'Laid out the page again', route_arrows: 'Routed arrows',
   apply_theme: 'Applied a theme', lint: 'Checked the page', snapshot: 'Looked at a picture of the draft',
-  align: 'Lined shapes up', distribute: 'Evened out gaps', match_size: 'Matched sizes', move: 'Moved shapes', layout_score: 'Scored the layout',
+  align: 'Lined shapes up', distribute: 'Evened out gaps', match_size: 'Matched sizes', move: 'Moved shapes', layout_score: 'Scored the layout', place_labels: 'Moved arrow labels',
 };
 const OPTS = 'flowsketch:aiAgentOptions';
 interface AgentChoices { effort: ReviewEffort; pictures: boolean; maxSteps: number; maxSpend: number | null }

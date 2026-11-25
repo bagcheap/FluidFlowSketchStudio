@@ -48,7 +48,7 @@ export const LOOK_RULES = `
 This run is about the LOOK of the page, not its content:
 - Don't add, remove or relabel items, and don't change arrow directions, heads, the play order or step numbers. Change only positions, sizes, alignment, spacing and arrow routes, and colours only if the request asks (then give items with the same role the same fill, with one set_color call per role).
 - Start with layout_score (and one snapshot, if you have that tool) to see what costs points.
-- Work in small groups of related changes: line up a row or column (align), even out its gaps (distribute), give similar shapes the same size (match_size), move shapes apart or nearer (move), then route_arrows for the arrows involved. After each group call layout_score. If the score went down, put things back with move and try something else.
+- Work in small groups of related changes: line up a row or column (align), even out its gaps (distribute), give similar shapes the same size (match_size), move shapes apart or nearer (move), then route_arrows for the arrows involved (it picks attachment sides that avoid crossings, and moves their labels). Use place_labels so labels sit beside their arrows, not on other arrows or shapes. Arrows crossing each other cost the most points: when two arrows join the same two shapes, they should run side by side. After each group call layout_score. If the score went down, put things back with move and try something else.
 - Stop when another change wouldn't raise the score, or the request is met. Keep the diagram recognisable: prefer small, local moves. Use auto_layout only if the request asks for a new layout, or the page is very tangled (score below 40), and say so.
 - In finish, give the layout score before and after.`;
 
